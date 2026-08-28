@@ -12,7 +12,7 @@ Max file length (where it makes sense) is 500 lines. Pay attention to
 
 Always use vite plus (vp xxx or vp run xxx) when running commands, not npm or pnpm.
 
-Use inferred types over annotations. any is the enemy. Do not take a type, turn it into a more genar
+Use inferred types over annotations. any is the enemy. Do not take a type, turn it into a more genaric type, then re-validate it back into a more complex type.
 
 ### Folder Structure
 
