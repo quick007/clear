@@ -1,0 +1,327 @@
+name: ${COMPOSE_PROJECT_NAME:-groundtruth}
+
+x-node-service: &node-service
+  image: groundtruth-node:local
+  build:
+    context: ..
+    dockerfile: infra/docker/node-service.Dockerfile
+  init: true
+  read_only: true
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+x-example-telemetry: &example-telemetry
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  GROUNDTRUTH_INGEST_KEY: ${GROUNDTRUTH_DEMO_INGEST_KEY:-local-demo-ingest-key}
+
+services:
+  postgres:
+    image: postgres:18.0-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: groundtruth
+      POSTGRES_USER: groundtruth
+      POSTGRES_PASSWORD: ${GROUNDTRUTH_POSTGRES_PASSWORD:-local-postgres-password}
+    ports:
+      - 127.0.0.1:${GROUNDTRUTH_POSTGRES_PORT:-5432}:5432
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB"]
+      interval: 5s # 5 seconds
+      timeout: 3s # 3 seconds
+      retries: 20
+      start_period: 10s # 10 seconds
+    networks:
+      - data
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  clickhouse:
+    image: groundtruth-clickhouse:local
+    build:
+      context: ..
+      dockerfile: infra/docker/clickhouse.Dockerfile
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: groundtruth
+      CLICKHOUSE_USER: groundtruth
+      CLICKHOUSE_PASSWORD: ${GROUNDTRUTH_CLICKHOUSE_PASSWORD:-local-clickhouse-password}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - 127.0.0.1:${GROUNDTRUTH_CLICKHOUSE_HTTP_PORT:-8123}:8123
+      - 127.0.0.1:${GROUNDTRUTH_CLICKHOUSE_NATIVE_PORT:-9000}:9000
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          clickhouse-client --user "$$CLICKHOUSE_USER" --password "$$CLICKHOUSE_PASSWORD"
+          --query "SELECT 1"
+      interval: 5s # 5 seconds
+      timeout: 5s # 5 seconds
+      retries: 30
+      start_period: 20s # 20 seconds
+    networks:
+      - data
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "3"
+
+  migrate:
+    <<: *node-service
+    restart: "no"
+    command: [sh, infra/scripts/run-migrations.sh]
+    environment:
+      GROUNDTRUTH_POSTGRES_URL: postgresql://groundtruth:${GROUNDTRUTH_POSTGRES_PASSWORD:-local-postgres-password}@postgres:5432/groundtruth
+      GROUNDTRUTH_CLICKHOUSE_URL: http://clickhouse:8123
+      GROUNDTRUTH_CLICKHOUSE_USER: groundtruth
+      GROUNDTRUTH_CLICKHOUSE_PASSWORD: ${GROUNDTRUTH_CLICKHOUSE_PASSWORD:-local-clickhouse-password}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - data
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  backend:
+    <<: *node-service
+    restart: unless-stopped
+    command: [./node_modules/.bin/vp, run, backend#start]
+    environment:
+      GROUNDTRUTH_PORT: "3000"
+      GROUNDTRUTH_PUBLIC_URL: http://localhost:${GROUNDTRUTH_API_PORT:-3000}
+      GROUNDTRUTH_CONSOLE_ORIGIN: ${GROUNDTRUTH_CONSOLE_ORIGIN:-http://localhost:5173}
+      GROUNDTRUTH_DEV_CONSOLE_ORIGIN: ${GROUNDTRUTH_DEV_CONSOLE_ORIGIN:-http://127.0.0.1:5173}
+      GROUNDTRUTH_POSTGRES_URL: postgresql://groundtruth:${GROUNDTRUTH_POSTGRES_PASSWORD:-local-postgres-password}@postgres:5432/groundtruth
+      GROUNDTRUTH_CLICKHOUSE_URL: http://clickhouse:8123
+      GROUNDTRUTH_CLICKHOUSE_USER: groundtruth
+      GROUNDTRUTH_CLICKHOUSE_PASSWORD: ${GROUNDTRUTH_CLICKHOUSE_PASSWORD:-local-clickhouse-password}
+      GROUNDTRUTH_COLLECTOR_SECRET: ${GROUNDTRUTH_COLLECTOR_SECRET:-local-collector-service-secret}
+      GROUNDTRUTH_SITE_HANDOFF_SECRET: ${GROUNDTRUTH_SITE_HANDOFF_SECRET:-local-sites-handoff-secret}
+      GROUNDTRUTH_SESSION_SECRET: ${GROUNDTRUTH_SESSION_SECRET:-local-session-secret}
+      GROUNDTRUTH_COOKIE_SECURE: "false"
+      GROUNDTRUTH_BOOTSTRAP_INGEST_KEY: ${GROUNDTRUTH_DEMO_INGEST_KEY:-local-demo-ingest-key}
+      GROUNDTRUTH_BOOTSTRAP_PROJECT_SLUG: local
+      GROUNDTRUTH_BOOTSTRAP_PROJECT_NAME: Local project
+    ports:
+      - 127.0.0.1:${GROUNDTRUTH_API_PORT:-3000}:3000
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s # 5 seconds
+      timeout: 3s # 3 seconds
+      retries: 20
+      start_period: 10s # 10 seconds
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - app
+      - data
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
+
+  collector:
+    image: groundtruth-collector:local
+    build:
+      context: ..
+      dockerfile: apps/collector/Dockerfile
+    restart: unless-stopped
+    command: [/groundtruth-collector, --config=/etc/groundtruth/local.yaml]
+    environment:
+      GROUNDTRUTH_BACKEND_ENDPOINT: http://backend:3000
+      GROUNDTRUTH_SERVICE_TOKEN: ${GROUNDTRUTH_COLLECTOR_SECRET:-local-collector-service-secret}
+    ports:
+      - 127.0.0.1:${GROUNDTRUTH_OTLP_GRPC_PORT:-4317}:4317
+      - 127.0.0.1:${GROUNDTRUTH_OTLP_HTTP_PORT:-4318}:4318
+      - 127.0.0.1:${GROUNDTRUTH_COLLECTOR_HEALTH_PORT:-13133}:13133
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "3"
+
+  payments-stub:
+    <<: *node-service
+    restart: unless-stopped
+    command: [./node_modules/.bin/vp, run, payments-stub#start]
+    environment:
+      <<: *example-telemetry
+      PORT: "4102"
+      OTEL_SERVICE_NAME: payments-stub
+      SERVICE_TOKEN: ${GROUNDTRUTH_PAYMENTS_SERVICE_TOKEN:-local-payments-service-token}
+      CONTROL_TOKEN: ${GROUNDTRUTH_PAYMENTS_CONTROL_TOKEN:-local-payments-control-token}
+      FAILURE_RATE: "0"
+      FAILURE_SEED: ${GROUNDTRUTH_SCENARIO_SEED:-groundtruth-retry-storm-v1}
+      BASE_LATENCY_MS: "45" # 45 milliseconds
+      LATENCY_JITTER_MS: "20" # 20 milliseconds
+    ports:
+      - 127.0.0.1:${GROUNDTRUTH_PAYMENTS_PORT:-4102}:4102
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:4102/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s # 5 seconds
+      timeout: 3s # 3 seconds
+      retries: 20
+      start_period: 10s # 10 seconds
+    depends_on:
+      collector:
+        condition: service_healthy
+    networks:
+      - app
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384M
+
+  checkout-api:
+    <<: *node-service
+    restart: unless-stopped
+    command: [./node_modules/.bin/vp, run, checkout-api#start]
+    environment:
+      <<: *example-telemetry
+      PORT: "4101"
+      OTEL_SERVICE_NAME: checkout-api
+      PAYMENTS_BASE_URL: http://payments-stub:4102
+      PAYMENTS_SERVICE_TOKEN: ${GROUNDTRUTH_PAYMENTS_SERVICE_TOKEN:-local-payments-service-token}
+      UPSTREAM_TIMEOUT_MS: "750" # 750 milliseconds
+      GROUNDTRUTH_DEPLOY_EVENTS_URL: http://backend:3000/v1/events/deploy
+    ports:
+      - 127.0.0.1:${GROUNDTRUTH_CHECKOUT_API_PORT:-4101}:4101
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:4101/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s # 5 seconds
+      timeout: 3s # 3 seconds
+      retries: 20
+      start_period: 10s # 10 seconds
+    depends_on:
+      backend:
+        condition: service_healthy
+      collector:
+        condition: service_healthy
+      payments-stub:
+        condition: service_healthy
+    networks:
+      - app
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384M
+
+  load-generator:
+    <<: *node-service
+    restart: unless-stopped
+    command: [./node_modules/.bin/vp, run, load-generator#start]
+    environment:
+      <<: *example-telemetry
+      PORT: "4103"
+      OTEL_SERVICE_NAME: load-generator
+      CHECKOUT_BASE_URL: http://checkout-api:4101
+      PAYMENTS_BASE_URL: http://payments-stub:4102
+      PAYMENTS_CONTROL_TOKEN: ${GROUNDTRUTH_PAYMENTS_CONTROL_TOKEN:-local-payments-control-token}
+      CONTROL_TOKEN: ${GROUNDTRUTH_LOAD_CONTROL_TOKEN:-local-load-control-token}
+      SCENARIO_SEED: ${GROUNDTRUTH_SCENARIO_SEED:-groundtruth-retry-storm-v1}
+      BASELINE_RPS: ${GROUNDTRUTH_BASELINE_RPS:-50}
+      UNIQUE_USERS: ${GROUNDTRUTH_UNIQUE_USERS:-800}
+      AUTOSTART: "false"
+    ports:
+      - 127.0.0.1:${GROUNDTRUTH_LOAD_GENERATOR_PORT:-4103}:4103
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:4103/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s # 5 seconds
+      timeout: 3s # 3 seconds
+      retries: 20
+      start_period: 10s # 10 seconds
+    depends_on:
+      collector:
+        condition: service_healthy
+      checkout-api:
+        condition: service_healthy
+      payments-stub:
+        condition: service_healthy
+    networks:
+      - app
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384M
+
+volumes:
+  postgres-data:
+  clickhouse-data:
+
+networks:
+  app:
+  data:
+    internal: true

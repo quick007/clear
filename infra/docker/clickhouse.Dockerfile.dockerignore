@@ -1,0 +1,7 @@
+*
+!infra/
+!infra/clickhouse/
+!infra/clickhouse/config.d/
+!infra/clickhouse/config.d/**
+!infra/clickhouse/users.d/
+!infra/clickhouse/users.d/**
