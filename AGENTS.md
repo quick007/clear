@@ -14,6 +14,7 @@ Build the WebMCP-native OpenTelemetry observability surface described in `contex
 - This project uses aggressivly adopts effect v4 apis, including the unstable ones. Lean into them whereever possible rather than regressing back to a more normal default
 - PostgreSQL uses Drizzle through its native Effect Postgres adapter. Prefer Relational Query Builder v2 through `db.query.<table>.findMany` and `findFirst` with `defineRelations` over `db.select().from(...)` whenever the relational API can express the read. Use `db.select` or raw SQL only for queries the relational API genuinely cannot express, and keep that exception isolated and explained. Writes use Drizzle's typed insert, update, and delete builders.
 - Durable application entities use application-generated UUIDv7 identifiers stored in native PostgreSQL `uuid` columns. Give every entity ID its own Effect-branded schema. Use Effect v4's `Model.UuidV7Insert` or `Crypto.randomUUIDv7` rather than database defaults or generic string IDs.
+- Do not add generic soft deletion or automatic `deletedAt` columns. Represent meaningful lifecycle states explicitly, such as `revokedAt`, `closedAt`, or `archivedAt`. A real delete must remove the PostgreSQL and ClickHouse data through the explicit purge workflow.
 - Make regular commits as you build, and push when you make those commits
 
 ### Folder Structure
