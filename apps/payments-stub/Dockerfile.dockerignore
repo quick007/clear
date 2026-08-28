@@ -1,0 +1,13 @@
+.git
+.github
+.codex
+backups
+context.md
+apps/collector/bin
+**/node_modules
+**/dist
+**/coverage
+**/.env
+**/.env.local
+**/.DS_Store
+*.log
