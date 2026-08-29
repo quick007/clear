@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 
 const shaderColors = ["#081415", "#54c4bd", "#c7f2e9", "#eef8f4", "#7baed1", "#d7a17a"];
 
+const shaderDrift = stylex.keyframes({
+  "0%": { transform: "translate3d(-1.2%, 0.7%, 0) scale(1.06)" },
+  "45%": { transform: "translate3d(0.9%, -0.6%, 0) scale(1.075)" },
+  "100%": { transform: "translate3d(1.3%, 0.5%, 0) scale(1.06)" },
+});
+
 export function HomeAtmosphere() {
   const [supportsWebGl, setSupportsWebGl] = useState(false);
 
@@ -63,10 +69,21 @@ const styles = stylex.create({
     WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, #000 28%, #000 100%)",
   },
   shader: {
+    animationDuration: "30s",
+    animationIterationCount: "infinite",
+    animationName: shaderDrift,
+    animationTimingFunction: "ease-in-out",
     display: "block",
     filter: "saturate(0.92) contrast(1.03)",
     height: "100%",
+    transformOrigin: "50% 62%",
+    willChange: "transform",
     width: "100%",
+    "@media (prefers-reduced-motion: reduce)": {
+      animationName: "none",
+      transform: "none",
+      willChange: "auto",
+    },
   },
   topFade: {
     backgroundImage:

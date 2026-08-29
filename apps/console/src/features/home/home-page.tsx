@@ -22,9 +22,10 @@ export function HomePage() {
             <span>Clear</span>
           </a>
 
-          <h1 {...stylex.props(styles.title)}>See clearly.</h1>
+          <h1 {...stylex.props(styles.title)}>The incident is in Clear. The fix is in the repo.</h1>
           <p {...stylex.props(styles.description)}>
-            OpenTelemetry for you and the agent that knows your code.
+            Clear is the OpenTelemetry view your coding agent diagnoses from, then fixes with the
+            repository access it already has.
           </p>
 
           <div {...stylex.props(styles.actions)}>
@@ -61,13 +62,13 @@ const styles = stylex.create({
   },
   hero: {
     alignItems: "center",
-    backdropFilter: "blur(30px) saturate(130%)",
-    backgroundColor: "rgba(10, 13, 13, 0.48)",
-    borderColor: "rgba(255, 255, 255, 0.14)",
+    backdropFilter: "blur(4px) saturate(105%)",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderColor: "rgba(255, 255, 255, 0.12)",
     borderRadius: { default: 28, "@media (max-width: 520px)": 22 },
     borderStyle: "solid",
     borderWidth: 1,
-    boxShadow: "0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 32px 100px rgba(0, 0, 0, 0.32)",
+    boxShadow: "0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 32px 100px rgba(0, 0, 0, 0.18)",
     display: "flex",
     flexDirection: "column",
     maxWidth: 680,
@@ -88,7 +89,7 @@ const styles = stylex.create({
     textDecoration: "none",
   },
   title: {
-    fontSize: { default: 72, "@media (max-width: 620px)": 52, "@media (max-width: 390px)": 44 },
+    fontSize: { default: 64, "@media (max-width: 620px)": 48, "@media (max-width: 390px)": 42 },
     fontWeight: 500,
     letterSpacing: "-0.06em",
     lineHeight: 0.96,
