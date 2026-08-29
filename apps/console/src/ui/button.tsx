@@ -17,12 +17,16 @@ export function Button({
   children,
   compact = false,
   large = false,
+  nativeButton,
+  render,
   tone = "secondary",
   ...props
 }: ButtonProps) {
   return (
     <BaseButton
       {...props}
+      nativeButton={nativeButton ?? render === undefined}
+      render={render}
       {...stylex.props(
         styles.button,
         toneStyles[tone],
