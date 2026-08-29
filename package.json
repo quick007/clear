@@ -1,0 +1,29 @@
+{
+  "name": "clear",
+  "version": "0.0.0",
+  "private": true,
+  "description": "OpenTelemetry observability shared by people and their agents",
+  "homepage": "https://clear.seufert.sh",
+  "repository": "https://github.com/quick007/clear",
+  "type": "module",
+  "scripts": {
+    "build": "vp run -r build",
+    "dev": "vp run console#dev",
+    "ready": "vp check && vp run -r test && vp run -r build",
+    "test": "vp run -r test"
+  },
+  "devDependencies": {
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.24.0",
+      "onFail": "download"
+    }
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

@@ -1,0 +1,24 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+
+exporters:
+  otlp/clear:
+    endpoint: collector.example.com:443
+    headers:
+      x-clear-ingest-key: ${env:GROUNDTRUTH_INGEST_KEY}
+    compression: gzip
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [otlp/clear]
+    logs:
+      receivers: [otlp]
+      exporters: [otlp/clear]
+    traces:
+      receivers: [otlp]
+      exporters: [otlp/clear]

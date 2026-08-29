@@ -1,0 +1,26 @@
+{
+  "name": "@groundtruth/api-contract",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "vp pack src/index.ts --dts --clean",
+    "check": "vp check",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "@groundtruth/domain": "workspace:*",
+    "@groundtruth/panel-dsl": "workspace:*",
+    "@groundtruth/telemetry": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

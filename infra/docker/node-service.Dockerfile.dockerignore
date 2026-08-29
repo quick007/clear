@@ -1,5 +1,7 @@
 .git
 .gitignore
+.github
+.codex
 .DS_Store
 .env
 .env.*
@@ -9,6 +11,16 @@
 **/node_modules
 **/dist
 **/coverage
+apps/collector/bin
 backups
 context.md
+docs
+video
+apps/checkout-api
+apps/checkout-web
+apps/collector
+apps/console
+apps/load-generator
+apps/payments-stub
+infra/runbooks
 *.log

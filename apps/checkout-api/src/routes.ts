@@ -9,6 +9,7 @@ import { CheckoutService } from "./checkout-service.js";
 import { CheckoutConfig } from "./config.js";
 import { CheckoutRequest, CheckoutResponse } from "./contracts.js";
 import { PaymentUnavailable } from "./errors.js";
+import { RequestGuards } from "./security.js";
 
 const health = HttpServerResponse.jsonUnsafe({
   service: "checkout-api",
@@ -23,23 +24,30 @@ const checkoutRoute = Effect.gen(function* () {
     status: 200,
   });
 }).pipe(
-  Effect.catchTag("PaymentUnavailable", (error: PaymentUnavailable) =>
+  Effect.catch((error) =>
     Effect.succeed(
-      HttpServerResponse.jsonUnsafe(
-        {
-          code: "payments_unavailable",
-          message: "Payments is temporarily unavailable",
-          requestFailedAtAttempt: error.attempt,
-        },
-        { status: 503 },
-      ),
+      error instanceof PaymentUnavailable
+        ? HttpServerResponse.jsonUnsafe(
+            {
+              code: "payments_unavailable",
+              message: "Payments is temporarily unavailable",
+              requestFailedAtAttempt: error.attempt,
+            },
+            { status: 503 },
+          )
+        : HttpServerResponse.jsonUnsafe(
+            { code: "invalid_request", message: "The checkout request is invalid" },
+            { status: 400 },
+          ),
     ),
   ),
-  Effect.catchCause(() =>
-    Effect.succeed(
-      HttpServerResponse.jsonUnsafe(
-        { code: "invalid_request", message: "The checkout request is invalid" },
-        { status: 400 },
+  Effect.catchCause((cause) =>
+    Effect.logError("Checkout failed unexpectedly", cause).pipe(
+      Effect.as(
+        HttpServerResponse.jsonUnsafe(
+          { code: "internal_error", message: "Checkout could not be completed" },
+          { status: 500 },
+        ),
       ),
     ),
   ),
@@ -51,7 +59,7 @@ const CorsLive = HttpRouter.middleware(
     return HttpMiddleware.cors({
       allowedHeaders: ["content-type"],
       allowedMethods: ["POST", "OPTIONS"],
-      allowedOrigins: [config.checkoutWebOrigin],
+      allowedOrigins: (origin) => origin === config.checkoutWebOrigin,
       credentials: false,
       maxAge: 3_600, // 1 hour
     });
@@ -60,6 +68,7 @@ const CorsLive = HttpRouter.middleware(
 );
 
 export const Routes = Layer.mergeAll(
+  RequestGuards,
   CorsLive,
   HttpRouter.add("GET", "/healthz", health),
   HttpRouter.add("GET", "/readyz", health),

@@ -26,7 +26,7 @@ Render host and port values through `CHECKOUT_HOSTPORT` and
 `AUTOSTART=true` starts the default scenario when the service becomes ready.
 The default is false so rehearsals can begin from a known state.
 
-Set `GROUNDTRUTH_INGEST_KEY` to add `x-groundtruth-ingest-key` to every OTLP
+Set `GROUNDTRUTH_INGEST_KEY` to add `x-clear-ingest-key` to every OTLP
 export. The standard OpenTelemetry exporter endpoint variables remain
 supported.
 
@@ -40,5 +40,5 @@ vp run start
 ```
 
 ```sh
-vp exec docker build -f apps/load-generator/Dockerfile -t groundtruth-load .
+vp exec docker build -f apps/load-generator/Dockerfile -t clear-load .
 ```

@@ -1,0 +1,107 @@
+1
+00:00:00,000 --> 00:00:03,096
+Dashboards were built for human hands.
+
+2
+00:00:03,096 --> 00:00:11,000
+Clear is an OpenTelemetry observability surface that you and your own agent can operate together.
+
+3
+00:00:11,000 --> 00:00:17,359
+For this scripted demonstration, we manufacture load and trigger a controlled failure in a real payments service.
+
+4
+00:00:17,359 --> 00:00:24,000
+Real traffic is flowing through the instrumented checkout stack, and metrics, logs, and traces are arriving over OTLP.
+
+5
+00:00:24,000 --> 00:00:28,224
+My agent starts with Clear's typed site tools.
+
+6
+00:00:28,224 --> 00:00:36,949
+The tool calls stay in our conversation while the website stays focused on the shared evidence,
+
+7
+00:00:36,949 --> 00:00:42,000
+so I can see the reasoning and steer the investigation.
+
+8
+00:00:42,000 --> 00:00:50,318
+At first, the rising request rate looks like a traffic surge.
+
+9
+00:00:50,318 --> 00:00:57,000
+We record that as a hypothesis, not a conclusion.
+
+10
+00:00:57,000 --> 00:01:02,617
+But if traffic tripled, where are the users?
+
+11
+00:01:02,617 --> 00:01:07,723
+The agent builds the comparison we need.
+
+12
+00:01:07,723 --> 00:01:15,000
+Requests are up three times while unique users stay flat.
+
+13
+00:01:15,000 --> 00:01:20,278
+Grouping by retry state exposes the amplification.
+
+14
+00:01:20,278 --> 00:01:30,517
+One trace and its correlated logs confirm three immediate retries against the failing dependency.
+
+15
+00:01:30,517 --> 00:01:34,000
+The first hypothesis is rejected.
+
+16
+00:01:34,000 --> 00:01:40,621
+Now the agent uses its existing repository access.
+
+17
+00:01:40,621 --> 00:01:54,922
+It makes a real checkout code change, adding bounded backoff, jitter, a retry budget, and a circuit breaker.
+
+18
+00:01:54,922 --> 00:02:03,000
+Then it runs the tests and pushes the dedicated shoot branch.
+
+19
+00:02:03,000 --> 00:02:07,042
+Render performs a real deployment of the checkout service.
+
+20
+00:02:07,042 --> 00:02:09,202
+Clear did not touch production.
+
+21
+00:02:09,202 --> 00:02:17,216
+It observes the deploy event, then shows retry pressure falling even while the controlled dependency fault remains.
+
+22
+00:02:17,216 --> 00:02:23,000
+We end that manufactured fault explicitly, and the full system returns to baseline.
+
+23
+00:02:23,000 --> 00:02:27,622
+The agent writes the incident summary and closes it.
+
+24
+00:02:27,622 --> 00:02:39,000
+Its incident-only capabilities disappear because the tool surface follows the work, without adding tool plumbing to the website.
+
+25
+00:02:39,000 --> 00:02:44,929
+Clear accepts standard OpenTelemetry metrics, logs, and traces.
+
+26
+00:02:44,929 --> 00:02:52,082
+Bring your own agent, connect your own service, or try the isolated sandbox.
+
+27
+00:02:52,082 --> 00:02:55,000
+The whole stack is open source.

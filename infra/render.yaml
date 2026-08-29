@@ -3,229 +3,130 @@
 version: "1"
 
 previews:
-  generation: off
-
-databases:
-  - name: groundtruth-postgres
-    databaseName: groundtruth
-    user: groundtruth
-    region: oregon
-    plan: basic-256mb
-    postgresMajorVersion: "18"
-    connectionPool: none
-    storageAutoscalingEnabled: false
-    ipAllowList: []
+  generation: "off"
 
 services:
-  - type: pserv
-    name: groundtruth-clickhouse
-    runtime: docker
-    region: oregon
-    plan: standard
-    numInstances: 1
-    dockerContext: .
-    dockerfilePath: infra/docker/clickhouse.Dockerfile
-    healthCheckPath: /ping
-    maxShutdownDelaySeconds: 60 # 60 seconds
-    autoDeployTrigger: commit
-    previews:
-      generation: off
-    buildFilter:
-      paths:
-        - infra/clickhouse/**
-        - infra/docker/clickhouse.Dockerfile
-        - infra/docker/clickhouse.Dockerfile.dockerignore
-    disk:
-      name: clickhouse-data
-      mountPath: /var/lib/clickhouse
-      sizeGB: 10
-    envVars:
-      - key: PORT
-        value: 8123
-      - key: CLICKHOUSE_DB
-        value: groundtruth
-      - key: CLICKHOUSE_USER
-        value: groundtruth
-      - key: CLICKHOUSE_PASSWORD
-        generateValue: true
-      - key: CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT
-        value: 1
-
   - type: web
-    name: groundtruth-api
+    name: clear-runtime
     runtime: docker
     region: oregon
-    plan: starter
+    plan: 1c-2g
     numInstances: 1
     dockerContext: .
-    dockerfilePath: infra/docker/node-service.Dockerfile
-    dockerCommand: ./node_modules/.bin/vp run backend#start
-    preDeployCommand: sh infra/scripts/run-migrations.sh
+    dockerfilePath: Dockerfile
     healthCheckPath: /health
-    maxShutdownDelaySeconds: 30 # 30 seconds
     autoDeployTrigger: commit
     domains:
-      - api.groundtruth.seufert.sh
+      - api.clear.seufert.sh
+      - otlp.clear.seufert.sh
     renderSubdomainPolicy: enabled
-    previews:
-      generation: off
     buildFilter:
       paths:
         - apps/backend/**
-        - packages/**
-        - infra/docker/node-service.Dockerfile
-        - infra/docker/node-service.Dockerfile.dockerignore
+        - apps/collector/**
+        - apps/load-generator/**
+        - apps/payments-stub/**
+        - infra/clickhouse/**
+        - infra/docker/backend-entry.mjs
+        - infra/render/**
+        - infra/scripts/check-database-readiness.mjs
         - infra/scripts/run-migrations.sh
+        - packages/**
+        - Dockerfile
+        - Dockerfile.dockerignore
         - package.json
         - pnpm-lock.yaml
         - pnpm-workspace.yaml
         - tsconfig.json
         - vite.config.ts
+    disk:
+      name: clear-data
+      mountPath: /var/lib
+      sizeGB: 10
     envVars:
-      - key: GROUNDTRUTH_PORT
-        value: 10000
       - key: GROUNDTRUTH_PUBLIC_URL
-        value: https://api.groundtruth.seufert.sh
+        value: https://api.clear.seufert.sh
       - key: GROUNDTRUTH_CONSOLE_ORIGIN
-        value: https://groundtruth.seufert.sh
-      - key: GROUNDTRUTH_POSTGRES_URL
-        fromDatabase:
-          name: groundtruth-postgres
-          property: connectionString
-      - key: GROUNDTRUTH_CLICKHOUSE_HOSTPORT
-        fromService:
-          type: pserv
-          name: groundtruth-clickhouse
-          property: hostport
-      - key: GROUNDTRUTH_CLICKHOUSE_USER
-        value: groundtruth
+        value: https://clear.seufert.sh
+      - key: GROUNDTRUTH_POSTGRES_PASSWORD
+        generateValue: true
       - key: GROUNDTRUTH_CLICKHOUSE_PASSWORD
-        fromService:
-          type: pserv
-          name: groundtruth-clickhouse
-          envVarKey: CLICKHOUSE_PASSWORD
+        generateValue: true
       - key: GROUNDTRUTH_COLLECTOR_SECRET
         generateValue: true
       - key: GROUNDTRUTH_SITE_HANDOFF_SECRET
         sync: false
       - key: GROUNDTRUTH_SESSION_SECRET
         generateValue: true
-      - key: GROUNDTRUTH_COOKIE_SECURE
-        value: "true"
-      - key: GROUNDTRUTH_MIGRATION_MAX_ATTEMPTS
-        value: 30
-      - key: GROUNDTRUTH_MIGRATION_RETRY_DELAY_SECONDS
-        value: 10 # 10 seconds, five minutes total
-      - key: NODE_OPTIONS
-        value: --max-old-space-size=384
-
-  - type: web
-    name: groundtruth-otlp-http
-    runtime: docker
-    region: oregon
-    plan: starter
-    numInstances: 1
-    dockerContext: .
-    dockerfilePath: apps/collector/Dockerfile
-    dockerCommand: /groundtruth-collector --config=/etc/groundtruth/hosted-http.yaml
-    maxShutdownDelaySeconds: 30 # 30 seconds
-    autoDeployTrigger: commit
-    domains:
-      - otlp.groundtruth.seufert.sh
-    renderSubdomainPolicy: enabled
-    previews:
-      generation: off
-    buildFilter:
-      paths:
-        - apps/collector/**
-    envVars:
-      - key: GROUNDTRUTH_BACKEND_ENDPOINT
-        fromService:
-          type: web
-          name: groundtruth-api
-          property: hostport
-      - key: GROUNDTRUTH_SERVICE_TOKEN
-        fromService:
-          type: web
-          name: groundtruth-api
-          envVarKey: GROUNDTRUTH_COLLECTOR_SECRET
-
-  - type: pserv
-    name: groundtruth-payments-stub
-    runtime: docker
-    region: oregon
-    plan: starter
-    numInstances: 1
-    dockerContext: .
-    dockerfilePath: infra/docker/node-service.Dockerfile
-    dockerCommand: ./node_modules/.bin/vp run payments-stub#start
-    healthCheckPath: /readyz
-    maxShutdownDelaySeconds: 20 # 20 seconds
-    autoDeployTrigger: commit
-    previews:
-      generation: off
-    buildFilter:
-      paths:
-        - apps/payments-stub/**
-        - packages/**
-        - infra/docker/node-service.Dockerfile
-        - infra/docker/node-service.Dockerfile.dockerignore
-        - package.json
-        - pnpm-lock.yaml
-        - pnpm-workspace.yaml
-        - tsconfig.json
-        - vite.config.ts
-    envVars:
-      - key: PORT
-        value: 10000
-      - key: OTEL_SERVICE_NAME
-        value: payments-stub
-      - key: OTEL_EXPORTER_OTLP_ENDPOINT
-        value: https://otlp.groundtruth.seufert.sh
-      - key: OTEL_EXPORTER_OTLP_PROTOCOL
-        value: http/protobuf
-      - key: GROUNDTRUTH_INGEST_KEY
-        fromService:
-          type: web
-          name: groundtruth-checkout-api
-          envVarKey: GROUNDTRUTH_INGEST_KEY
+      - key: GROUNDTRUTH_DEMO_INGEST_KEY
+        generateValue: true
       - key: SERVICE_TOKEN
         generateValue: true
       - key: CONTROL_TOKEN
         generateValue: true
+      - key: PAYMENTS_CONTROL_TOKEN
+        generateValue: true
+      - key: GROUNDTRUTH_COOKIE_SECURE
+        value: "true"
+      - key: GROUNDTRUTH_SANDBOX_SESSION_LIMIT
+        value: 100
+      - key: GROUNDTRUTH_SANDBOX_CREATIONS_PER_MINUTE
+        value: 10
+      - key: GROUNDTRUTH_AUTHENTICATED_REQUESTS_PER_MINUTE
+        value: 300
+      - key: GROUNDTRUTH_PUBLIC_REQUESTS_PER_MINUTE
+        value: 10000
+      - key: GROUNDTRUTH_MIGRATION_MAX_ATTEMPTS
+        value: 30
+      - key: GROUNDTRUTH_MIGRATION_RETRY_DELAY_SECONDS
+        value: 2 # 2 seconds, one minute total
       - key: FAILURE_RATE
         value: 0
       - key: FAILURE_SEED
-        value: groundtruth-retry-storm-v1
+        value: clear-retry-storm-v1
       - key: BASE_LATENCY_MS
-        value: 45 # 45 milliseconds
+        value: 85 # 85 milliseconds
       - key: LATENCY_JITTER_MS
-        value: 20 # 20 milliseconds
+        value: 35 # 35 milliseconds
+      - key: EXPECTED_RPS
+        value: 51
+      - key: OVERLOAD_GAIN
+        value: 0.22
+      - key: OVERLOAD_LATENCY_MS
+        value: 35 # 35 milliseconds per excess request per second
+      - key: SCENARIO_SEED
+        value: clear-retry-storm-v1
+      - key: BASELINE_RPS
+        value: 50
+      - key: UNIQUE_USERS
+        value: 800
+      - key: BASELINE_DURATION_MS
+        value: 20000 # 20 seconds
+      - key: BLIP_DURATION_MS
+        value: 10000 # 10 seconds
+      - key: MAX_SCENARIO_DURATION_MS
+        value: 900000 # 15 minutes
+      - key: AUTOSTART
+        value: "false"
       - key: NODE_OPTIONS
-        value: --max-old-space-size=256
+        value: --max-old-space-size=320
+
   - type: web
-    name: groundtruth-checkout-api
+    name: clear-checkout-api
     runtime: docker
     region: oregon
-    plan: starter
+    plan: free
     numInstances: 1
     dockerContext: .
-    dockerfilePath: infra/docker/node-service.Dockerfile
-    dockerCommand: ./node_modules/.bin/vp run checkout-api#start
+    dockerfilePath: apps/checkout-api/Dockerfile
     healthCheckPath: /readyz
-    maxShutdownDelaySeconds: 20 # 20 seconds
     autoDeployTrigger: commit
     domains:
-      - checkout-api.groundtruth.seufert.sh
+      - checkout-api.clear.seufert.sh
     renderSubdomainPolicy: enabled
-    previews:
-      generation: off
     buildFilter:
       paths:
         - apps/checkout-api/**
-        - packages/**
-        - infra/docker/node-service.Dockerfile
-        - infra/docker/node-service.Dockerfile.dockerignore
         - package.json
         - pnpm-lock.yaml
         - pnpm-workspace.yaml
@@ -237,91 +138,26 @@ services:
       - key: OTEL_SERVICE_NAME
         value: checkout-api
       - key: OTEL_EXPORTER_OTLP_ENDPOINT
-        value: https://otlp.groundtruth.seufert.sh
+        value: https://otlp.clear.seufert.sh
       - key: OTEL_EXPORTER_OTLP_PROTOCOL
         value: http/protobuf
       - key: GROUNDTRUTH_INGEST_KEY
-        sync: false
-      - key: PAYMENTS_HOSTPORT
         fromService:
-          type: pserv
-          name: groundtruth-payments-stub
-          property: hostport
+          type: web
+          name: clear-runtime
+          envVarKey: GROUNDTRUTH_DEMO_INGEST_KEY
+      - key: PAYMENTS_BASE_URL
+        value: https://api.clear.seufert.sh/internal/payments
       - key: PAYMENTS_SERVICE_TOKEN
         fromService:
-          type: pserv
-          name: groundtruth-payments-stub
+          type: web
+          name: clear-runtime
           envVarKey: SERVICE_TOKEN
       - key: UPSTREAM_TIMEOUT_MS
         value: 750 # 750 milliseconds
       - key: GROUNDTRUTH_DEPLOY_EVENTS_URL
-        value: https://api.groundtruth.seufert.sh/v1/events/deploy
+        value: https://api.clear.seufert.sh/v1/events/deploy
+      - key: CHECKOUT_WEB_ORIGIN
+        value: https://checkout.clear.seufert.sh
       - key: NODE_OPTIONS
-        value: --max-old-space-size=256
-
-  - type: pserv
-    name: groundtruth-load-generator
-    runtime: docker
-    region: oregon
-    plan: starter
-    numInstances: 1
-    dockerContext: .
-    dockerfilePath: infra/docker/node-service.Dockerfile
-    dockerCommand: ./node_modules/.bin/vp run load-generator#start
-    healthCheckPath: /readyz
-    maxShutdownDelaySeconds: 20 # 20 seconds
-    autoDeployTrigger: commit
-    previews:
-      generation: off
-    buildFilter:
-      paths:
-        - apps/load-generator/**
-        - packages/**
-        - infra/docker/node-service.Dockerfile
-        - infra/docker/node-service.Dockerfile.dockerignore
-        - package.json
-        - pnpm-lock.yaml
-        - pnpm-workspace.yaml
-        - tsconfig.json
-        - vite.config.ts
-    envVars:
-      - key: PORT
-        value: 10000
-      - key: OTEL_SERVICE_NAME
-        value: load-generator
-      - key: OTEL_EXPORTER_OTLP_ENDPOINT
-        value: https://otlp.groundtruth.seufert.sh
-      - key: OTEL_EXPORTER_OTLP_PROTOCOL
-        value: http/protobuf
-      - key: GROUNDTRUTH_INGEST_KEY
-        fromService:
-          type: web
-          name: groundtruth-checkout-api
-          envVarKey: GROUNDTRUTH_INGEST_KEY
-      - key: CHECKOUT_HOSTPORT
-        fromService:
-          type: web
-          name: groundtruth-checkout-api
-          property: hostport
-      - key: PAYMENTS_HOSTPORT
-        fromService:
-          type: pserv
-          name: groundtruth-payments-stub
-          property: hostport
-      - key: PAYMENTS_CONTROL_TOKEN
-        fromService:
-          type: pserv
-          name: groundtruth-payments-stub
-          envVarKey: CONTROL_TOKEN
-      - key: CONTROL_TOKEN
-        generateValue: true
-      - key: SCENARIO_SEED
-        value: groundtruth-retry-storm-v1
-      - key: BASELINE_RPS
-        value: 50
-      - key: UNIQUE_USERS
-        value: 800
-      - key: AUTOSTART
-        value: "false"
-      - key: NODE_OPTIONS
-        value: --max-old-space-size=256
+        value: --max-old-space-size=320

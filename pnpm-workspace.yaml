@@ -1,0 +1,46 @@
+packages:
+  - apps/*
+  - packages/*
+  - tools/*
+
+catalogMode: prefer
+
+catalog:
+  "@types/node": ^24
+  "@effect/platform-node": 4.0.0-beta.107
+  "@effect/vitest": 4.0.0-beta.107
+  effect: 4.0.0-beta.107
+  tsx: 4.23.12
+  typescript: ^7.0.2
+  vite: npm:@voidzero-dev/vite-plus-core@0.3.0
+  vite-plus: 0.3.0
+  vitest: 4.1.11
+  "@fontsource/ibm-plex-sans": ^5.3.0
+  "@fontsource/ibm-plex-mono": ^5.3.0
+  webmcp-types: ^0.1.5
+
+overrides:
+  vite@*: "catalog:"
+
+peerDependencyRules:
+  allowAny:
+    - vite
+  allowedVersions:
+    vite: "*"
+
+allowBuilds:
+  cpu-features: false
+  esbuild: true
+  msgpackr-extract: false
+  protobufjs: false
+  ssh2: false
+  workerd: true
+
+minimumReleaseAgeExclude:
+  - "@cloudflare/vite-plugin@1.54.1"
+  - "@cloudflare/workers-types@5.20260828.1"
+  - "@tanstack/query-core@5.102.8"
+  - "@tanstack/react-query@5.102.8"
+  - "@vitejs/plugin-react@6.1.1"
+  - miniflare@5.20260826.0-alpha
+  - wrangler@4.127.0

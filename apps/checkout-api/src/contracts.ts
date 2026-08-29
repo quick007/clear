@@ -1,22 +1,30 @@
 import { Schema } from "effect";
 
-const Identifier = Schema.NonEmptyString;
-const PositiveInt = Schema.Int.check(Schema.isGreaterThan(0));
+const Identifier = Schema.String.check(
+  Schema.isLengthBetween(1, 160),
+  Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/),
+);
+const RequestIdentifier = Schema.String.check(
+  Schema.isLengthBetween(1, 128),
+  Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/),
+);
+const AmountCents = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 10_000_000 }));
+const ItemCount = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 }));
 
 export const CheckoutRequest = Schema.Struct({
-  amountCents: PositiveInt,
-  itemCount: PositiveInt,
-  requestId: Identifier,
-  userId: Identifier,
+  amountCents: AmountCents,
+  itemCount: ItemCount,
+  requestId: RequestIdentifier,
+  userId: RequestIdentifier,
 });
 
 export type CheckoutRequest = typeof CheckoutRequest.Type;
 
 export const PaymentAuthorizationRequest = Schema.Struct({
-  amountCents: PositiveInt,
-  attempt: Schema.Natural,
-  requestId: Identifier,
-  userId: Identifier,
+  amountCents: AmountCents,
+  attempt: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 3 })),
+  requestId: RequestIdentifier,
+  userId: RequestIdentifier,
 });
 
 export type PaymentAuthorizationRequest = typeof PaymentAuthorizationRequest.Type;

@@ -1,46 +1,54 @@
-# Groundtruth infrastructure
+# Clear infrastructure
 
-This directory runs the stateful Groundtruth services without pretending that ChatGPT Sites is a container host. The console and checkout storefront are separate Sites deployments. Render runs the Effect API, public OTLP/HTTP ingress, PostgreSQL, private ClickHouse, and the example services.
+The hosted hackathon topology is deliberately small. ChatGPT Sites publishes the console and checkout storefront. Render runs one stateful Clear service plus a separate checkout API so the video can show a clean real checkout deployment.
 
 ## Topology
 
-| Component | Local address | Hosted address | Exposure |
-| --- | --- | --- | --- |
-| Console | `http://localhost:5173` | `https://groundtruth.seufert.sh` | Sites |
-| Checkout storefront | Local Vite dev server | `https://checkout.groundtruth.seufert.sh` | Sites |
-| Effect API | `http://localhost:3000` | `https://api.groundtruth.seufert.sh` | Public |
-| OTLP/HTTP | `http://localhost:4318` | `https://otlp.groundtruth.seufert.sh` | Public |
-| OTLP/gRPC | `localhost:4317` | Not in hosted v1 | Local and self-hosted |
-| Collector health | `http://localhost:13133` | Private platform check | Local only |
-| Checkout API | `http://localhost:4101` | `https://checkout-api.groundtruth.seufert.sh` | Public |
-| Payments stub | `http://localhost:4102` | Render private network | Local or private |
-| Load controller | `http://localhost:4103` | Render private network | Local or private |
-| PostgreSQL | `localhost:5432` | Render managed Postgres | Local or private |
-| ClickHouse HTTP | `http://localhost:8123` | Render private network | Local or private |
+| Component           | Local address           | Hosted address                          | Runtime                 |
+| ------------------- | ----------------------- | --------------------------------------- | ----------------------- |
+| Console             | `http://localhost:5173` | `https://clear.seufert.sh`              | ChatGPT Sites           |
+| Checkout storefront | `http://localhost:5174` | `https://checkout.clear.seufert.sh`     | ChatGPT Sites           |
+| Effect API          | `http://localhost:3000` | `https://api.clear.seufert.sh`          | stateful Render service |
+| OTLP/HTTP           | `http://localhost:4318` | `https://otlp.clear.seufert.sh`         | stateful Render service |
+| OTLP/gRPC           | `localhost:4317`        | not hosted                              | local development only  |
+| Checkout API        | `http://localhost:4101` | `https://checkout-api.clear.seufert.sh` | separate Render service |
+| Payments stub       | `http://localhost:4102` | internal route only                     | stateful Render service |
+| Load controller     | `http://localhost:4103` | internal route only                     | stateful Render service |
+| PostgreSQL          | `localhost:5432`        | internal listener on persistent disk    | stateful Render service |
+| ClickHouse HTTP     | `http://localhost:8123` | internal listener on persistent disk    | stateful Render service |
 
-Render exposes one public port per service. Hosted v1 therefore publishes the Collector's OTLP/HTTP receiver and documents gRPC for local and self-hosted installs. It does not add a custom protocol proxy merely to force both transports through one Render service.
+The stateful Render service uses the `1c-2g` plan and one 10 GB disk. Nginx receives Render's public port and routes by hostname to the API or Collector. PostgreSQL, ClickHouse, the payments stub, and the scenario controller are not exposed as standalone public services.
+
+The checkout API remains separate so a commit limited to `apps/checkout-api` deploys only that service. The main service keeps the free checkout service warm during the recorded scenario.
+
+## Hosted limits
+
+- one instance, no horizontal scaling or high-availability claim
+- 24 hours of raw metrics, logs, and traces
+- 7 days of ten-second metric rollups
+- OTLP/HTTP protobuf and JSON for all three stable signals
+- no public OTLP/gRPC endpoint
+- no off-host backup commitment for the hackathon
 
 ## Run locally
 
 Requirements:
 
 - Docker Engine with Compose v2
-- At least 4 GB of memory available to Docker
-- Vite+ for running the console outside Compose
-
-Copy the local configuration and replace the example secrets if the machine is shared:
+- at least 4 GB of memory available to Docker
+- Vite+ for the console outside Compose
 
 ```sh
 cp .env.example .env
 docker compose -f infra/compose.yaml up --build
 ```
 
-Compose starts storage first, runs committed PostgreSQL and ClickHouse migrations, then starts the API, Collector, and example services. The API idempotently creates a local project whose ingest key is `GROUNDTRUTH_DEMO_INGEST_KEY`. Production never enables this bootstrap path.
+Compose starts storage first, runs committed PostgreSQL and ClickHouse migrations, then starts the API, Collector, and example services. The API creates a development project whose ingest key is `GROUNDTRUTH_DEMO_INGEST_KEY`. Production never enables this bootstrap path.
 
-Run the console separately with Vite+:
+Run the console separately:
 
 ```sh
-vp dev
+vp run dev
 ```
 
 Quick checks:
@@ -53,28 +61,29 @@ curl --fail http://localhost:4102/readyz
 curl --fail http://localhost:4103/readyz
 ```
 
-All host-published local ports bind to `127.0.0.1`. Containers use the private `app` and `data` networks. PostgreSQL and ClickHouse are not reachable from the application network except through the backend.
+All host-published local ports bind to `127.0.0.1`. `docker compose down` preserves database volumes. Removing volumes deletes local product state and telemetry.
 
-`docker compose down` preserves the named database volumes. Removing the volumes deletes local product state and telemetry, so volume removal is intentionally not part of the normal workflow.
+The local admin-token route exists for development only. The Compose topology is not a supported self-hosted release.
 
 ## Images and limits
 
-- TypeScript services build with the pinned Vite+ `0.3.0` image and run on Node `24.8.0` as a non-root user.
-- ClickHouse is pinned to `25.8.33.6-alpine`, the 25.8 LTS line.
-- Local ClickHouse is capped at 2 GB. The Render Blueprint uses the 2 GB Standard service because 512 MB is not a credible always-on target for merges across metrics, logs, and traces.
-- Render previews and autoscaling are disabled. The architecture intentionally has one instance of each service.
-- Node services use read-only root filesystems and bounded Docker logs locally.
+- TypeScript services build with pinned Vite+ and Node versions.
+- The backend runtime image contains production bundles, migration entrypoints, and migration assets rather than monorepo source or development dependencies.
+- ClickHouse is pinned to the 25.8 LTS line.
+- The all-in-one hosted configuration gives PostgreSQL, ClickHouse, Node, Go Collector, and Nginx explicit memory and concurrency limits.
+- Render previews and autoscaling are disabled.
 
-The current Render Blueprint is paid infrastructure. Review its plans before importing it. Do not silently downgrade ClickHouse to a 512 MB Starter instance to reduce the displayed estimate.
+The ClickHouse database name remains `groundtruth` because it is an internal storage contract. Public branding does not require a risky database or package namespace migration.
 
 ## Files
 
-- `compose.yaml`: complete local and self-hosted stack
-- `render.yaml`: Render Blueprint for hosted stateful services
-- `docker/`: reproducible Node and ClickHouse images
+- `compose.yaml`: contributor-only local stack
+- `render.yaml`: Render Blueprint for the hosted stateful service and checkout API
+- `render/`: hosted process supervisor and Nginx routing
+- `docker/`: reproducible images and runtime entrypoints
 - `scripts/run-migrations.sh`: ordered, retry-bounded migrations
-- `scripts/backup-local.sh`: PostgreSQL plus ClickHouse logical backup
-- `runbooks/deploy.md`: deployment and migration order
-- `runbooks/backups.md`: backup and restore drills
+- `scripts/backup-local.sh`: local PostgreSQL plus ClickHouse backup helper
+- `runbooks/deploy.md`: hosted deployment order
+- `runbooks/backups.md`: local backup and hosted no-backup policy
 - `runbooks/operations.md`: health, disk, and failure response
 - `domains.md`: custom-domain and DNS ownership

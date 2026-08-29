@@ -1,10 +1,6 @@
 name: ${COMPOSE_PROJECT_NAME:-groundtruth}
 
-x-node-service: &node-service
-  image: groundtruth-node:local
-  build:
-    context: ..
-    dockerfile: infra/docker/node-service.Dockerfile
+x-service-runtime: &service-runtime
   init: true
   read_only: true
   tmpfs:
@@ -17,6 +13,13 @@ x-node-service: &node-service
       max-size: 10m
       max-file: "3"
 
+x-node-service: &node-service
+  <<: *service-runtime
+  image: groundtruth-node:local
+  build:
+    context: ..
+    dockerfile: infra/docker/node-service.Dockerfile
+
 x-example-telemetry: &example-telemetry
   OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
   OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
@@ -24,7 +27,7 @@ x-example-telemetry: &example-telemetry
 
 services:
   postgres:
-    image: postgres:18.0-alpine
+    image: postgres:18.6-alpine3.24@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
     restart: unless-stopped
     environment:
       POSTGRES_DB: groundtruth
@@ -33,7 +36,7 @@ services:
     ports:
       - 127.0.0.1:${GROUNDTRUTH_POSTGRES_PORT:-5432}:5432
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql
     healthcheck:
       test: [CMD-SHELL, pg_isready --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB"]
       interval: 5s # 5 seconds
@@ -107,6 +110,7 @@ services:
     environment:
       GROUNDTRUTH_POSTGRES_URL: postgresql://groundtruth:${GROUNDTRUTH_POSTGRES_PASSWORD:-local-postgres-password}@postgres:5432/groundtruth
       GROUNDTRUTH_CLICKHOUSE_URL: http://clickhouse:8123
+      GROUNDTRUTH_CLICKHOUSE_DATABASE: groundtruth
       GROUNDTRUTH_CLICKHOUSE_USER: groundtruth
       GROUNDTRUTH_CLICKHOUSE_PASSWORD: ${GROUNDTRUTH_CLICKHOUSE_PASSWORD:-local-clickhouse-password}
     depends_on:
@@ -125,7 +129,7 @@ services:
   backend:
     <<: *node-service
     restart: unless-stopped
-    command: [./node_modules/.bin/vp, run, backend#start]
+    command: [node, apps/backend/dist/index.mjs]
     environment:
       GROUNDTRUTH_PORT: "3000"
       GROUNDTRUTH_PUBLIC_URL: http://localhost:${GROUNDTRUTH_API_PORT:-3000}
@@ -133,12 +137,18 @@ services:
       GROUNDTRUTH_DEV_CONSOLE_ORIGIN: ${GROUNDTRUTH_DEV_CONSOLE_ORIGIN:-http://127.0.0.1:5173}
       GROUNDTRUTH_POSTGRES_URL: postgresql://groundtruth:${GROUNDTRUTH_POSTGRES_PASSWORD:-local-postgres-password}@postgres:5432/groundtruth
       GROUNDTRUTH_CLICKHOUSE_URL: http://clickhouse:8123
+      GROUNDTRUTH_CLICKHOUSE_DATABASE: groundtruth
       GROUNDTRUTH_CLICKHOUSE_USER: groundtruth
       GROUNDTRUTH_CLICKHOUSE_PASSWORD: ${GROUNDTRUTH_CLICKHOUSE_PASSWORD:-local-clickhouse-password}
       GROUNDTRUTH_COLLECTOR_SECRET: ${GROUNDTRUTH_COLLECTOR_SECRET:-local-collector-service-secret}
       GROUNDTRUTH_SITE_HANDOFF_SECRET: ${GROUNDTRUTH_SITE_HANDOFF_SECRET:-local-sites-handoff-secret}
       GROUNDTRUTH_SESSION_SECRET: ${GROUNDTRUTH_SESSION_SECRET:-local-session-secret}
+      GROUNDTRUTH_ADMIN_TOKEN: ${GROUNDTRUTH_ADMIN_TOKEN:-local-admin-token-change-before-sharing-1234}
       GROUNDTRUTH_COOKIE_SECURE: "false"
+      GROUNDTRUTH_SANDBOX_SESSION_LIMIT: ${GROUNDTRUTH_SANDBOX_SESSION_LIMIT:-100}
+      GROUNDTRUTH_SANDBOX_CREATIONS_PER_MINUTE: ${GROUNDTRUTH_SANDBOX_CREATIONS_PER_MINUTE:-10}
+      GROUNDTRUTH_AUTHENTICATED_REQUESTS_PER_MINUTE: ${GROUNDTRUTH_AUTHENTICATED_REQUESTS_PER_MINUTE:-300}
+      GROUNDTRUTH_PUBLIC_REQUESTS_PER_MINUTE: ${GROUNDTRUTH_PUBLIC_REQUESTS_PER_MINUTE:-10000}
       GROUNDTRUTH_BOOTSTRAP_INGEST_KEY: ${GROUNDTRUTH_DEMO_INGEST_KEY:-local-demo-ingest-key}
       GROUNDTRUTH_BOOTSTRAP_PROJECT_SLUG: local
       GROUNDTRUTH_BOOTSTRAP_PROJECT_NAME: Local project
@@ -167,12 +177,12 @@ services:
           memory: 768M
 
   collector:
-    image: groundtruth-collector:local
+    <<: *service-runtime
+    image: clear-collector:local
     build:
       context: ..
       dockerfile: apps/collector/Dockerfile
     restart: unless-stopped
-    command: [/groundtruth-collector, --config=/etc/groundtruth/local.yaml]
     environment:
       GROUNDTRUTH_BACKEND_ENDPOINT: http://backend:3000
       GROUNDTRUTH_SERVICE_TOKEN: ${GROUNDTRUTH_COLLECTOR_SECRET:-local-collector-service-secret}
@@ -185,8 +195,6 @@ services:
         condition: service_healthy
     networks:
       - app
-    security_opt:
-      - no-new-privileges:true
     deploy:
       resources:
         limits:
@@ -199,9 +207,12 @@ services:
         max-file: "3"
 
   payments-stub:
-    <<: *node-service
+    <<: *service-runtime
+    image: groundtruth-payments-stub:local
+    build:
+      context: ..
+      dockerfile: apps/payments-stub/Dockerfile
     restart: unless-stopped
-    command: [./node_modules/.bin/vp, run, payments-stub#start]
     environment:
       <<: *example-telemetry
       PORT: "4102"
@@ -210,8 +221,11 @@ services:
       CONTROL_TOKEN: ${GROUNDTRUTH_PAYMENTS_CONTROL_TOKEN:-local-payments-control-token}
       FAILURE_RATE: "0"
       FAILURE_SEED: ${GROUNDTRUTH_SCENARIO_SEED:-groundtruth-retry-storm-v1}
-      BASE_LATENCY_MS: "45" # 45 milliseconds
-      LATENCY_JITTER_MS: "20" # 20 milliseconds
+      BASE_LATENCY_MS: "85" # 85 milliseconds
+      LATENCY_JITTER_MS: "35" # 35 milliseconds
+      EXPECTED_RPS: ${GROUNDTRUTH_PAYMENTS_EXPECTED_RPS:-51}
+      OVERLOAD_GAIN: ${GROUNDTRUTH_PAYMENTS_OVERLOAD_GAIN:-0.22}
+      OVERLOAD_LATENCY_MS: ${GROUNDTRUTH_PAYMENTS_OVERLOAD_LATENCY_MS:-35} # 35 milliseconds per excess request per second
     ports:
       - 127.0.0.1:${GROUNDTRUTH_PAYMENTS_PORT:-4102}:4102
     healthcheck:
@@ -236,9 +250,12 @@ services:
           memory: 384M
 
   checkout-api:
-    <<: *node-service
+    <<: *service-runtime
+    image: groundtruth-checkout-api:local
+    build:
+      context: ..
+      dockerfile: apps/checkout-api/Dockerfile
     restart: unless-stopped
-    command: [./node_modules/.bin/vp, run, checkout-api#start]
     environment:
       <<: *example-telemetry
       PORT: "4101"
@@ -247,6 +264,7 @@ services:
       PAYMENTS_SERVICE_TOKEN: ${GROUNDTRUTH_PAYMENTS_SERVICE_TOKEN:-local-payments-service-token}
       UPSTREAM_TIMEOUT_MS: "750" # 750 milliseconds
       GROUNDTRUTH_DEPLOY_EVENTS_URL: http://backend:3000/v1/events/deploy
+      CHECKOUT_WEB_ORIGIN: ${GROUNDTRUTH_CHECKOUT_WEB_ORIGIN:-http://localhost:5174}
     ports:
       - 127.0.0.1:${GROUNDTRUTH_CHECKOUT_API_PORT:-4101}:4101
     healthcheck:
@@ -275,9 +293,12 @@ services:
           memory: 384M
 
   load-generator:
-    <<: *node-service
+    <<: *service-runtime
+    image: groundtruth-load-generator:local
+    build:
+      context: ..
+      dockerfile: apps/load-generator/Dockerfile
     restart: unless-stopped
-    command: [./node_modules/.bin/vp, run, load-generator#start]
     environment:
       <<: *example-telemetry
       PORT: "4103"
@@ -289,6 +310,9 @@ services:
       SCENARIO_SEED: ${GROUNDTRUTH_SCENARIO_SEED:-groundtruth-retry-storm-v1}
       BASELINE_RPS: ${GROUNDTRUTH_BASELINE_RPS:-50}
       UNIQUE_USERS: ${GROUNDTRUTH_UNIQUE_USERS:-800}
+      BASELINE_DURATION_MS: ${GROUNDTRUTH_BASELINE_DURATION_MS:-20000} # 20 seconds
+      BLIP_DURATION_MS: ${GROUNDTRUTH_BLIP_DURATION_MS:-10000} # 10 seconds
+      MAX_SCENARIO_DURATION_MS: ${GROUNDTRUTH_MAX_SCENARIO_DURATION_MS:-900000} # 15 minutes
       AUTOSTART: "false"
     ports:
       - 127.0.0.1:${GROUNDTRUTH_LOAD_GENERATOR_PORT:-4103}:4103
@@ -324,4 +348,3 @@ volumes:
 networks:
   app:
   data:
-    internal: true

@@ -1,0 +1,34 @@
+<clickhouse>
+    <!-- Conservative limits for a small single-node observability deployment. -->
+    <max_server_memory_usage_to_ram_ratio>0.72</max_server_memory_usage_to_ram_ratio>
+    <mark_cache_size>33554432</mark_cache_size>
+    <uncompressed_cache_size>0</uncompressed_cache_size>
+    <mmap_cache_size>128</mmap_cache_size>
+    <compiled_expression_cache_size>16777216</compiled_expression_cache_size>
+    <background_pool_size>4</background_pool_size>
+    <background_schedule_pool_size>4</background_schedule_pool_size>
+    <background_fetches_pool_size>2</background_fetches_pool_size>
+    <background_move_pool_size>2</background_move_pool_size>
+    <max_connections>100</max_connections>
+
+    <merge_tree>
+        <number_of_free_entries_in_pool_to_execute_mutation>2</number_of_free_entries_in_pool_to_execute_mutation>
+        <number_of_free_entries_in_pool_to_execute_optimize_entire_partition>2</number_of_free_entries_in_pool_to_execute_optimize_entire_partition>
+    </merge_tree>
+
+    <storage_configuration>
+        <disks>
+            <backups>
+                <type>local</type>
+                <path>/var/lib/clickhouse/backups/</path>
+            </backups>
+        </disks>
+    </storage_configuration>
+
+    <backups>
+        <allowed_disk>backups</allowed_disk>
+        <allowed_path>/var/lib/clickhouse/backups/</allowed_path>
+        <allow_concurrent_backups>false</allow_concurrent_backups>
+        <allow_concurrent_restores>false</allow_concurrent_restores>
+    </backups>
+</clickhouse>

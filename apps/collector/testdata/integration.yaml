@@ -1,0 +1,71 @@
+extensions:
+  health_check:
+    endpoint: ${env:TEST_HEALTH_ENDPOINT}
+    path: /healthz
+  groundtruth_auth:
+    endpoint: ${env:TEST_BACKEND_ENDPOINT}
+    service_token: ${env:TEST_SERVICE_TOKEN}
+    cache_ttl: 1m
+    cache_entries: 16
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: ${env:TEST_GRPC_ENDPOINT}
+        auth:
+          authenticator: groundtruth_auth
+        max_recv_msg_size_mib: 8
+      http:
+        endpoint: ${env:TEST_HTTP_ENDPOINT}
+        auth:
+          authenticator: groundtruth_auth
+        max_request_body_size: 8388608
+
+processors:
+  memory_limiter:
+    check_interval: 100ms
+    limit_mib: 128
+    spike_limit_mib: 32
+  resource/project:
+    attributes:
+      - key: groundtruth.project.id
+        from_context: metadata.groundtruth-project-id
+        action: upsert
+  batch:
+    timeout: 10ms
+    send_batch_size: 64
+    send_batch_max_size: 128
+    metadata_keys: [groundtruth-project-id, groundtruth-ingest-key]
+    metadata_cardinality_limit: 16
+
+exporters:
+  groundtruth:
+    endpoint: ${env:TEST_BACKEND_ENDPOINT}
+    service_token: ${env:TEST_SERVICE_TOKEN}
+    compression: gzip
+    timeout: 2s
+    max_request_size: 16777216
+    retry_on_failure:
+      enabled: false
+    sending_queue:
+      wait_for_result: true
+      num_consumers: 2
+      queue_size: 16
+      block_on_overflow: false
+
+service:
+  extensions: [health_check, groundtruth_auth]
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/project, batch]
+      exporters: [groundtruth]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/project, batch]
+      exporters: [groundtruth]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/project, batch]
+      exporters: [groundtruth]

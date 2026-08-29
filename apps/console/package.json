@@ -1,0 +1,45 @@
+{
+  "name": "console",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vp build",
+    "dev": "vp dev",
+    "preview": "vp preview",
+    "test": "vp test --run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@base-ui/react": "1.7.0",
+    "@fontsource/ibm-plex-mono": "catalog:",
+    "@fontsource/ibm-plex-sans": "catalog:",
+    "@groundtruth/api-contract": "workspace:*",
+    "@groundtruth/domain": "workspace:*",
+    "@groundtruth/panel-dsl": "workspace:*",
+    "@groundtruth/telemetry": "workspace:*",
+    "@hugeicons/core-free-icons": "4.3.0",
+    "@hugeicons/react": "1.1.10",
+    "@stylexjs/stylex": "0.19.0",
+    "@tanstack/react-query": "5.102.8",
+    "@tanstack/react-router": "1.170.32",
+    "echarts": "6.1.0",
+    "effect": "catalog:",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.54.1",
+    "@cloudflare/workers-types": "5.20260828.1",
+    "@openai/sites-vite-plugin": "0.2.0",
+    "@stylexjs/unplugin": "0.19.0",
+    "@tanstack/router-plugin": "1.168.35",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "webmcp-types": "catalog:",
+    "wrangler": "4.127.0"
+  }
+}

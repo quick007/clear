@@ -28,6 +28,7 @@ docker compose -f "$compose_file" exec -T \
 docker compose -f "$compose_file" cp \
   "clickhouse:/var/lib/clickhouse/backups/$clickhouse_archive" \
   "$backup_directory/clickhouse.zip"
+chmod 600 "$backup_directory/clickhouse.zip"
 
 (
   cd "$backup_directory"

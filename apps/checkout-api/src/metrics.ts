@@ -5,8 +5,8 @@ export const checkoutDuration = Metric.histogram("http.server.duration", {
   description: "Checkout request duration in milliseconds",
 });
 
-export const logicalRequests = Metric.counter("http.server.requests", {
-  description: "Checkout processing attempts, including immediate retries",
+export const serverRequests = Metric.counter("http.server.requests", {
+  description: "Incoming checkout HTTP requests",
   incremental: true,
 });
 

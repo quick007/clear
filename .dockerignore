@@ -1,0 +1,14 @@
+.git
+.gitignore
+.wrangler
+**/node_modules
+**/dist
+apps/collector/bin/
+**/coverage
+**/.env
+**/.env.*
+!**/.env.example
+backups
+context.md
+*.log
+.DS_Store

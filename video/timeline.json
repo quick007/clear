@@ -1,0 +1,86 @@
+{
+  "title": "Clear submission video",
+  "durationSeconds": 175,
+  "shots": [
+    {
+      "id": "hook",
+      "start": 0,
+      "end": 11,
+      "source": "board",
+      "caption": "Observability, shared with your agent",
+      "narration": "Dashboards were built for human hands. Clear is an OpenTelemetry observability surface that you and your own agent can operate together."
+    },
+    {
+      "id": "real-incident",
+      "start": 11,
+      "end": 24,
+      "source": "checkout-and-board",
+      "caption": "Manufactured load creates a real checkout incident",
+      "narration": "For this scripted demonstration, we manufacture load and trigger a controlled failure in a real payments service. Real traffic is flowing through the instrumented checkout stack, and metrics, logs, and traces are arriving over OTLP."
+    },
+    {
+      "id": "orient",
+      "start": 24,
+      "end": 42,
+      "source": "codex-and-board",
+      "caption": "The agent reads the same live telemetry you do",
+      "narration": "My agent starts with Clear's typed site tools. The tool calls stay in our conversation while the website stays focused on the shared evidence, so I can see the reasoning and steer the investigation."
+    },
+    {
+      "id": "decoy",
+      "start": 42,
+      "end": 57,
+      "source": "board",
+      "caption": "First hypothesis: a traffic surge",
+      "narration": "At first, the rising request rate looks like a traffic surge. We record that as a hypothesis, not a conclusion."
+    },
+    {
+      "id": "challenge",
+      "start": 57,
+      "end": 75,
+      "source": "codex-and-board",
+      "caption": "If requests tripled, where are the users?",
+      "narration": "But if traffic tripled, where are the users? The agent builds the comparison we need. Requests are up three times while unique users stay flat."
+    },
+    {
+      "id": "reveal",
+      "start": 75,
+      "end": 94,
+      "source": "board",
+      "caption": "Requests are up 3x. Users are flat. Retries are exploding.",
+      "narration": "Grouping by retry state exposes the amplification. One trace and its correlated logs confirm three immediate retries against the failing dependency. The first hypothesis is rejected."
+    },
+    {
+      "id": "fix",
+      "start": 94,
+      "end": 123,
+      "source": "codex-code",
+      "caption": "A real checkout code change, through the agent's own access",
+      "narration": "Now the agent uses its existing repository access. It makes a real checkout code change, adding bounded backoff, jitter, a retry budget, and a circuit breaker. Then it runs the tests and pushes the dedicated shoot branch."
+    },
+    {
+      "id": "deploy",
+      "start": 123,
+      "end": 143,
+      "source": "board",
+      "caption": "A real deploy bounds the retries",
+      "narration": "Render performs a real deployment of the checkout service. Clear did not touch production. It observes the deploy event, then shows retry pressure falling even while the controlled dependency fault remains. We end that manufactured fault explicitly, and the full system returns to baseline."
+    },
+    {
+      "id": "close",
+      "start": 143,
+      "end": 159,
+      "source": "codex-and-board",
+      "caption": "A complete incident record, ready to share",
+      "narration": "The agent writes the incident summary and closes it. Its incident-only capabilities disappear because the tool surface follows the work, without adding tool plumbing to the website."
+    },
+    {
+      "id": "outro",
+      "start": 159,
+      "end": 175,
+      "source": "board-and-end-card",
+      "caption": "Real OpenTelemetry. Bring any agent. Open source.",
+      "narration": "Clear accepts standard OpenTelemetry metrics, logs, and traces. Bring your own agent, connect your own service, or try the isolated sandbox. The whole stack is open source."
+    }
+  ]
+}

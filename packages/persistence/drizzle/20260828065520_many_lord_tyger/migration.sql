@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "dashboards_one_default_per_project_unique" ON "dashboards" ("project_id") WHERE "is_default" = true;

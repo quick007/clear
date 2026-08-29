@@ -1,0 +1,37 @@
+{
+  "name": "@groundtruth/persistence",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts",
+    "./testing": "./src/testing/index.ts"
+  },
+  "scripts": {
+    "build": "vp pack src/index.ts --dts --clean",
+    "check": "vp check",
+    "db:generate": "vp exec drizzle-kit generate --config drizzle.config.ts",
+    "db:migrate": "vp exec node src/postgres/migrate.ts",
+    "clickhouse:migrate": "vp exec node src/clickhouse/migrate.ts",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "@clickhouse/client": "1.23.1",
+    "@groundtruth/domain": "workspace:*",
+    "@groundtruth/panel-dsl": "workspace:*",
+    "@groundtruth/telemetry": "workspace:*",
+    "drizzle-orm": "1.0.0-rc.4",
+    "effect": "catalog:",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@testcontainers/clickhouse": "11.12.0",
+    "@testcontainers/postgresql": "11.12.0",
+    "@types/node": "catalog:",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "1.0.0-rc.4",
+    "testcontainers": "11.12.0",
+    "typescript": "catalog:"
+  }
+}

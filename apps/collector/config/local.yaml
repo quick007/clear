@@ -1,0 +1,82 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+    path: /healthz
+  groundtruth_auth:
+    endpoint: ${env:GROUNDTRUTH_BACKEND_ENDPOINT}
+    service_token: ${env:GROUNDTRUTH_SERVICE_TOKEN}
+    cache_ttl: 1m
+    cache_entries: 4096
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        auth:
+          authenticator: groundtruth_auth
+        max_recv_msg_size_mib: 8
+      http:
+        endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: groundtruth_auth
+        max_request_body_size: 8388608
+        read_header_timeout: 5s
+        read_timeout: 15s
+        write_timeout: 20s
+        idle_timeout: 1m
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 384
+    spike_limit_mib: 96
+  resource/project:
+    attributes:
+      - key: groundtruth.project.id
+        from_context: metadata.groundtruth-project-id
+        action: upsert
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+    metadata_keys:
+      - groundtruth-project-id
+      - groundtruth-ingest-key
+    metadata_cardinality_limit: 1024
+
+exporters:
+  groundtruth:
+    endpoint: ${env:GROUNDTRUTH_BACKEND_ENDPOINT}
+    service_token: ${env:GROUNDTRUTH_SERVICE_TOKEN}
+    compression: none
+    timeout: 5s
+    max_request_size: 16777216
+    retry_on_failure:
+      enabled: true
+      initial_interval: 250ms
+      max_interval: 2s
+      max_elapsed_time: 10s
+    sending_queue:
+      wait_for_result: true
+      num_consumers: 4
+      queue_size: 128
+      block_on_overflow: false
+
+service:
+  extensions:
+    - health_check
+    - groundtruth_auth
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/project, batch]
+      exporters: [groundtruth]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/project, batch]
+      exporters: [groundtruth]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/project, batch]
+      exporters: [groundtruth]

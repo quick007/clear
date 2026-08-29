@@ -1,11 +1,16 @@
-# Backup and restore runbook
+# Backup policy
 
-Groundtruth spans PostgreSQL and ClickHouse. A backup of only one store is incomplete:
+Clear spans PostgreSQL and ClickHouse. PostgreSQL owns product state, while ClickHouse owns metrics, logs, traces, correlations, and rollups. A copy of only one store is not a coherent backup.
 
-- PostgreSQL owns users, projects, keys, boards, incidents, timelines, deploy events, and the durable event outbox.
-- ClickHouse owns metrics, logs, traces, correlations, and rollups.
+## Hackathon deployment
 
-## Local backup
+The hosted hackathon service has no off-host backup commitment. Its Render disk is persistent across normal deploys, but a disk snapshot is not a coordinated database backup and must not be described as one.
+
+The hosted service is a public preview with 24-hour raw telemetry retention and 7-day metric rollups. Do not place irreplaceable production telemetry in it. If the persistent disk is lost or corrupted, rebuild the service and treat the hosted telemetry as lost.
+
+This is an explicit scope decision, not a missing configuration. A future production release needs coordinated logical backups, restore drills, recovery objectives, encrypted off-host storage, and schema-compatible recovery procedures before making durability claims.
+
+## Local backup helper
 
 With the Compose stack healthy, run:
 
@@ -19,61 +24,17 @@ The script creates a timestamped directory under `backups/` containing:
 - `clickhouse.zip`, a native ClickHouse database backup compressed with Zstandard
 - `SHA256SUMS`, checksums for both artifacts
 
-Pass a different destination directory as the first argument when the backup must live outside the repository.
+Pass a different destination directory as the first argument when the files should live outside the repository. This helper exists for migration rehearsal and contributor debugging. It is not the hosted product's backup system.
 
-The ClickHouse archive is first created on the configured `backups` disk and then copied to the host. Periodically remove old server-side archives after the off-host copy and checksum have been verified, or they will consume the telemetry disk.
+## Local restore rehearsal
 
-## Hosted backup
+Never test a restore over active databases.
 
-Render's automatic persistent-disk snapshots are not a database-consistent recovery mechanism for a custom database. Render explicitly recommends logical database backups instead of restoring a disk snapshot for this case.
-
-For a coordinated hosted backup:
-
-1. Stop the load generator and pause public Collector traffic.
-2. Wait for in-flight ingest requests and migrations to finish.
-3. Create or verify the managed PostgreSQL backup for the selected plan. Also take a `pg_dump --format=custom` before a risky schema release.
-4. Open a shell on the ClickHouse private service and run:
-
-```sql
-BACKUP DATABASE groundtruth
-TO Disk('backups', 'groundtruth-YYYYMMDDTHHMMSSZ.zip')
-SETTINGS compression_method = 'zstd', compression_level = 3;
-```
-
-5. Copy the ClickHouse archive off the Render disk with SFTP or SCP using the exact SSH command Render supplies.
-6. Record the PostgreSQL backup identifier, ClickHouse archive checksum, application revision, and migration versions together.
-7. Resume Collector traffic and the load generator.
-
-A file that exists only on the ClickHouse persistent disk is not a backup. Store it in a separate provider or a separately controlled machine.
-
-## Restore drill
-
-Never test a restore over the active databases.
-
-1. Provision fresh isolated PostgreSQL and ClickHouse instances using the same major versions and ClickHouse configuration.
+1. Start fresh isolated PostgreSQL and ClickHouse instances using the same major versions and ClickHouse configuration.
 2. Restore `postgres.dump` with `pg_restore` into the empty PostgreSQL database.
-3. Upload the ClickHouse archive to the fresh instance's `/var/lib/clickhouse/backups/` directory.
-4. Restore under a temporary database name first:
-
-```sql
-RESTORE DATABASE groundtruth AS groundtruth_restore
-FROM Disk('backups', 'groundtruth-YYYYMMDDTHHMMSSZ.zip');
-```
-
-5. Check migration-version tables, per-project row counts, a sample trace tree, trace-to-log correlation, metric rollups, and the newest timestamps.
+3. Upload `clickhouse.zip` to the fresh instance's configured `backups` disk.
+4. Restore under a temporary database name first.
+5. Check migration ledgers, per-project row counts, a sample trace tree, trace-to-log correlation, metric rollups, and newest timestamps.
 6. Start an isolated API against the restored stores and run storage integration tests.
-7. Record the measured restore time and any manual corrections.
-8. Destroy the isolated restore only after the drill result has been captured.
 
-If a real recovery needs the restored data, keep ingest stopped, validate project boundaries, then switch both PostgreSQL and ClickHouse connections in one planned cutover. Do not combine a restored PostgreSQL snapshot with an unrelated ClickHouse point in time without documenting the expected mismatch.
-
-## Initial policy
-
-Until traffic volume gives better evidence:
-
-- Take a logical backup before schema changes and before recording the submission video.
-- Take ClickHouse logical backups daily while hosted data matters.
-- Restore-test at least once before submission and after any backup configuration change.
-- Monitor backup duration and archive size so a full telemetry disk does not prevent the next backup.
-
-The final off-host destination and explicit recovery-point and recovery-time targets remain product-owner decisions.
+Do not combine a PostgreSQL snapshot with an unrelated ClickHouse point in time without documenting the expected mismatch.

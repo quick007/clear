@@ -1,0 +1,242 @@
+import {
+  MetricChartPanel,
+  RequestsVsUsersPanel,
+  RetryAmplificationPanel,
+  TablePanel,
+  UpstreamPressurePanel,
+} from "@groundtruth/panel-dsl";
+import { MetricSeriesPoint } from "@groundtruth/telemetry";
+import { DateTime, Schema } from "effect";
+import { describe, expect, it } from "vite-plus/test";
+
+import { buildPanelPlans, type PanelSeries } from "../../data/panels";
+import { buildMetricChartOption } from "../overview/metric-chart-options";
+import { buildChartLegend } from "./panel-legend";
+import { buildPanelTableRows, tableCellValue } from "./panel-table";
+
+const at = (iso: string) => DateTime.makeUnsafe(iso);
+
+const series = ({
+  axis = "left",
+  label,
+  queryRef,
+  values,
+}: {
+  axis?: "left" | "right";
+  label: string;
+  queryRef: PanelSeries["queryRef"];
+  values: ReadonlyArray<readonly [string, number]>;
+}): PanelSeries => ({
+  attributes: {},
+  axis,
+  color: axis === "left" ? "#fb923c" : "#38bdf8",
+  label,
+  lineStyle: axis === "left" ? "solid" : "dashed",
+  points: values.map(([time, value]) => new MetricSeriesPoint({ at: at(time), value })),
+  queryRef,
+  tone: axis === "left" ? "orange" : "blue",
+});
+
+describe("panel query and chart rendering", () => {
+  it("keeps the seeded upstream pressure panel on supported exact-match semantics", () => {
+    const planning = buildPanelPlans(UpstreamPressurePanel.queries);
+    expect(planning.error).toBeNull();
+    expect(planning.plans).toHaveLength(2);
+    expect(UpstreamPressurePanel.queries[0]).toMatchObject({
+      filters: [
+        {
+          _tag: "match",
+          attribute: "http.response.status_code",
+          operator: "eq",
+          value: 503,
+        },
+      ],
+    });
+  });
+
+  it("preserves dual axes and per-query series styles", () => {
+    const planning = buildPanelPlans(RequestsVsUsersPanel.queries);
+    expect(planning.error).toBeNull();
+    expect(planning.plans).toMatchObject([
+      { axis: "left", label: "Upstream request rate", tone: "orange" },
+      { axis: "right", label: "Unique users", tone: "cyan" },
+    ]);
+
+    const chartSeries = [
+      series({
+        label: "Upstream request rate",
+        queryRef: RequestsVsUsersPanel.queries[0].refId,
+        values: [["2026-08-28T08:00:00Z", 120]],
+      }),
+      series({
+        axis: "right",
+        label: "Unique users",
+        queryRef: RequestsVsUsersPanel.queries[1]!.refId,
+        values: [["2026-08-28T08:00:00Z", 42]],
+      }),
+    ];
+    expect(
+      buildMetricChartOption({
+        annotations: [{ _tag: "deploy", atMs: 1_772_176_400_000, label: "release" }],
+        axes: RequestsVsUsersPanel.axes,
+        reducedMotion: true,
+        series: chartSeries,
+        thresholds: [{ axis: "left", value: 100, condition: "above", severity: "warning" }],
+        visualization: "line",
+      }),
+    ).toMatchObject({
+      animationDuration: 0,
+      series: [
+        {
+          lineStyle: { type: "solid" },
+          markLine: { data: [{ yAxis: 100 }, { xAxis: 1_772_176_400_000 }] },
+          yAxisIndex: 0,
+        },
+        { lineStyle: { type: "dashed" }, yAxisIndex: 1 },
+      ],
+      yAxis: [
+        { name: "Upstream requests", position: "left" },
+        { name: "Unique users", position: "right" },
+      ],
+    });
+  });
+
+  it("honors area fill, stacking, legend summaries, and bar rendering", () => {
+    const attemptSeries = series({
+      label: "attempt=2",
+      queryRef: RetryAmplificationPanel.queries[0].refId,
+      values: [
+        ["2026-08-28T08:00:00Z", 10],
+        ["2026-08-28T08:01:00Z", 20],
+      ],
+    });
+    expect(
+      buildMetricChartOption({
+        axes: RetryAmplificationPanel.axes,
+        series: [{ ...attemptSeries, fillOpacity: 0.35 }],
+        stacking: "normal",
+        visualization: "area",
+      }),
+    ).toMatchObject({
+      series: [{ areaStyle: { opacity: 0.35 }, stack: "panel-left", type: "line" }],
+    });
+    expect(
+      buildMetricChartOption({
+        axes: RetryAmplificationPanel.axes,
+        series: [attemptSeries],
+        visualization: "bar",
+      }),
+    ).toMatchObject({ series: [{ type: "bar" }], xAxis: { boundaryGap: true } });
+    expect(
+      buildMetricChartOption({
+        axes: RetryAmplificationPanel.axes,
+        series: [attemptSeries, { ...attemptSeries, label: "attempt=3" }],
+        stacking: "percent",
+        visualization: "area",
+      }),
+    ).toMatchObject({
+      series: [
+        {
+          data: [
+            [expect.any(Number), 0.5],
+            [expect.any(Number), 0.5],
+          ],
+          stack: "panel-left",
+        },
+        {
+          data: [
+            [expect.any(Number), 0.5],
+            [expect.any(Number), 0.5],
+          ],
+          stack: "panel-left",
+        },
+      ],
+      yAxis: [{ max: 1, min: 0 }],
+    });
+
+    const legend = buildChartLegend(
+      { ...RequestsVsUsersPanel, legend: { visibility: "always", values: ["last", "max"] } },
+      [attemptSeries],
+      {},
+    );
+    expect(legend).toMatchObject([
+      {
+        label: "attempt=2",
+        summaries: [
+          { label: "last", value: "20.0 upstream requests/s" },
+          { label: "max", value: "20.0 upstream requests/s" },
+        ],
+      },
+    ]);
+  });
+
+  it("rejects query features the backend cannot preserve instead of weakening them", () => {
+    const panel = Schema.decodeUnknownSync(MetricChartPanel)({
+      _tag: "metric-chart",
+      axes: [{ id: "left", unit: { _tag: "auto" } }],
+      queries: [
+        {
+          aggregation: "avg",
+          axis: "left",
+          filters: [{ _tag: "range", attribute: "attempt", operator: "gte", value: 2 }],
+          metric: "upstream.client.duration",
+          refId: "A",
+          window: "1h",
+        },
+      ],
+      title: "Filtered latency",
+      version: 1,
+      visualization: "line",
+    });
+    expect(buildPanelPlans(panel.queries).error?.message).toContain("range filters");
+  });
+});
+
+describe("table rendering", () => {
+  it("uses declared columns, value refs, sorting, and row limits", () => {
+    const panel = Schema.decodeUnknownSync(TablePanel)({
+      _tag: "table",
+      columns: [
+        { _tag: "time", id: "time", label: "Time", width: 120 },
+        { _tag: "attribute", id: "region", attribute: "region", label: "Region" },
+        {
+          _tag: "value",
+          id: "latency",
+          queryRef: "A",
+          label: "Latency",
+          unit: { _tag: "duration", input: "ms", display: "ms" },
+        },
+      ],
+      queries: [
+        {
+          aggregation: "p95",
+          groupBy: { attributes: ["region"], maxSeries: 4 },
+          metric: "http.server.duration",
+          refId: "A",
+          window: "1h",
+        },
+      ],
+      rowLimit: 1,
+      sort: { columnId: "latency", direction: "desc" },
+      title: "Regional latency",
+      version: 1,
+    });
+    const base = series({
+      label: "region=west",
+      queryRef: panel.queries[0].refId,
+      values: [["2026-08-28T08:00:00Z", 120]],
+    });
+    const rows = buildPanelTableRows(panel, [
+      { ...base, attributes: { region: "west" } },
+      {
+        ...base,
+        attributes: { region: "east" },
+        label: "region=east",
+        points: [new MetricSeriesPoint({ at: at("2026-08-28T08:00:00Z"), value: 240 })],
+      },
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(tableCellValue(panel.columns[1]!, rows[0]!)).toBe("east");
+    expect(tableCellValue(panel.columns[2]!, rows[0]!)).toBe(240);
+  });
+});

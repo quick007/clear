@@ -1,0 +1,1 @@
+ALTER TABLE "panels" ADD COLUMN "annotations" jsonb DEFAULT '[]' NOT NULL;

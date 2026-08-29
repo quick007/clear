@@ -3,7 +3,8 @@ import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstab
 import { CheckoutConfig } from "./config.js";
 import { PaymentAuthorizationRequest, PaymentAuthorizationResponse } from "./contracts.js";
 import { PaymentUnavailable } from "./errors.js";
-import { logicalRequests, upstreamDuration, upstreamRequests } from "./metrics.js";
+import { upstreamDuration, upstreamRequests } from "./metrics.js";
+import { metricUserId } from "./telemetry-cardinality.js";
 
 const recordAttempt = (
   request: PaymentAuthorizationRequest,
@@ -11,17 +12,16 @@ const recordAttempt = (
   status: string,
 ) => {
   const attributes = {
-    attempt: String(request.attempt),
+    attempt: String(request.attempt + 1),
     retry: String(request.attempt > 0),
     route: "/v1/checkout",
     status,
     target: "payments-stub",
-    "user.id": request.userId,
+    "user.id": metricUserId(request.userId),
   };
 
   return Effect.all(
     [
-      Metric.update(Metric.withAttributes(logicalRequests, attributes), 1),
       Metric.update(Metric.withAttributes(upstreamRequests, attributes), 1),
       Metric.update(Metric.withAttributes(upstreamDuration, attributes), durationMs),
     ],

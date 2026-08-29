@@ -1,0 +1,24 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+
+exporters:
+  otlphttp/clear:
+    endpoint: https://otlp.clear.seufert.sh
+    headers:
+      x-clear-ingest-key: ${env:GROUNDTRUTH_INGEST_KEY}
+    compression: gzip
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [otlphttp/clear]
+    logs:
+      receivers: [otlp]
+      exporters: [otlphttp/clear]
+    traces:
+      receivers: [otlp]
+      exporters: [otlphttp/clear]

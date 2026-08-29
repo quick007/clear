@@ -1,0 +1,7 @@
+ALTER TABLE groundtruth.logs
+    ADD COLUMN IF NOT EXISTS batch_id UUID DEFAULT toUUID('00000000-0000-0000-0000-000000000000')
+    AFTER project_id;
+
+ALTER TABLE groundtruth.logs
+    ADD COLUMN IF NOT EXISTS log_ordinal UInt32 DEFAULT 0
+    AFTER batch_id;

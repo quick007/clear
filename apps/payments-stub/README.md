@@ -1,6 +1,6 @@
 # Payments Stub
 
-A private, deterministic payments dependency for the Groundtruth incident
+A private, deterministic payments dependency for the Clear incident
 stack. It exports real OTLP metrics, logs, and traces and models a small upstream
 failure becoming worse under retry pressure.
 
@@ -24,7 +24,7 @@ Copy `.env.example` and replace both local bearer tokens outside local
 development. The baseline failure model and overload response are configured
 by `FAILURE_RATE`, `EXPECTED_RPS`, `OVERLOAD_GAIN`, and the latency variables.
 
-Set `GROUNDTRUTH_INGEST_KEY` to add `x-groundtruth-ingest-key` to every OTLP
+Set `GROUNDTRUTH_INGEST_KEY` to add `x-clear-ingest-key` to every OTLP
 export. The standard OpenTelemetry exporter endpoint variables remain
 supported.
 
@@ -38,5 +38,5 @@ vp run start
 ```
 
 ```sh
-vp exec docker build -f apps/payments-stub/Dockerfile -t groundtruth-payments .
+vp exec docker build -f apps/payments-stub/Dockerfile -t clear-payments .
 ```

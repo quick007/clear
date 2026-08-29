@@ -1,0 +1,23 @@
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+  html {
+    background: #f5f2ec;
+    color-scheme: light;
+  }
+  body {
+    margin: 0;
+    min-width: 320px;
+  }
+  img {
+    display: block;
+    max-width: 100%;
+  }
+  ::selection {
+    background: #ead8c8;
+    color: #201e1a;
+  }
+}

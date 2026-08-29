@@ -11,7 +11,7 @@ const exporterHeaders = Config.redacted("GROUNDTRUTH_INGEST_KEY").pipe(
   Config.option,
   Config.map(
     Option.map((key) => ({
-      "x-groundtruth-ingest-key": Redacted.value(key),
+      "x-clear-ingest-key": Redacted.value(key),
     })),
   ),
 );

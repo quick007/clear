@@ -11,7 +11,7 @@ const report = Effect.gen(function* () {
   }
 
   const request = yield* HttpClientRequest.post(config.deployEventsUrl.value).pipe(
-    HttpClientRequest.bearerToken(Redacted.value(config.ingestKey.value)),
+    HttpClientRequest.setHeader("x-clear-ingest-key", Redacted.value(config.ingestKey.value)),
     HttpClientRequest.bodyJson({
       description: "checkout-api deployment started",
       service: "checkout-api",

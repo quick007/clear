@@ -2,15 +2,15 @@
 
 ## Health model
 
-| Component | Check | Healthy means |
-| --- | --- | --- |
-| API | `GET /health` | Process is serving and required stores are reachable |
-| Collector | `GET :13133/` locally, TCP check on Render | Receiver pipelines and extensions started |
-| Checkout API | `GET /readyz` | Server and payments dependency are usable |
-| Payments stub | `GET /readyz` | Server can accept authorization calls |
-| Load generator | `GET /readyz` | Controller can reach its scenario dependencies |
-| PostgreSQL | `pg_isready` | Server accepts the product database connection |
-| ClickHouse | `/ping` or `SELECT 1` | Server accepts the configured user connection |
+| Component      | Check                                   | Healthy means                                        |
+| -------------- | --------------------------------------- | ---------------------------------------------------- |
+| API            | `GET /health`                           | Process is serving and required stores are reachable |
+| Collector      | `GET :13133/healthz` inside the runtime | Receiver pipelines and extensions started            |
+| Checkout API   | `GET /readyz`                           | Server and payments dependency are usable            |
+| Payments stub  | `GET /readyz`                           | Server can accept authorization calls                |
+| Load generator | `GET /readyz`                           | Controller can reach its scenario dependencies       |
+| PostgreSQL     | `pg_isready`                            | Server accepts the product database connection       |
+| ClickHouse     | `/ping` or `SELECT 1`                   | Server accepts the configured user connection        |
 
 Liveness must not claim the system is healthy when required storage is unavailable. Readiness may remain degraded while product state can still be served, but ingest must return an explicit retryable failure rather than silently dropping telemetry.
 
@@ -31,7 +31,7 @@ FROM system.disks;
 Initial actions:
 
 - 70 percent used: review retention, unexpected cardinality, and backup growth.
-- 85 percent used: shorten nonessential retention or increase the Render disk before the next recording.
+- 85 percent used: confirm TTL cleanup, remove stale local backup artifacts, or increase the Render disk before the next recording.
 - 95 percent used: pause ingest and preserve query access. Do not wait for merges to exhaust the disk.
 
 Render disks can grow but cannot shrink. TTL cleanup and merges need working space, so the response threshold must stay below full capacity. Deleting arbitrary parts is not the first response.
@@ -46,15 +46,15 @@ Expected behavior:
 4. PostgreSQL product state remains available where safe, but telemetry views clearly show that data is delayed.
 5. Collector activity hints remain disposable and do not claim that data was committed.
 
-Check disk capacity, process memory, recent merges, failed migrations, and credentials. Restart only after identifying whether the failure is resource exhaustion or configuration. If the disk is corrupt, stop ingest and follow the fresh-instance restore procedure.
+Check disk capacity, process memory, recent merges, failed migrations, and credentials. Restart only after identifying whether the failure is resource exhaustion or configuration. If the hosted disk is corrupt, stop ingest and rebuild. The hackathon deployment has no off-host recovery promise.
 
 ## PostgreSQL unavailable
 
-The API cannot authenticate projects or reliably write product state, so it should fail readiness and reject ingest rather than bypass project-key validation. Confirm the managed database status and connection limits. Do not point production at a local fallback or create an in-memory project store.
+The API cannot authenticate projects or reliably write product state, so it should fail readiness and reject ingest rather than bypass project-key validation. Inspect the PostgreSQL child process, disk capacity, credentials, and connection limits. Do not point the hosted service at an in-memory fallback.
 
 ## Collector unavailable
 
-Existing data and product state remain queryable through the API. New clients receive connection failures at the OTLP endpoint. Check the Render service logs, private API connectivity, service-token agreement, and receiver limits. A Collector restart is safe because durable state lives behind the API and databases, but clients must still use standard retry behavior.
+Existing data and product state remain queryable through the API. New clients receive connection failures at the OTLP endpoint. Check the Render service logs, internal API connectivity, service-token agreement, and receiver limits. A Collector restart is safe because durable state lives behind the API and databases, but clients must still use standard retry behavior.
 
 ## Migration failure
 
@@ -70,4 +70,4 @@ The migration runner applies PostgreSQL first and ClickHouse second. Each migrat
 
 For planned maintenance, stop scenario traffic first, then Collector ingress, API, ClickHouse, and PostgreSQL. Start in the reverse dependency order: storage, migrations, API, Collector, examples. Compose encodes this startup order with health and completion conditions.
 
-Do not remove persistent volumes during routine restart. Do not restore a Render persistent-disk snapshot as if it were a ClickHouse logical backup.
+Do not remove persistent volumes during routine restart. A Render persistent-disk snapshot is not a coordinated PostgreSQL and ClickHouse backup.

@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node", "vitest/importMeta"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}
