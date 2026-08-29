@@ -9,14 +9,26 @@ type ButtonTone = "primary" | "secondary" | "ghost" | "danger";
 type ButtonProps = Omit<ComponentProps<typeof BaseButton>, "className"> & {
   children: ReactNode;
   compact?: boolean;
+  large?: boolean;
   tone?: ButtonTone;
 };
 
-export function Button({ children, compact = false, tone = "secondary", ...props }: ButtonProps) {
+export function Button({
+  children,
+  compact = false,
+  large = false,
+  tone = "secondary",
+  ...props
+}: ButtonProps) {
   return (
     <BaseButton
       {...props}
-      {...stylex.props(styles.button, toneStyles[tone], compact && styles.compact)}
+      {...stylex.props(
+        styles.button,
+        toneStyles[tone],
+        compact && styles.compact,
+        large && styles.large,
+      )}
     >
       {children}
     </BaseButton>
@@ -63,9 +75,11 @@ const styles = stylex.create({
     paddingInline: space.x3,
     transitionDuration: "140ms",
     transitionProperty: "background-color, border-color, color, opacity",
+    textDecoration: "none",
     userSelect: "none",
     whiteSpace: "nowrap",
     ":disabled": { cursor: "not-allowed", opacity: 0.45 },
   },
   compact: { height: { default: 32, "@media (max-width: 620px)": 44 }, paddingInline: 10 },
+  large: { fontSize: 14, height: 44, paddingInline: 18 },
 });
