@@ -13,6 +13,7 @@ backups/
 .env
 .env.*
 !.env.example
+!apps/console/.env.production
 
 # Editors and operating systems
 .DS_Store
