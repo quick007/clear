@@ -28,10 +28,10 @@ export function Button({
       nativeButton={nativeButton ?? render === undefined}
       render={render}
       {...stylex.props(
-        styles.button,
-        toneStyles[tone],
-        compact && styles.compact,
-        large && styles.large,
+        buttonStyles.button,
+        buttonToneStyles[tone],
+        compact && buttonStyles.compact,
+        large && buttonStyles.large,
       )}
     >
       {children}
@@ -39,7 +39,7 @@ export function Button({
   );
 }
 
-const toneStyles = stylex.create({
+export const buttonToneStyles = stylex.create({
   primary: {
     backgroundColor: { default: colors.text, ":hover": "#d6d3d1" },
     borderColor: colors.text,
@@ -62,7 +62,7 @@ const toneStyles = stylex.create({
   },
 });
 
-const styles = stylex.create({
+export const buttonStyles = stylex.create({
   button: {
     alignItems: "center",
     borderRadius: radii.sm,

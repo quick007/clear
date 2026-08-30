@@ -3,7 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 
 import { colors, space } from "../../theme/tokens.stylex";
-import { Button } from "../../ui/button";
+import { buttonStyles, buttonToneStyles } from "../../ui/button";
 import { ClearMark } from "../../ui/clear-mark";
 import { Icon } from "../../ui/icon";
 import { HomeAtmosphere } from "./home-atmosphere";
@@ -28,13 +28,20 @@ export function HomePage() {
           </p>
 
           <div {...stylex.props(styles.actions)}>
-            <Button large render={<Link search={{ start: true }} to="/board" />} tone="primary">
+            <Link
+              search={{ start: true }}
+              to="/board"
+              {...stylex.props(buttonStyles.button, buttonToneStyles.primary, buttonStyles.large)}
+            >
               Demo incident
               <Icon icon={ArrowRight01Icon} size={17} />
-            </Button>
-            <Button large render={<a href={loginHref} />} tone="secondary">
+            </Link>
+            <a
+              href={loginHref}
+              {...stylex.props(buttonStyles.button, buttonToneStyles.secondary, buttonStyles.large)}
+            >
               Log in
-            </Button>
+            </a>
           </div>
         </section>
       </main>
