@@ -158,8 +158,8 @@
       "theme": "dark",
       "headline": {
         "x": 360,
-        "y": 50,
-        "lines": ["Agent Driven Observability"],
+        "y": 72,
+        "lines": ["Let your agent see production"],
         "size": 88
       }
     }
