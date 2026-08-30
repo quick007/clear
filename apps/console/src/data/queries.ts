@@ -1,6 +1,7 @@
 import {
   type CloseIncidentRequest,
   type CreateAlertRequest,
+  CreateIngestKeyRequest,
   type CreateManualAlertRequest,
   type CreatePanelRequest,
   type StartInvestigationRequest,
@@ -414,7 +415,7 @@ export function useCreateIngestKey(projectId: ProjectId) {
       runMutation("Create ingest key", (runtime) =>
         runtime.api.client.ingestKeys.createIngestKey({
           params: { projectId },
-          payload: { name: IngestKeyName.make(name) },
+          payload: CreateIngestKeyRequest.make({ name: IngestKeyName.make(name) }),
         }),
       ),
     onSuccess: () =>

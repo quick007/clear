@@ -1,5 +1,5 @@
-import { CreateAlertRequest } from "@groundtruth/api-contract";
-import { AlertId, ProjectId } from "@groundtruth/domain";
+import { CreateAlertRequest, CreateIngestKeyRequest } from "@groundtruth/api-contract";
+import { AlertId, IngestKeyName, ProjectId } from "@groundtruth/domain";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { Schema } from "effect";
 import { makeBrowserApiClient } from "./client";
@@ -20,7 +20,7 @@ const makeSessionStorage = (initial: Readonly<Record<string, string>> = {}) => {
   };
 };
 
-describe("browser API client", () => {
+describe.sequential("browser API client", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("uses the generated contract client with credentials and access middleware", async () => {
@@ -33,6 +33,24 @@ describe("browser API client", () => {
       expect(new Headers(init?.headers).get("x-groundtruth-sandbox-session")).toBe("sandbox-1");
       if (request.method === "DELETE") return new Response(null, { status: 204 });
       if (request.method === "POST") {
+        if (new URL(request.url).pathname.endsWith("/ingest-keys")) {
+          return new Response(
+            JSON.stringify({
+              metadata: {
+                id: "01890f6e-7c00-7000-8000-000000000004",
+                projectId,
+                name: "primary-exporter",
+                prefix: "gtik_abc123def456",
+                status: "active",
+                createdAt: "2026-08-30T06:00:00.000Z",
+                lastUsedAt: null,
+                revokedAt: null,
+              },
+              key: `gtik_abc123def456_${"a".repeat(43)}`,
+            }),
+            { status: 201, headers: { "content-type": "application/json" } },
+          );
+        }
         return new Response(
           JSON.stringify({
             id: alertId,
@@ -83,10 +101,18 @@ describe("browser API client", () => {
       enabled: true,
     });
     await api.run(api.client.alerts.createAlert({ params: { projectId }, payload }));
+    await api.run(
+      api.client.ingestKeys.createIngestKey({
+        params: { projectId },
+        payload: CreateIngestKeyRequest.make({
+          name: IngestKeyName.make("primary-exporter"),
+        }),
+      }),
+    );
     await api.run(api.client.alerts.deleteAlert({ params: { projectId, alertId } }));
 
     expect(services).toEqual([]);
-    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(fetch).toHaveBeenCalledTimes(4);
     const request = fetch.mock.calls[0]?.[0];
     const requestUrl =
       typeof request === "string" ? request : request instanceof URL ? request.href : request?.url;
@@ -94,12 +120,14 @@ describe("browser API client", () => {
     expect(requests.map((item) => [item.method, new URL(item.url).pathname])).toEqual([
       ["GET", `/v1/projects/${projectId}/services`],
       ["POST", `/v1/projects/${projectId}/alerts`],
+      ["POST", `/v1/projects/${projectId}/ingest-keys`],
       ["DELETE", `/v1/projects/${projectId}/alerts/${alertId}`],
     ]);
     await expect(requests[1]?.clone().json()).resolves.toMatchObject({
       metricName: "http.server.duration",
       enabled: true,
     });
+    await expect(requests[2]?.clone().json()).resolves.toEqual({ name: "primary-exporter" });
   });
 
   it("persists and clears the per-tab sandbox session", async () => {
