@@ -124,13 +124,15 @@ The server enforces project scope from the authenticated ingest key. A client-pr
 
 ## Limits
 
-The checked-in Collector configuration starts with:
+The deployed all-in-one Collector configuration starts with:
 
 - 8 MiB inbound HTTP and gRPC messages
 - 16 MiB canonical batches between Collector and API
-- batches capped at 2,048 signal items
-- a bounded 128-request in-memory exporter queue
+- batches capped at 1,024 signal items
+- a bounded 32-request in-memory exporter queue with one consumer
 - ten seconds of bounded retry time for retryable backend failures
+
+The separate local and hosted Collector configurations allow batches of up to 2,048 signal items and use a 128-request queue with four consumers. Those larger topology-specific values do not describe the deployed all-in-one service.
 
 These are safety limits, not sizing promises. Review them together with API, ClickHouse, and client retry behavior before production use.
 
@@ -157,7 +159,7 @@ Set `OTEL_SERVICE_NAME` or the SDK's `service.name` resource attribute before th
 
 **Some data is retried or rejected**
 
-Check request size, client timeouts, Collector logs, API health, and ClickHouse capacity. A bounded batch is accepted or rejected atomically in the current implementation.
+Check request size, client timeouts, Collector logs, API health, and ClickHouse capacity. Clear validates a bounded batch before persistence and acknowledges it only after all ClickHouse writes finish. The writes span multiple tables and are not transactional, so a failed request can leave part of a batch persisted.
 
 **The local console does not show received data**
 

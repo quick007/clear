@@ -82,7 +82,7 @@ Content-Type: application/json
 
 The checked-in local and hosted configurations send these internal requests without compression. The ingest key header lets the backend reject a key revoked after the Collector authorization cache was populated. The header is authentication metadata and is not copied into canonical OTLP JSON. This preserves the OTLP resource, scope, schema URL, metric temporality, exemplar, trace, span, event, link, and log correlation structures for backend normalization.
 
-The backend accepts or rejects each bounded batch atomically in the first release. The official receiver returns a normal OTLP success response after acceptance, a retryable error for throttling or backend availability failures, and a permanent error for invalid data. Record-level partial success is intentionally not invented at the exporter boundary. If the backend later adds record-level rejection, its typed response and the receiver response path must be extended together.
+The backend validates each bounded batch before persistence and returns success only after every ClickHouse table write finishes. ClickHouse persistence spans multiple tables and is not transactional, so a failed request can leave part of a batch persisted. The official receiver returns a normal OTLP success response after acceptance, a retryable error for throttling or backend availability failures, and a permanent error for invalid data. Record-level partial success is intentionally not invented at the exporter boundary. If the backend later adds record-level rejection, its typed response and the receiver response path must be extended together.
 
 ## Local use
 
@@ -139,7 +139,7 @@ OTLP/HTTP accepts uncompressed and gzip-compressed Protobuf and Protobuf JSON at
 
 ## Bounds and backpressure
 
-The checked-in configurations apply these initial limits:
+The checked-in local and separate Collector configurations apply these initial limits:
 
 - 8 MiB inbound requests before and after HTTP decompression, and 8 MiB gRPC messages.
 - 16 MiB canonical JSON batches between the Collector and backend.
@@ -148,6 +148,8 @@ The checked-in configurations apply these initial limits:
 - A bounded 128-request exporter queue with four consumers.
 - Ten seconds of bounded retry time for retryable backend failures.
 - Synchronous queue results so OTLP callers receive downstream export failures.
+
+The deployed all-in-one configuration is smaller: it caps batches at 1,024 signal items and uses a 32-request queue with one consumer. The remaining request-size, memory, retry, and synchronous-result limits are unchanged.
 
 The queue is intentionally in memory. Collector authentication context is not safe to persist through the upstream persistent queue abstraction, and hosted v1 runs one Collector instance.
 

@@ -44,7 +44,7 @@ OpenTelemetry clients       Effect API       deploy-event webhooks
 
 The Collector validates an ingest key with the API, receives its project ID, and overwrites any client-provided `groundtruth.project.id` resource attribute. Batches are partitioned by authenticated project so records from different projects do not share an export request.
 
-The queue is bounded and in memory. Export failures are returned to OTLP callers after bounded retries so clients can apply their normal retry policy. The backend accepts or rejects each bounded batch atomically. Hosted ingress exposes OTLP/HTTP protobuf and JSON for metrics, logs, and traces. OTLP/gRPC is retained for local development but is not a hosted hackathon endpoint.
+The queue is bounded and in memory. Export failures are returned to OTLP callers after bounded retries so clients can apply their normal retry policy. The backend validates each bounded batch before persistence and responds only after all ClickHouse writes finish. Those writes span multiple tables and are not transactional, so a failure can leave part of a batch persisted. Hosted ingress exposes OTLP/HTTP protobuf and JSON for metrics, logs, and traces. OTLP/gRPC is retained for local development but is not a hosted hackathon endpoint.
 
 ## Control plane
 
