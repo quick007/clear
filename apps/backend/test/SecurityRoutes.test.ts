@@ -4,7 +4,7 @@ import { HttpRouter, HttpServerResponse } from "effect/unstable/http";
 import { BackendConfig } from "../src/config/BackendConfig.js";
 import { SecurityRoutes, sessionCookieName } from "../src/http/SecurityRoutes.js";
 
-const consoleOrigin = "https://clear.seufert.sh";
+const consoleOrigin = "https://clear.test";
 
 const configTest = (publicRequestsPerMinute = 300) =>
   Layer.succeed(
@@ -12,7 +12,7 @@ const configTest = (publicRequestsPerMinute = 300) =>
     BackendConfig.of({
       environment: "test",
       port: 3000,
-      publicUrl: "https://api.clear.seufert.sh",
+      publicUrl: "https://api.clear.test",
       consoleOrigin,
       developmentConsoleOrigin: undefined,
       collectorSecret: Redacted.make("collector-secret"),
@@ -59,7 +59,7 @@ describe("SecurityRoutes", () => {
       Effect.gen(function* () {
         const response = yield* Effect.promise(() =>
           handler(
-            new Request("https://api.clear.seufert.sh/probe", {
+            new Request("https://api.clear.test/probe", {
               method: "OPTIONS",
               headers: {
                 origin: consoleOrigin,
@@ -86,7 +86,7 @@ describe("SecurityRoutes", () => {
         const cookie = `${sessionCookieName}=opaque-session`;
         const missingOrigin = yield* Effect.promise(() =>
           handler(
-            new Request("https://api.clear.seufert.sh/probe", {
+            new Request("https://api.clear.test/probe", {
               method: "POST",
               headers: { cookie },
             }),
@@ -94,7 +94,7 @@ describe("SecurityRoutes", () => {
         );
         const allowedOrigin = yield* Effect.promise(() =>
           handler(
-            new Request("https://api.clear.seufert.sh/probe", {
+            new Request("https://api.clear.test/probe", {
               method: "POST",
               headers: { cookie, origin: consoleOrigin },
             }),
@@ -102,7 +102,7 @@ describe("SecurityRoutes", () => {
         );
         const cookieFree = yield* Effect.promise(() =>
           handler(
-            new Request("https://api.clear.seufert.sh/probe", {
+            new Request("https://api.clear.test/probe", {
               method: "POST",
             }),
           ),
@@ -125,7 +125,7 @@ describe("SecurityRoutes", () => {
             (index) =>
               Effect.promise(() =>
                 handler(
-                  new Request("https://api.clear.seufert.sh/probe", {
+                  new Request("https://api.clear.test/probe", {
                     headers: {
                       authorization: `Bearer invalid-${index}`,
                       "x-groundtruth-sandbox-session": `invalid-${index}`,
@@ -149,14 +149,14 @@ describe("SecurityRoutes", () => {
         Effect.gen(function* () {
           const first = yield* Effect.promise(() =>
             handler(
-              new Request("https://api.clear.seufert.sh/probe", {
+              new Request("https://api.clear.test/probe", {
                 headers: { "x-forwarded-for": "203.0.113.1" },
               }),
             ),
           );
           const second = yield* Effect.promise(() =>
             handler(
-              new Request("https://api.clear.seufert.sh/probe", {
+              new Request("https://api.clear.test/probe", {
                 headers: { "x-forwarded-for": "198.51.100.200" },
               }),
             ),
@@ -177,7 +177,7 @@ describe("SecurityRoutes", () => {
           (index) =>
             Effect.promise(() =>
               handler(
-                new Request("https://api.clear.seufert.sh/v1/sandbox/session", {
+                new Request("https://api.clear.test/v1/sandbox/session", {
                   method: "POST",
                   headers: {
                     "x-forwarded-for": `203.0.113.${index + 1}`,

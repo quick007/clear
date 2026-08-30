@@ -7,6 +7,9 @@ readonly postgres_data="${PGDATA:-/var/lib/postgresql/data}"
 readonly postgres_password="${GROUNDTRUTH_POSTGRES_PASSWORD:?GROUNDTRUTH_POSTGRES_PASSWORD is required}"
 readonly clickhouse_password="${GROUNDTRUTH_CLICKHOUSE_PASSWORD:?GROUNDTRUTH_CLICKHOUSE_PASSWORD is required}"
 readonly demo_ingest_key="${GROUNDTRUTH_DEMO_INGEST_KEY:?GROUNDTRUTH_DEMO_INGEST_KEY is required}"
+readonly public_url="${GROUNDTRUTH_PUBLIC_URL:?GROUNDTRUTH_PUBLIC_URL is required}"
+readonly console_origin="${GROUNDTRUTH_CONSOLE_ORIGIN:?GROUNDTRUTH_CONSOLE_ORIGIN is required}"
+readonly checkout_service_url="${CHECKOUT_BASE_URL:-http://${CHECKOUT_HOSTPORT:?CHECKOUT_BASE_URL or CHECKOUT_HOSTPORT is required}}"
 declare -a service_pids=()
 
 terminate_services() {
@@ -71,7 +74,8 @@ start_postgres() {
 start_clickhouse() {
   mkdir -p /var/lib/clickhouse
   chown -R clickhouse:clickhouse /var/lib/clickhouse
-  export CLICKHOUSE_DB=groundtruth
+  # The committed migrations create the database. Leaving CLICKHOUSE_DB unset
+  # avoids the image's one-shot init server and keeps this supervisor in control.
   export CLICKHOUSE_USER=groundtruth
   export CLICKHOUSE_PASSWORD="$clickhouse_password"
   export CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
@@ -89,11 +93,11 @@ configure_application() {
   local encoded_postgres_password
   encoded_postgres_password="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$postgres_password")"
 
-  # Keep the internal API off Render's public port scanner. Nginx owns port 10000.
+  # Keep the internal API off Render's public port scanner. Nginx owns port 10001.
   export GROUNDTRUTH_HOST=127.0.0.1
   export GROUNDTRUTH_PORT=3000
-  export GROUNDTRUTH_PUBLIC_URL="${GROUNDTRUTH_PUBLIC_URL:-https://api.clear.seufert.sh}"
-  export GROUNDTRUTH_CONSOLE_ORIGIN="${GROUNDTRUTH_CONSOLE_ORIGIN:-https://clear.seufert.sh}"
+  export GROUNDTRUTH_PUBLIC_URL="$public_url"
+  export GROUNDTRUTH_CONSOLE_ORIGIN="$console_origin"
   export GROUNDTRUTH_POSTGRES_URL="postgresql://groundtruth:${encoded_postgres_password}@127.0.0.1:5432/groundtruth"
   export GROUNDTRUTH_POSTGRES_MAX_CONNECTIONS="${GROUNDTRUTH_POSTGRES_MAX_CONNECTIONS:-8}"
   export GROUNDTRUTH_CLICKHOUSE_URL=http://127.0.0.1:8123
@@ -111,6 +115,14 @@ configure_application() {
 start_application_services() {
   # Bind Render's public port before any internal TCP listener. Render selects
   # the first detected port for health checks and public traffic.
+  mkdir -p \
+    /var/lib/nginx/logs \
+    /var/lib/nginx/tmp/client_body \
+    /var/lib/nginx/tmp/fastcgi \
+    /var/lib/nginx/tmp/proxy \
+    /var/lib/nginx/tmp/scgi \
+    /var/lib/nginx/tmp/uwsgi
+  chown -R nginx:nginx /var/lib/nginx
   nginx -g 'daemon off;' &
   service_pids+=("$!")
 
@@ -133,17 +145,17 @@ start_application_services() {
 
   PORT=4103 \
     OTEL_SERVICE_NAME=load-generator \
-    CHECKOUT_BASE_URL="${CHECKOUT_BASE_URL:-https://checkout-api.clear.seufert.sh}" \
+    CHECKOUT_BASE_URL="$checkout_service_url" \
     PAYMENTS_BASE_URL=http://127.0.0.1:4102 \
-    su-exec clear:clear node apps/load-generator/dist/main.mjs &
+    su-exec clear:clear node examples/load-generator/dist/main.mjs &
   service_pids+=("$!")
   wait_for_command "Load generator" curl --fail --silent http://127.0.0.1:4103/readyz
 
-  wait_for_command "Clear ingress" curl --fail --silent --header 'Host: api.clear.seufert.sh' http://127.0.0.1:10000/health
+  wait_for_command "Clear ingress" curl --fail --silent http://127.0.0.1:10001/health
 }
 
 keep_checkout_warm() {
-  local checkout_url="${CHECKOUT_KEEPALIVE_URL:-https://checkout-api.clear.seufert.sh/readyz}"
+  local checkout_url="${checkout_service_url%/}/readyz"
   while true; do
     sleep 600
     curl --fail --silent --max-time 15 "$checkout_url" >/dev/null || true

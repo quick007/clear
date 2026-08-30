@@ -5,12 +5,12 @@ const env = {
   ASSETS: {
     fetch: vi.fn(async () => new Response("console asset")),
   } as unknown as Fetcher,
-  GROUNDTRUTH_API_ORIGIN: "https://api.clear.seufert.sh",
+  GROUNDTRUTH_API_ORIGIN: "https://api.clear.test",
   GROUNDTRUTH_SITE_HANDOFF_SECRET: "sites-handoff-secret",
 } as const;
 
 const request = (path: string, init?: RequestInit) =>
-  new Request(`https://clear.seufert.sh${path}`, init);
+  new Request(`https://clear.test${path}`, init);
 
 const authenticatedHeaders = {
   "oai-authenticated-user-id": "chatgpt-user-1",
@@ -61,7 +61,7 @@ describe("Sites authentication Worker", () => {
     const handoffCode = "handoff-code-123456789012345678901234";
     let browserNonce: string | undefined;
     const backendFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      expect(requestUrl(input)).toBe("https://api.clear.seufert.sh/v1/auth/handoffs");
+      expect(requestUrl(input)).toBe("https://api.clear.test/v1/auth/handoffs");
       expect(init?.method).toBe("POST");
       expect(init?.redirect).toBe("error");
       expect(new Headers(init?.headers).get("authorization")).toBe("Bearer sites-handoff-secret");
@@ -96,7 +96,7 @@ describe("Sites authentication Worker", () => {
 
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe(
-      `https://api.clear.seufert.sh/v1/auth/chatgpt/callback?code=${handoffCode}`,
+      `https://api.clear.test/v1/auth/chatgpt/callback?code=${handoffCode}`,
     );
     expect(response.headers.get("location")).not.toContain("returnPath");
     expect(response.headers.get("location")).not.toContain(browserNonce ?? "missing-nonce");
@@ -104,7 +104,7 @@ describe("Sites authentication Worker", () => {
     const nonceCookie = response.headers.get("set-cookie") ?? "";
     expect(nonceCookie).toContain(`groundtruth_handoff_nonce=${browserNonce}`);
     expect(nonceCookie).toContain("Max-Age=60");
-    expect(nonceCookie).toContain("Domain=clear.seufert.sh");
+    expect(nonceCookie).toContain("Domain=clear.test");
     expect(nonceCookie).toContain("Path=/v1/auth/chatgpt/callback");
     expect(nonceCookie).toContain("HttpOnly");
     expect(nonceCookie).toContain("Secure");

@@ -1,7 +1,12 @@
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { createCheckout } from "./checkout-api";
 
-afterEach(() => vi.restoreAllMocks());
+beforeEach(() => vi.stubEnv("VITE_CHECKOUT_API_URL", "https://checkout-api.clear.test"));
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
 
 describe("createCheckout", () => {
   it("makes exactly one browser request", async () => {

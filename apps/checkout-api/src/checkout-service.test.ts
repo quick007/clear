@@ -130,7 +130,7 @@ describe("CheckoutService request metrics", () => {
     const ConfigTest = Layer.succeed(
       CheckoutConfig,
       CheckoutConfig.of({
-        checkoutWebOrigin: "https://checkout.clear.seufert.sh",
+        checkoutWebOrigin: "https://checkout.clear.test",
         deployEventsUrl: Option.none(),
         ingestKey: Option.none(),
         paymentsBaseUrl: "http://payments-stub",

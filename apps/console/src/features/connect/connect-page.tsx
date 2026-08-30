@@ -2,6 +2,7 @@ import { CheckmarkCircle02Icon, CloudUploadIcon, Key01Icon } from "@hugeicons/co
 import * as stylex from "@stylexjs/stylex";
 import { useState } from "react";
 
+import { getConsoleConfig } from "../../config";
 import { errorMessage, formatRelativeTime } from "../../data/format";
 import { useCreateIngestKey, useOverviewQuery, useRuntimeQuery } from "../../data/queries";
 import { colors, radii, space } from "../../theme/tokens.stylex";
@@ -11,11 +12,8 @@ import { Icon } from "../../ui/icon";
 import { ContentState, Page, PageHeader, RetryButton } from "../../ui/page";
 import { StatusDot } from "../../ui/status";
 
-const endpoint =
-  import.meta.env.VITE_CLEAR_OTLP_ENDPOINT ??
-  (import.meta.env.DEV ? "http://localhost:4318" : "https://otlp.clear.seufert.sh");
-
 export function ConnectPage() {
+  const endpoint = getConsoleConfig().otlpOrigin;
   const runtime = useRuntimeQuery();
   const projectId = runtime.data?.projectId ?? null;
   const overview = useOverviewQuery(projectId);

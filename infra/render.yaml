@@ -16,15 +16,12 @@ services:
     dockerfilePath: Dockerfile
     healthCheckPath: /health
     autoDeployTrigger: commit
-    domains:
-      - api.clear.seufert.sh
-      - otlp.clear.seufert.sh
     renderSubdomainPolicy: enabled
     buildFilter:
       paths:
         - apps/backend/**
         - apps/collector/**
-        - apps/load-generator/**
+        - examples/load-generator/**
         - apps/payments-stub/**
         - infra/clickhouse/**
         - infra/docker/backend-entry.mjs
@@ -44,10 +41,17 @@ services:
       mountPath: /var/lib
       sizeGB: 10
     envVars:
+      - key: PORT
+        value: 10001
       - key: GROUNDTRUTH_PUBLIC_URL
-        value: https://clear-runtime.onrender.com
+        sync: false
       - key: GROUNDTRUTH_CONSOLE_ORIGIN
-        value: https://clear-observability.seufert.chatgpt.site
+        sync: false
+      - key: CHECKOUT_HOSTPORT
+        fromService:
+          type: web
+          name: clear-checkout-api
+          property: hostport
       - key: GROUNDTRUTH_POSTGRES_PASSWORD
         generateValue: true
       - key: GROUNDTRUTH_CLICKHOUSE_PASSWORD
@@ -115,14 +119,12 @@ services:
     name: clear-checkout-api
     runtime: docker
     region: oregon
-    plan: free
+    plan: 0.5c-512mb
     numInstances: 1
     dockerContext: .
     dockerfilePath: apps/checkout-api/Dockerfile
     healthCheckPath: /readyz
     autoDeployTrigger: commit
-    domains:
-      - checkout-api.clear.seufert.sh
     renderSubdomainPolicy: enabled
     buildFilter:
       paths:
@@ -134,20 +136,21 @@ services:
         - vite.config.ts
     envVars:
       - key: PORT
-        value: 10000
+        value: 4101
       - key: OTEL_SERVICE_NAME
         value: checkout-api
-      - key: OTEL_EXPORTER_OTLP_ENDPOINT
-        value: https://clear-runtime.onrender.com
       - key: OTEL_EXPORTER_OTLP_PROTOCOL
         value: http/protobuf
+      - key: GROUNDTRUTH_RUNTIME_HOSTPORT
+        fromService:
+          type: web
+          name: clear-runtime
+          property: hostport
       - key: GROUNDTRUTH_INGEST_KEY
         fromService:
           type: web
           name: clear-runtime
           envVarKey: GROUNDTRUTH_DEMO_INGEST_KEY
-      - key: PAYMENTS_BASE_URL
-        value: https://clear-runtime.onrender.com/internal/payments
       - key: PAYMENTS_SERVICE_TOKEN
         fromService:
           type: web
@@ -155,9 +158,7 @@ services:
           envVarKey: SERVICE_TOKEN
       - key: UPSTREAM_TIMEOUT_MS
         value: 750 # 750 milliseconds
-      - key: GROUNDTRUTH_DEPLOY_EVENTS_URL
-        value: https://clear-runtime.onrender.com/v1/events/deploy
       - key: CHECKOUT_WEB_ORIGIN
-        value: https://clear-checkout.seufert.chatgpt.site
+        sync: false
       - key: NODE_OPTIONS
         value: --max-old-space-size=320

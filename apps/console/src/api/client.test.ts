@@ -2,7 +2,7 @@ import { CreateAlertRequest } from "@groundtruth/api-contract";
 import { AlertId, ProjectId } from "@groundtruth/domain";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { Schema } from "effect";
-import { makeBrowserApiClient, resolveApiBaseUrl } from "./client";
+import { makeBrowserApiClient } from "./client";
 
 const projectId = Schema.decodeUnknownSync(ProjectId)("01890f6e-7c00-7000-8000-000000000001");
 
@@ -113,20 +113,5 @@ describe("browser API client", () => {
 
     api.access.setSandboxSessionId(null);
     expect(sessionStorage.getItem("groundtruth.sandboxSessionId")).toBeNull();
-  });
-});
-
-describe("resolveApiBaseUrl", () => {
-  it("uses localhost only for development", () => {
-    expect(resolveApiBaseUrl({ isDevelopment: true })).toBe("http://localhost:3000");
-  });
-
-  it("requires an explicit production API origin", () => {
-    expect(() => resolveApiBaseUrl({ isDevelopment: false })).toThrow(
-      "Set VITE_GROUNDTRUTH_API_URL",
-    );
-    expect(
-      resolveApiBaseUrl({ configured: "https://api.groundtruth.example", isDevelopment: false }),
-    ).toBe("https://api.groundtruth.example");
   });
 });

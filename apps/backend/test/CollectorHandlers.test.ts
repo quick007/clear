@@ -96,7 +96,7 @@ describe("CollectorHandlers", () => {
           const body = '{\n  "resourceMetrics": []\n}';
           const response = yield* Effect.promise(() =>
             handler(
-              new Request("https://api.clear.seufert.sh/internal/v1/telemetry/metrics", {
+              new Request("https://api.clear.test/internal/v1/telemetry/metrics", {
                 method: "POST",
                 headers: {
                   authorization: "Bearer collector-secret",
@@ -151,7 +151,7 @@ describe("CollectorHandlers", () => {
           });
           const response = yield* Effect.promise(() =>
             handler(
-              new Request("https://api.clear.seufert.sh/internal/v1/telemetry/activity", {
+              new Request("https://api.clear.test/internal/v1/telemetry/activity", {
                 method: "POST",
                 headers: {
                   authorization: "Bearer collector-secret",

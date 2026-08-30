@@ -3,6 +3,11 @@
 An always-on internal service that drives deterministic checkout traffic and
 records the incident screenplay as explicit, timestamped phase transitions.
 
+This is incident support tooling rather than product runtime code. The hosted
+Render stack runs it as an internal process for the scripted incident, while
+contributors can run it independently against local checkout and payments
+services.
+
 ## HTTP surface
 
 - `GET /healthz`
@@ -40,5 +45,13 @@ vp run start
 ```
 
 ```sh
-vp exec docker build -f apps/load-generator/Dockerfile -t clear-load .
+vp exec docker build -f examples/load-generator/Dockerfile -t clear-load .
 ```
+
+## Key files
+
+- [`src/main.ts`](src/main.ts): Effect runtime and HTTP server.
+- [`src/scenario-controller.ts`](src/scenario-controller.ts): phase transitions and counters.
+- [`src/checkout-client.ts`](src/checkout-client.ts): generated checkout requests.
+- [`src/payments-admin.ts`](src/payments-admin.ts): controlled upstream state.
+- [`src/telemetry.ts`](src/telemetry.ts): generator telemetry.

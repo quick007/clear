@@ -23,10 +23,10 @@ RUN vp pack \
     --sourcemap \
     --deps.always-bundle '/.*/'
 RUN vp pack \
-    apps/load-generator/src/main.ts \
+    examples/load-generator/src/main.ts \
     --no-config \
     --platform node \
-    --out-dir apps/load-generator/dist \
+    --out-dir examples/load-generator/dist \
     --clean \
     --sourcemap \
     --deps.always-bundle '/.*/'
@@ -87,7 +87,7 @@ COPY --from=collector-build /src/apps/collector/dist/clear-collector /usr/local/
 COPY --from=node-build /workspace/apps/backend/dist ./apps/backend/dist
 COPY --from=node-build /workspace/infra/docker/backend-entry.mjs ./apps/backend/dist/index.mjs
 COPY --from=node-build /workspace/apps/payments-stub/dist ./apps/payments-stub/dist
-COPY --from=node-build /workspace/apps/load-generator/dist ./apps/load-generator/dist
+COPY --from=node-build /workspace/examples/load-generator/dist ./examples/load-generator/dist
 COPY --from=node-build /workspace/packages/persistence/dist ./packages/persistence/dist
 COPY --from=node-build /workspace/packages/persistence/drizzle ./packages/persistence/drizzle
 COPY --from=node-build /workspace/infra/clickhouse/migrations ./infra/clickhouse/migrations
@@ -106,7 +106,7 @@ RUN chmod 0755 /usr/local/bin/start-clear /usr/local/bin/clear-collector && \
     chown -R postgres:postgres /var/lib/postgresql && \
     chown -R clickhouse:clickhouse /var/lib/clickhouse
 
-EXPOSE 10000
+EXPOSE 10001
 
 STOPSIGNAL SIGTERM
 ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/start-clear"]

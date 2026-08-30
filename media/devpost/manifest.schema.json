@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://clear.seufert.sh/schemas/devpost-media-manifest.json",
+  "$id": "urn:clear:schemas:devpost-media-manifest",
   "title": "Clear Devpost media manifest",
   "type": "object",
   "additionalProperties": false,

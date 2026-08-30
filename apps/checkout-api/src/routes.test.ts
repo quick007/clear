@@ -7,8 +7,8 @@ import { CheckoutResponse } from "./contracts.js";
 import { PaymentUnavailable } from "./errors.js";
 import { Routes } from "./routes.js";
 
-const checkoutOrigin = "https://checkout.clear.seufert.sh";
-const checkoutUrl = "https://checkout-api.clear.seufert.sh/v1/checkout";
+const checkoutOrigin = "https://checkout.clear.test";
+const checkoutUrl = "https://checkout-api.clear.test/v1/checkout";
 const validRequest = {
   amountCents: 16_058,
   itemCount: 1,

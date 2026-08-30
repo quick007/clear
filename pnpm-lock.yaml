@@ -527,7 +527,7 @@ importers:
         specifier: 4.127.0
         version: 4.127.0(@cloudflare/workers-types@5.20260828.1)
 
-  apps/load-generator:
+  examples/load-generator:
     dependencies:
       '@effect/opentelemetry':
         specifier: 4.0.0-beta.107

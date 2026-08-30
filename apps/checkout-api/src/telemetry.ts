@@ -6,6 +6,7 @@ import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { Config, Effect, Option, Redacted } from "effect";
+import { clearRuntimeEndpoints } from "./config.js";
 
 const exporterHeaders = Config.redacted("GROUNDTRUTH_INGEST_KEY").pipe(
   Config.option,
@@ -19,18 +20,23 @@ const exporterHeaders = Config.redacted("GROUNDTRUTH_INGEST_KEY").pipe(
 export const TelemetryLive = NodeSdk.layer(
   Effect.gen(function* () {
     const headers = Option.getOrUndefined(yield* exporterHeaders);
+    const runtime = yield* clearRuntimeEndpoints;
     const exportIntervalMillis = yield* Config.int("OTEL_METRIC_EXPORT_INTERVAL_MS").pipe(
       Config.withDefault(5_000),
     ); // 5 seconds
-    const exporterOptions = headers === undefined ? undefined : { headers };
+    const exporterOptions = (endpoint: Option.Option<string>) =>
+      Option.match(endpoint, {
+        onNone: () => (headers === undefined ? {} : { headers }),
+        onSome: (url) => (headers === undefined ? { url } : { headers, url }),
+      });
 
     return {
       logRecordProcessor: new BatchLogRecordProcessor({
-        exporter: new OTLPLogExporter(exporterOptions),
+        exporter: new OTLPLogExporter(exporterOptions(runtime.otlpLogsUrl)),
       }),
       loggerMergeWithExisting: true,
       metricReader: new PeriodicExportingMetricReader({
-        exporter: new OTLPMetricExporter(exporterOptions),
+        exporter: new OTLPMetricExporter(exporterOptions(runtime.otlpMetricsUrl)),
         exportIntervalMillis,
       }),
       resource: {
@@ -38,7 +44,9 @@ export const TelemetryLive = NodeSdk.layer(
         serviceVersion: "0.0.0",
       },
       shutdownTimeout: 5_000, // 5 seconds
-      spanProcessor: new BatchSpanProcessor(new OTLPTraceExporter(exporterOptions)),
+      spanProcessor: new BatchSpanProcessor(
+        new OTLPTraceExporter(exporterOptions(runtime.otlpTracesUrl)),
+      ),
     };
   }),
 );

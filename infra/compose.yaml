@@ -297,7 +297,7 @@ services:
     image: groundtruth-load-generator:local
     build:
       context: ..
-      dockerfile: apps/load-generator/Dockerfile
+      dockerfile: examples/load-generator/Dockerfile
     restart: unless-stopped
     environment:
       <<: *example-telemetry

@@ -3,7 +3,7 @@ import { Effect, Layer } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/unstable/http";
 import { makeRequestGuards } from "./security.js";
 
-const checkoutUrl = "https://checkout-api.clear.seufert.sh/v1/checkout";
+const checkoutUrl = "https://checkout-api.clear.test/v1/checkout";
 
 const withHandler = <Value>(
   routes: Layer.Layer<never, never, HttpRouter.HttpRouter>,
@@ -57,7 +57,7 @@ describe("checkout request guards", () => {
           Effect.promise(() => handler(new Request(checkoutUrl, { method: "POST" }))),
         );
         const health = yield* Effect.promise(() =>
-          handler(new Request("https://checkout-api.clear.seufert.sh/healthz")),
+          handler(new Request("https://checkout-api.clear.test/healthz")),
         );
 
         assert.deepStrictEqual(

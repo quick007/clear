@@ -18,6 +18,10 @@ jobs:
     name: TypeScript workspace
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      VITE_CLEAR_OTLP_ENDPOINT: https://otlp.clear.test
+      VITE_GROUNDTRUTH_API_URL: https://api.clear.test
+      VITE_CHECKOUT_API_URL: https://checkout-api.clear.test
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

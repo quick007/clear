@@ -4,9 +4,6 @@
   "main": "./src/worker.ts",
   "compatibility_date": "2026-08-28",
   "compatibility_flags": ["nodejs_compat"],
-  "vars": {
-    "GROUNDTRUTH_API_ORIGIN": "https://api.clear.seufert.sh",
-  },
   "secrets": {
     "required": ["GROUNDTRUTH_SITE_HANDOFF_SECRET"],
   },

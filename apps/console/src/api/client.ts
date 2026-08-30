@@ -2,6 +2,7 @@ import { GroundtruthAccess, GroundtruthApi } from "@groundtruth/api-contract";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient, HttpClientRequest } from "effect/unstable/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/unstable/httpapi";
+import { getConsoleConfig } from "../config";
 
 export type GroundtruthClient = HttpApiClient.ForApi<typeof GroundtruthApi>;
 
@@ -52,27 +53,6 @@ const persistSandboxSessionId = (storage: SessionStorage | null, sessionId: stri
   }
 };
 
-export const resolveApiBaseUrl = ({
-  configured,
-  isDevelopment,
-}: {
-  configured?: string;
-  isDevelopment: boolean;
-}) => {
-  const value = configured?.trim();
-  if (value) return value;
-  if (isDevelopment) return "http://localhost:3000";
-  throw new Error(
-    "Clear API URL is not configured. Set VITE_GROUNDTRUTH_API_URL for this deployment.",
-  );
-};
-
-const defaultBaseUrl = () =>
-  resolveApiBaseUrl({
-    configured: import.meta.env.VITE_GROUNDTRUTH_API_URL,
-    isDevelopment: import.meta.env.DEV,
-  });
-
 export const makeBrowserApiClient = async (
   options: { readonly baseUrl?: string; readonly sessionStorage?: SessionStorage | null } = {},
 ): Promise<BrowserApiClient> => {
@@ -98,7 +78,7 @@ export const makeBrowserApiClient = async (
 
   const client = await Effect.runPromise(
     HttpApiClient.make(GroundtruthApi, {
-      baseUrl: options.baseUrl ?? defaultBaseUrl(),
+      baseUrl: options.baseUrl ?? getConsoleConfig().apiOrigin,
     }).pipe(Effect.provide(clientLayer)),
   );
 

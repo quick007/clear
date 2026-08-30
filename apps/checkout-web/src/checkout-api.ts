@@ -1,4 +1,5 @@
 import { Option, Schema } from "effect";
+import { getCheckoutConfig } from "./config";
 
 const Identifier = Schema.String.check(
   Schema.isLengthBetween(1, 160),
@@ -22,8 +23,6 @@ export type CheckoutFailure = {
   code: "invalid_request" | "payments_unavailable" | "request_failed";
   message: string;
 };
-
-const defaultApiUrl = "http://localhost:4101";
 
 const requestFailed = (): CheckoutFailure => ({
   code: "request_failed",
@@ -60,7 +59,7 @@ export const createCheckout = async ({
   signal?: AbortSignal;
   userId: string;
 }): Promise<CheckoutResult> => {
-  const apiUrl = (import.meta.env.VITE_CHECKOUT_API_URL || defaultApiUrl).replace(/\/$/u, "");
+  const apiUrl = getCheckoutConfig().apiOrigin;
   const response = await fetch(`${apiUrl}/v1/checkout`, {
     body: JSON.stringify({ amountCents, itemCount, requestId: crypto.randomUUID(), userId }),
     headers: { "content-type": "application/json" },

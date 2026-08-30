@@ -20,7 +20,7 @@ apps/checkout-api
 apps/checkout-web
 apps/collector
 apps/console
-apps/load-generator
+examples/load-generator
 apps/payments-stub
 infra/runbooks
 *.log
