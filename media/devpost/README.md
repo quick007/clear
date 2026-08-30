@@ -10,19 +10,21 @@ Capture product sources at 2560 by 1440 without browser chrome when the surface 
 | --------------------------------------- | ----------------------------------------------------------- |
 | `sources/homepage.png`                  | Signed-out homepage after the paper shader settles          |
 | `sources/homepage-material.png`         | Shader-only lower edge derived from `homepage.png`          |
+| `sources/homepage-background.png`       | Atmosphere-only homepage at the final 1800 by 1200 canvas   |
 | `sources/board-reveal.png`              | Requests elevated, users flat, retries visible              |
 | `sources/codex-agent.png`               | Clean Codex task with only the checkout repository attached |
 | `sources/board-agent.png`               | Clear at the same moment as the Codex capture               |
 | `sources/board-agent-top.png`           | Diagnosed Clear board at scroll top with no stale notices   |
+| `sources/board-agent-pane.png`          | Diagnosed board at the final responsive pane size           |
 | `sources/codex-workspace-reference.png` | User-provided Codex investigation reference                 |
-| `sources/hero-workspace.png`            | Prepared 30/70 Codex and Clear workspace                    |
+| `sources/hero-workspace.png`            | Prepared 28/72 Codex and Clear workspace                    |
 | `sources/trace-detail.png`              | Real retrying checkout trace with an upstream failure       |
 | `sources/log-detail.png`                | Correlated logs for the same service and time window        |
 | `sources/recovery-board.png`            | Real deploy marker with latency and retries recovering      |
 
 Do not include keys, tokens, local paths, unrelated browser tabs, or unfinished UI. Use the real deployed app and a real Codex task. If a callout disagrees with the captured value or points at the wrong evidence, adjust the manifest before rendering.
 
-`homepage-material.png` is a deterministic crop and resize of the real homepage capture. Regenerate it from `homepage.png`; do not repaint or hand-edit the shader. `hero-workspace.png` is a deterministic composition of `codex-workspace-reference.png` and `board-agent-top.png`.
+`homepage-material.png` is a deterministic crop and resize of the real homepage capture used by the thumbnail. Regenerate it from `homepage.png`; do not repaint or hand-edit the shader. The hero instead uses `homepage-background.png` at its native 1800 by 1200 size without crop, modulation, or fading. `hero-workspace.png` is a deterministic composition of `codex-workspace-reference.png` and `board-agent-pane.png`. The Clear pane is captured at its final responsive size, so the compositor does not crop or reshape it. Only the bottom of the combined workspace continues below the final hero canvas.
 
 ## Final outputs
 

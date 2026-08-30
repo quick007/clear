@@ -118,33 +118,20 @@
     "maxBytes": 10000000,
     "layers": [
       {
-        "source": "homepageMaterial",
+        "source": "homepageBackground",
         "x": 0,
-        "y": 180,
+        "y": 0,
         "width": 1800,
-        "height": 1020,
-        "fit": "cover",
-        "position": "centre",
-        "crop": {
-          "left": 0,
-          "top": 0,
-          "width": 2560,
-          "height": 1440
-        },
-        "style": {
-          "fadeTop": 420,
-          "modulate": {
-            "brightness": 0.9,
-            "saturation": 1
-          }
-        }
+        "height": 1200,
+        "fit": "contain",
+        "position": "centre"
       },
       {
         "source": "heroWorkspace",
-        "x": 64,
-        "y": 350,
-        "width": 1672,
-        "height": 940,
+        "x": 62,
+        "y": 450,
+        "width": 1675,
+        "height": 804,
         "fit": "cover",
         "position": "north",
         "clipToCanvas": true,

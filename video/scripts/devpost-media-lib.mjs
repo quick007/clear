@@ -18,9 +18,11 @@ const expectedAssets = new Map([
 
 const expectedSources = [
   "homepage",
+  "homepageBackground",
   "boardReveal",
   "codexAgent",
   "boardAgent",
+  "boardAgentPane",
   "heroWorkspace",
   "traceDetail",
   "logDetail",

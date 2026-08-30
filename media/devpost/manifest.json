@@ -28,6 +28,18 @@
         "state": "Derived from the captured homepage without recreating or repainting the shader."
       }
     },
+    "homepageBackground": {
+      "file": "homepage-background.png",
+      "description": "The live Clear homepage atmosphere captured without foreground content at the final hero dimensions.",
+      "capture": {
+        "route": "/",
+        "viewport": {
+          "width": 1800,
+          "height": 1200
+        },
+        "state": "Fresh homepage atmosphere with the foreground main content hidden only for the capture."
+      }
+    },
     "boardReveal": {
       "file": "board-reveal.png",
       "description": "Clear board after the agent creates the requests-versus-users and retries panels.",
@@ -76,6 +88,18 @@
         "state": "Fresh sandbox at scroll top with the rejected surge hypothesis, confirmed retry hypothesis, and no stale-session notices."
       }
     },
+    "boardAgentPane": {
+      "file": "board-agent-pane.png",
+      "description": "Diagnosed Clear board captured at its final responsive pane dimensions.",
+      "capture": {
+        "route": "/board",
+        "viewport": {
+          "width": 1800,
+          "height": 1200
+        },
+        "state": "Viewport capture from a fresh sandbox at scroll top with the rejected surge hypothesis, confirmed retry hypothesis, and no overlays or chart hover state."
+      }
+    },
     "codexWorkspaceReference": {
       "file": "codex-workspace-reference.png",
       "description": "User-provided Codex investigation reference used only for its clean left task pane.",
@@ -94,10 +118,10 @@
       "capture": {
         "route": "Derived from the Codex and Clear source captures",
         "viewport": {
-          "width": 2560,
-          "height": 1440
+          "width": 2500,
+          "height": 1200
         },
-        "state": "Codex occupies the left 30 percent and Clear occupies the right 70 percent with no browser chrome or stale-session notices."
+        "state": "Codex occupies the left 28 percent and Clear occupies the right 72 percent with no browser chrome or stale-session notices."
       }
     },
     "traceDetail": {
