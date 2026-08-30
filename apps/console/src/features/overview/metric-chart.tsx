@@ -37,6 +37,7 @@ const severityRank = { critical: 3, warning: 2, info: 1 } as const;
 
 export function MetricChart({ accessibleName, summary, ...input }: MetricChartProps) {
   const descriptionId = useId();
+  const gradientPrefix = useId().replaceAll(":", "");
   const narrow = useSyncExternalStore(subscribeNarrowViewport, narrowViewport, () => false);
   const model = buildMetricChartModel(input);
   const labeledThresholds = new Set(
@@ -89,11 +90,29 @@ export function MetricChart({ accessibleName, summary, ...input }: MetricChartPr
             data={model.rows}
             margin={model.compact ? compactMargin : chartMargin}
           >
+            {model.visualization === "area" ? (
+              <defs>
+                {model.series.map((series) => (
+                  <linearGradient
+                    id={`${gradientPrefix}-${series.key}`}
+                    key={series.key}
+                    x1="0"
+                    x2="0"
+                    y1="0"
+                    y2="1"
+                  >
+                    <stop offset="0%" stopColor={series.color} stopOpacity={series.fillOpacity} />
+                    <stop offset="100%" stopColor={series.color} stopOpacity={0.025} />
+                  </linearGradient>
+                ))}
+              </defs>
+            ) : null}
             {model.gridAxisId ? (
               <CartesianGrid
                 horizontal
-                stroke={colors.line}
-                strokeOpacity={0.62}
+                stroke={colors.lineStrong}
+                strokeDasharray="2 5"
+                strokeOpacity={0.38}
                 vertical={false}
                 yAxisId={model.gridAxisId}
               />
@@ -128,7 +147,7 @@ export function MetricChart({ accessibleName, summary, ...input }: MetricChartPr
                     : formatPanelAxisValue(value, axis.unit, model.resolvedUnits[axis.id])
                 }
                 tickLine={false}
-                tickCount={narrow ? 4 : undefined}
+                ticks={model.stacking === "percent" ? percentTicks : model.axisTicks[axis.id]}
                 tickMargin={narrow ? 4 : axis.id === "left" ? 10 : 8}
                 width={
                   model.compact
@@ -198,7 +217,12 @@ export function MetricChart({ accessibleName, summary, ...input }: MetricChartPr
                 ))}
             {model.series.map((series) => {
               const common = {
-                activeDot: { fill: series.color, r: 4, stroke: colors.surface, strokeWidth: 2 },
+                activeDot: {
+                  fill: series.color,
+                  r: model.compact ? 3.5 : 4.5,
+                  stroke: colors.surface,
+                  strokeWidth: 2,
+                },
                 dataKey: series.key,
                 isAnimationActive: false,
                 key: series.key,
@@ -206,7 +230,9 @@ export function MetricChart({ accessibleName, summary, ...input }: MetricChartPr
                 stackId: series.stackId,
                 stroke: series.color,
                 strokeDasharray: series.lineStyle === "dashed" ? "6 5" : undefined,
-                strokeWidth: 2,
+                strokeLinecap: "round" as const,
+                strokeLinejoin: "round" as const,
+                strokeWidth: model.compact ? 1.75 : 2.25,
                 type: "linear" as const,
                 yAxisId: series.axis,
               };
@@ -232,8 +258,8 @@ export function MetricChart({ accessibleName, summary, ...input }: MetricChartPr
                     {...common}
                     connectNulls={false}
                     dot={false}
-                    fill={series.color}
-                    fillOpacity={series.fillOpacity}
+                    fill={`url(#${gradientPrefix}-${series.key})`}
+                    fillOpacity={1}
                   />
                 );
               }
@@ -269,11 +295,12 @@ function AxisCaptions({ model }: { readonly model: ReturnType<typeof buildMetric
 }
 
 const axisTick = {
-  fill: "#918a84",
+  fill: "#a8a29e",
   fontFamily: "IBM Plex Mono, monospace",
-  fontSize: 10,
+  fontSize: 11,
 };
 const narrowAxisTick = { ...axisTick, fontSize: 9 };
+const percentTicks = [0, 0.25, 0.5, 0.75, 1] as const;
 
 const thresholdLabelBudget = 2;
 const annotationLabelBudget = 2;
@@ -288,7 +315,7 @@ const subscribeNarrowViewport = (onChange: () => void) => {
   return () => query.removeEventListener("change", onChange);
 };
 
-const chartMargin = { bottom: 2, left: 4, right: 4, top: 20 } as const;
+const chartMargin = { bottom: 2, left: 4, right: 4, top: 18 } as const;
 const compactMargin = { bottom: 2, left: 2, right: 2, top: 8 } as const;
 
 const styles = stylex.create({
@@ -304,14 +331,14 @@ const styles = stylex.create({
   chartCanvas: { flex: 1, minHeight: 0, minWidth: 0 },
   axisCaptions: {
     alignItems: "center",
-    color: colors.textSubtle,
+    color: colors.textMuted,
     display: "flex",
     fontFamily: "IBM Plex Mono, monospace",
-    fontSize: 9,
+    fontSize: 10,
     gap: 12,
     justifyContent: "space-between",
     lineHeight: 1.4,
-    minHeight: 14,
+    minHeight: 16,
     paddingInline: { default: 68, "@media (max-width: 520px)": 48 },
   },
   axisCaption: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },

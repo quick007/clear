@@ -290,6 +290,27 @@ describe("panel query and chart rendering", () => {
 
     expect(model.axisDomains.left[0]).toBe(0);
     expect(model.axisDomains.left[1]).toBeGreaterThan(5);
+    expect(model.axisTicks.left).toEqual([0, 2, 4, 6]);
+  });
+
+  it("uses readable round ticks for automatically scaled metric axes", () => {
+    const model = buildMetricChartModel({
+      axes: [{ id: "left", minimum: 0, unit: { _tag: "rate", per: "second" } }],
+      series: [
+        series({
+          label: "requests",
+          queryRef: RequestsVsUsersPanel.queries[0].refId,
+          values: [
+            ["2026-08-28T08:00:00Z", 120],
+            ["2026-08-28T08:00:30Z", 153.7],
+          ],
+        }),
+      ],
+      visualization: "line",
+    });
+
+    expect(model.axisDomains.left).toEqual([0, 200]);
+    expect(model.axisTicks.left).toEqual([0, 50, 100, 150, 200]);
   });
 
   it("respects grid preferences and rejects nonpositive log thresholds", () => {

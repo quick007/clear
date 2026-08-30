@@ -22,7 +22,9 @@ export function MetricChartTooltip({
     return [
       {
         color: descriptor.color,
+        key: descriptor.key,
         label: descriptor.label,
+        lineStyle: descriptor.lineStyle,
         value:
           model.stacking === "percent"
             ? `${(entry.value * 100).toFixed(1)}%`
@@ -37,11 +39,11 @@ export function MetricChartTooltip({
       <time {...stylex.props(styles.time)}>{formatEpochShortTime(label)}</time>
       <div {...stylex.props(styles.values)}>
         {values.map((entry) => (
-          <div key={entry.label} {...stylex.props(styles.row)}>
+          <div key={entry.key} {...stylex.props(styles.row)}>
             <span
               aria-hidden
-              style={{ backgroundColor: entry.color }}
-              {...stylex.props(styles.swatch)}
+              style={{ borderTopColor: entry.color }}
+              {...stylex.props(styles.swatch, entry.lineStyle === "dashed" && styles.swatchDashed)}
             />
             <span {...stylex.props(styles.label)}>{entry.label}</span>
             <strong {...stylex.props(styles.value)}>{entry.value}</strong>
@@ -64,15 +66,31 @@ const styles = stylex.create({
     minWidth: { default: 220, "@media (max-width: 520px)": 160 },
     padding: space.x3,
   },
-  time: { color: colors.textSubtle, fontFamily: "IBM Plex Mono, monospace", fontSize: 10 },
+  time: {
+    borderBottomColor: colors.line,
+    borderBottomStyle: "solid",
+    borderBottomWidth: 1,
+    color: colors.textMuted,
+    display: "block",
+    fontFamily: "IBM Plex Mono, monospace",
+    fontSize: 10,
+    paddingBottom: space.x2,
+  },
   values: { display: "grid", gap: space.x2, marginTop: space.x2 },
   row: {
     alignItems: "center",
     display: "grid",
     gap: space.x2,
-    gridTemplateColumns: "8px minmax(0, 1fr) auto",
+    gridTemplateColumns: "14px minmax(0, 1fr) auto",
   },
-  swatch: { borderRadius: radii.pill, height: 7, width: 7 },
+  swatch: {
+    borderRadius: radii.pill,
+    borderTopStyle: "solid",
+    borderTopWidth: 2,
+    height: 0,
+    width: 14,
+  },
+  swatchDashed: { borderTopStyle: "dashed" },
   label: {
     color: colors.textMuted,
     fontSize: 11,

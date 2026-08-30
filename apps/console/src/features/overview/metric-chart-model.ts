@@ -45,6 +45,7 @@ export type MetricChartModel = {
     Record<"left" | "right", readonly [number | "auto", number | "auto"]>
   >;
   readonly axes: ReadonlyArray<Axis>;
+  readonly axisTicks: Readonly<Partial<Record<"left" | "right", ReadonlyArray<number>>>>;
   readonly compact: boolean;
   readonly gridAxisId?: "left" | "right";
   readonly invalidLogAxis?: "left" | "right";
@@ -104,20 +105,27 @@ export function buildMetricChartModel({
         thresholds.some((threshold) => threshold.axis === axis.id && threshold.value <= 0)),
   )?.id;
   const gridAxisId = axes.find((axis) => axis.showGrid !== false)?.id;
-  const axisDomains = Object.fromEntries(
+  const axisScales = Object.fromEntries(
     (["left", "right"] as const).map((axisId) => [
       axisId,
-      axisDomain(
+      axisScale(
         axes.find((axis) => axis.id === axisId),
         series.filter((item) => item.axis === axisId),
         thresholds.filter((threshold) => threshold.axis === axisId),
       ),
     ]),
-  ) as Record<"left" | "right", readonly [number | "auto", number | "auto"]>;
+  ) as Record<"left" | "right", AxisScale>;
 
   return {
     annotations,
-    axisDomains,
+    axisDomains: {
+      left: axisScales.left.domain,
+      right: axisScales.right.domain,
+    },
+    axisTicks: {
+      left: axisScales.left.ticks,
+      right: axisScales.right.ticks,
+    },
     axes,
     compact,
     gridAxisId,
@@ -132,17 +140,24 @@ export function buildMetricChartModel({
   };
 }
 
-const axisDomain = (
+type AxisScale = {
+  readonly domain: readonly [number | "auto", number | "auto"];
+  readonly ticks?: ReadonlyArray<number>;
+};
+
+const axisScale = (
   axis: Axis | undefined,
   series: ReadonlyArray<PanelSeries>,
   thresholds: ReadonlyArray<ChartThreshold>,
-): readonly [number | "auto", number | "auto"] => {
-  if (!axis) return ["auto", "auto"];
+): AxisScale => {
+  if (!axis) return { domain: ["auto", "auto"] };
   const values = [
     ...series.flatMap((item) => item.points.map((point) => point.value)),
     ...thresholds.map((threshold) => threshold.value),
   ];
-  if (values.length === 0) return [axis.minimum ?? "auto", axis.maximum ?? "auto"];
+  if (values.length === 0) {
+    return { domain: [axis.minimum ?? "auto", axis.maximum ?? "auto"] };
+  }
 
   const smallest = Math.min(...values);
   const largest = Math.max(...values);
@@ -150,12 +165,42 @@ const axisDomain = (
   const fallbackSpan = Math.max(Math.abs(largest), 1);
   const padding = (span === 0 ? fallbackSpan : span) * 0.06;
   if (axis.scale === "log") {
-    return [axis.minimum ?? smallest, axis.maximum ?? largest + padding];
+    return { domain: [axis.minimum ?? smallest, axis.maximum ?? largest + padding] };
   }
   const minimum = axis.minimum ?? smallest - padding;
   const maximum = axis.maximum ?? largest + padding;
-  return minimum === maximum ? [minimum, maximum + fallbackSpan] : [minimum, maximum];
+  const expandedMaximum = minimum === maximum ? maximum + fallbackSpan : maximum;
+  return niceLinearScale(minimum, expandedMaximum, axis.minimum, axis.maximum);
 };
+
+const targetTickIntervals = 5;
+
+const niceLinearScale = (
+  minimum: number,
+  maximum: number,
+  fixedMinimum: number | undefined,
+  fixedMaximum: number | undefined,
+): AxisScale => {
+  const step = niceStep((maximum - minimum) / targetTickIntervals);
+  const domainMinimum = fixedMinimum ?? Math.floor(minimum / step) * step;
+  const domainMaximum = fixedMaximum ?? Math.ceil(maximum / step) * step;
+  const ticks = Array.from(
+    { length: Math.floor((domainMaximum - domainMinimum) / step) + 1 },
+    (_, index) => normalizeTick(domainMinimum + index * step),
+  );
+  if (ticks.at(-1) !== domainMaximum) ticks.push(domainMaximum);
+  return { domain: [domainMinimum, domainMaximum], ticks };
+};
+
+const niceStep = (roughStep: number) => {
+  if (!Number.isFinite(roughStep) || roughStep <= 0) return 1;
+  const magnitude = 10 ** Math.floor(Math.log10(roughStep));
+  const normalized = roughStep / magnitude;
+  const factor = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return factor * magnitude;
+};
+
+const normalizeTick = (value: number) => Number(value.toPrecision(12));
 
 const percentTotals = (series: ReadonlyArray<PanelSeries>) => {
   const totals = new Map<string, number>();
