@@ -23,7 +23,7 @@ import {
 } from "@groundtruth/persistence";
 import { PersistenceMemory, RepositoriesMemoryControl } from "@groundtruth/persistence/testing";
 import { RequestsVsUsersPanel, RetryAmplificationPanel } from "@groundtruth/panel-dsl";
-import { Context, Crypto, DateTime, Effect, Layer } from "effect";
+import { Context, Crypto, DateTime, Deferred, Effect, Fiber, Layer, Stream } from "effect";
 import { TestClock } from "effect/testing";
 import { BoardService } from "../src/board/BoardService.js";
 import { BoardServiceLive } from "../src/board/BoardServiceLive.js";
@@ -167,6 +167,76 @@ describe("BoardServiceLive", () => {
           ),
           false,
         );
+      }).pipe(Effect.provide(BoardTest)),
+    ),
+  );
+
+  it.effect("publishes panel and aggregate board revisions for hosted boards", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const boards = yield* BoardService;
+        const events = yield* LiveEventBus;
+        const project = yield* createHostedProject;
+        const board = yield* boards.getDefaultBoard(project.id);
+        const first = yield* boards.createPanel(
+          project.id,
+          new CreatePanelRequest({
+            dashboardId: board.dashboard.id,
+            spec: RequestsVsUsersPanel,
+          }),
+        );
+        const second = yield* boards.createPanel(
+          project.id,
+          new CreatePanelRequest({
+            dashboardId: board.dashboard.id,
+            spec: RetryAmplificationPanel,
+          }),
+        );
+        const at = yield* DateTime.now;
+        yield* boards.annotatePanel(
+          project.id,
+          second.metadata.id,
+          new AnnotatePanelRequest({ at, label: "Second panel changed" }),
+        );
+
+        const stream = yield* events.stream(project.id, undefined);
+        const subscribed = yield* Deferred.make<void>();
+        const observedFiber = yield* stream.pipe(
+          Stream.tap((event) =>
+            event._tag === "ResyncRequired" ? Deferred.succeed(subscribed, undefined) : Effect.void,
+          ),
+          Stream.dropWhile(
+            (event) =>
+              !(
+                event._tag === "PanelChanged" &&
+                event.panelId === first.metadata.id &&
+                event.change === "annotated"
+              ),
+          ),
+          Stream.filter((event) => event._tag === "PanelChanged" || event._tag === "BoardChanged"),
+          Stream.take(2),
+          Stream.runCollect,
+          Effect.forkScoped,
+        );
+        yield* Deferred.await(subscribed);
+
+        const annotated = yield* boards.annotatePanel(
+          project.id,
+          first.metadata.id,
+          new AnnotatePanelRequest({ at, label: "First panel changed" }),
+        );
+        const current = yield* boards.getBoard(project.id, board.dashboard.id);
+        const observed = yield* Fiber.join(observedFiber);
+        const panelEvent = observed[0];
+        const boardEvent = observed[1];
+
+        assert(panelEvent?._tag === "PanelChanged");
+        assert.strictEqual(panelEvent.panelId, annotated.metadata.id);
+        assert.strictEqual(panelEvent.revision, annotated.metadata.revision);
+        assert(boardEvent?._tag === "BoardChanged");
+        assert.strictEqual(boardEvent.dashboardId, board.dashboard.id);
+        assert.strictEqual(boardEvent.revision, current.revision);
+        assert.notStrictEqual(panelEvent.revision, boardEvent.revision);
       }).pipe(Effect.provide(BoardTest)),
     ),
   );

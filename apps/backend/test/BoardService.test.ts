@@ -138,7 +138,7 @@ describe("BoardService", () => {
       assert(panelEvent?._tag === "PanelChanged");
       assert.strictEqual(panelEvent.panelId, created.metadata.id);
       assert.strictEqual(panelEvent.change, "created");
-      assert.strictEqual(panelEvent.revision, 2);
+      assert.strictEqual(panelEvent.revision, created.metadata.revision);
       assert(boardEvent?._tag === "BoardChanged");
       assert.strictEqual(boardEvent.dashboardId, sandboxDashboardId);
       assert.strictEqual(boardEvent.revision, 2);

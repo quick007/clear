@@ -104,8 +104,9 @@ const hypothesisStatusStyles = stylex.create({
 const styles = stylex.create({
   strip: {
     alignItems: "center",
-    backgroundColor: colors.canvasRaised,
-    borderBottomColor: colors.line,
+    backdropFilter: "blur(12px) saturate(108%)",
+    backgroundColor: "rgba(16, 18, 18, 0.78)",
+    borderBottomColor: colors.materialLine,
     borderBottomStyle: "solid",
     borderBottomWidth: 1,
     display: "grid",
@@ -132,7 +133,7 @@ const styles = stylex.create({
     color: colors.textSubtle,
     display: "flex",
     fontFamily: "IBM Plex Mono, monospace",
-    fontSize: 11,
+    fontSize: 12,
     gap: 5,
   },
   incidentSummary: {
@@ -153,7 +154,7 @@ const styles = stylex.create({
   },
   hypothesisLabel: {
     color: colors.textSubtle,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 500,
   },
   hypotheses: {
@@ -169,7 +170,7 @@ const styles = stylex.create({
     borderStyle: "solid",
     borderWidth: 1,
     display: "inline-flex",
-    fontSize: 11,
+    fontSize: 12,
     gap: 7,
     lineHeight: 1.35,
     maxWidth: "100%",
@@ -195,6 +196,6 @@ const styles = stylex.create({
   hypothesisStatus: {
     flexShrink: 0,
     fontFamily: "IBM Plex Mono, monospace",
-    fontSize: 9,
+    fontSize: 10,
   },
 });

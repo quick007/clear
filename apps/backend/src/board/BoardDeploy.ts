@@ -49,7 +49,11 @@ const annotateBoard = (
       return panel;
     }
     const annotated = annotatePanel(panel, deploy, label, occurredAt);
-    mutations.push({ board, panelId: annotated.metadata.id });
+    mutations.push({
+      board,
+      panelId: annotated.metadata.id,
+      panelRevision: annotated.metadata.revision,
+    });
     return annotated;
   });
   if (mutations.length === 0) {
@@ -58,7 +62,11 @@ const annotateBoard = (
   const nextBoard = withPanels(board, panels, occurredAt);
   return {
     board: nextBoard,
-    mutations: mutations.map(({ panelId }) => ({ board: nextBoard, panelId })),
+    mutations: mutations.map(({ panelId, panelRevision }) => ({
+      board: nextBoard,
+      panelId,
+      panelRevision,
+    })),
   };
 };
 

@@ -25,23 +25,27 @@ import { navigationStyles } from "./sidebar-navigation.styles";
 
 export function WorkspaceSidebar({
   overview,
+  overviewState,
   session,
 }: {
   overview?: ConsoleOverview;
+  overviewState: "error" | "loading" | "ready";
   session?: SessionView;
 }) {
   return (
     <aside {...stylex.props(styles.desktopSidebar)}>
-      <SidebarContent overview={overview} session={session} />
+      <SidebarContent overview={overview} overviewState={overviewState} session={session} />
     </aside>
   );
 }
 
 export function MobileWorkspaceHeader({
   overview,
+  overviewState,
   session,
 }: {
   overview?: ConsoleOverview;
+  overviewState: "error" | "loading" | "ready";
   session?: SessionView;
 }) {
   const [open, setOpen] = useState(false);
@@ -72,6 +76,7 @@ export function MobileWorkspaceHeader({
             <SidebarContent
               onNavigate={() => setOpen(false)}
               overview={overview}
+              overviewState={overviewState}
               session={session}
             />
           </Dialog.Popup>
@@ -84,10 +89,12 @@ export function MobileWorkspaceHeader({
 function SidebarContent({
   onNavigate,
   overview,
+  overviewState,
   session,
 }: {
   onNavigate?: () => void;
   overview?: ConsoleOverview;
+  overviewState: "error" | "loading" | "ready";
   session?: SessionView;
 }) {
   const logout = useLogoutMutation();
@@ -95,6 +102,18 @@ function SidebarContent({
   const accountName = account?.displayName ?? account?.email ?? "Account";
   const initials = accountInitials(accountName);
   const firingCount = overview?.alerts.filter((alert) => alert.status === "firing").length ?? 0;
+  const projectName =
+    overviewState === "error"
+      ? "Project unavailable"
+      : (overview?.project.name ?? "Opening workspace");
+  const projectSummary =
+    overviewState === "error"
+      ? "Try again from the page"
+      : overviewState === "loading"
+        ? "Loading signals"
+        : overview?.services.length
+          ? serviceSummary(overview)
+          : "No signals yet";
 
   return (
     <div {...stylex.props(styles.sidebarContent)}>
@@ -109,19 +128,13 @@ function SidebarContent({
           <ClearMark />
           <span>Clear</span>
         </Link>
-        <div {...stylex.props(styles.project)}>
-          <span {...stylex.props(styles.projectMark)}>
-            {overview?.project.name[0]?.toUpperCase() ?? "C"}
-          </span>
+        <Link onClick={onNavigate} to="/connect" {...stylex.props(styles.project)}>
+          <span {...stylex.props(styles.projectMark)}>{projectName[0]?.toUpperCase() ?? "C"}</span>
           <span {...stylex.props(styles.projectCopy)}>
-            <strong {...stylex.props(styles.projectName)}>
-              {overview?.project.name ?? "Opening workspace"}
-            </strong>
-            <span {...stylex.props(styles.projectSummary)}>
-              {overview?.services.length ? serviceSummary(overview) : "No signals yet"}
-            </span>
+            <strong {...stylex.props(styles.projectName)}>{projectName}</strong>
+            <span {...stylex.props(styles.projectSummary)}>{projectSummary}</span>
           </span>
-        </div>
+        </Link>
       </div>
 
       <nav aria-label="Workspace" {...stylex.props(styles.nav)}>
@@ -216,8 +229,9 @@ function SidebarContent({
 }
 const styles = stylex.create({
   desktopSidebar: {
-    backgroundColor: colors.canvasRaised,
-    borderRightColor: colors.line,
+    backdropFilter: "blur(16px) saturate(110%)",
+    backgroundColor: "rgba(12, 14, 14, 0.86)",
+    borderRightColor: colors.materialLine,
     borderRightStyle: "solid",
     borderRightWidth: 1,
     display: { default: "block", "@media (max-width: 840px)": "none" },
@@ -242,8 +256,8 @@ const styles = stylex.create({
   },
   project: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
+    backgroundColor: colors.materialSurfaceStrong,
+    borderColor: colors.materialLine,
     borderRadius: radii.md,
     borderStyle: "solid",
     borderWidth: 1,
@@ -252,6 +266,10 @@ const styles = stylex.create({
     marginTop: space.x4,
     minHeight: 58,
     padding: space.x3,
+    boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+    color: colors.text,
+    textDecoration: "none",
+    ":hover": { backgroundColor: "rgba(255, 255, 255, 0.075)" },
   },
   projectMark: {
     alignItems: "center",
@@ -281,7 +299,7 @@ const styles = stylex.create({
   },
   projectSummary: {
     color: colors.textSubtle,
-    fontSize: 10,
+    fontSize: 11,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -292,7 +310,7 @@ const styles = stylex.create({
     borderRadius: radii.pill,
     color: colors.red,
     fontFamily: "IBM Plex Mono, monospace",
-    fontSize: 9,
+    fontSize: 10,
     minWidth: 20,
     paddingBlock: 2,
     paddingInline: 6,
@@ -340,7 +358,7 @@ const styles = stylex.create({
     color: colors.text,
     display: "flex",
     fontFamily: "IBM Plex Mono, monospace",
-    fontSize: 10,
+    fontSize: 11,
     height: 32,
     justifyContent: "center",
     width: 32,
@@ -352,7 +370,7 @@ const styles = stylex.create({
     minWidth: 0,
   },
   accountName: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 500,
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -360,7 +378,7 @@ const styles = stylex.create({
   },
   accountDetail: {
     color: colors.textSubtle,
-    fontSize: 9,
+    fontSize: 11,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
@@ -381,8 +399,9 @@ const styles = stylex.create({
   },
   mobileHeader: {
     alignItems: "center",
-    backgroundColor: colors.canvasRaised,
-    borderBottomColor: colors.line,
+    backdropFilter: "blur(16px) saturate(110%)",
+    backgroundColor: "rgba(12, 14, 14, 0.86)",
+    borderBottomColor: colors.materialLine,
     borderBottomStyle: "solid",
     borderBottomWidth: 1,
     display: { default: "none", "@media (max-width: 840px)": "grid" },
@@ -426,7 +445,8 @@ const styles = stylex.create({
   },
   backdrop: { backgroundColor: colors.overlay, inset: 0, position: "fixed", zIndex: 90 },
   drawer: {
-    backgroundColor: colors.canvasRaised,
+    backdropFilter: "blur(16px) saturate(110%)",
+    backgroundColor: "rgba(12, 14, 14, 0.94)",
     borderRightColor: colors.lineStrong,
     borderRightStyle: "solid",
     borderRightWidth: 1,

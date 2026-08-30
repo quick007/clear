@@ -1,0 +1,263 @@
+{
+  "$schema": "./manifest.schema.json",
+  "version": 1,
+  "sourceDirectory": "sources",
+  "outputDirectory": "outputs",
+  "sources": {
+    "homepage": {
+      "file": "homepage.png",
+      "description": "Clear homepage with the live paper shader visible and no browser chrome.",
+      "capture": {
+        "route": "/",
+        "viewport": { "width": 2560, "height": 1440 },
+        "state": "Fresh signed-out visit. Let the shader settle before capture."
+      }
+    },
+    "boardReveal": {
+      "file": "board-reveal.png",
+      "description": "Clear board after the agent creates the requests-versus-users and retries panels.",
+      "capture": {
+        "route": "/board",
+        "viewport": { "width": 2560, "height": 1440 },
+        "state": "Amplification active, requests elevated, users flat, retry share visible."
+      }
+    },
+    "codexAgent": {
+      "file": "codex-agent.png",
+      "description": "The clean checkout-only Codex task during the incident investigation.",
+      "capture": {
+        "route": "Codex desktop task",
+        "viewport": { "width": 2560, "height": 1440 },
+        "state": "Show the agent reasoning from telemetry and the focused checkout repository only."
+      }
+    },
+    "boardAgent": {
+      "file": "board-agent.png",
+      "description": "Clear board at the matching moment in the Codex investigation.",
+      "capture": {
+        "route": "/board",
+        "viewport": { "width": 2560, "height": 1440 },
+        "state": "Use the same incident state shown in the Codex source capture."
+      }
+    },
+    "traceDetail": {
+      "file": "trace-detail.png",
+      "description": "A real trace detail view from the manufactured checkout incident.",
+      "capture": {
+        "route": "/traces/<traceId>",
+        "viewport": { "width": 2560, "height": 1440 },
+        "state": "Select a trace that exposes retry amplification and upstream failures."
+      }
+    },
+    "logDetail": {
+      "file": "log-detail.png",
+      "description": "A real correlated log view from the same checkout incident.",
+      "capture": {
+        "route": "/explore?signal=logs&service=checkout-api&window=1h",
+        "viewport": { "width": 2560, "height": 1440 },
+        "state": "Keep the same service and incident time window as the trace capture."
+      }
+    },
+    "recoveryBoard": {
+      "file": "recovery-board.png",
+      "description": "Clear board after the real checkout deploy, with its marker and recovery visible.",
+      "capture": {
+        "route": "/board",
+        "viewport": { "width": 2560, "height": 1440 },
+        "state": "Real deploy event present, retry volume collapsing, latency and errors recovering."
+      }
+    }
+  },
+  "assets": [
+    {
+      "id": "homepage-thumbnail",
+      "description": "Devpost gallery thumbnail and project card image.",
+      "output": "clear-devpost-thumbnail.jpg",
+      "canvas": { "width": 1800, "height": 1200, "background": "#f4f5f2" },
+      "format": { "type": "jpeg", "quality": 92 },
+      "maxBytes": 5000000,
+      "layers": [
+        {
+          "source": "homepage",
+          "x": 0,
+          "y": 0,
+          "width": 1800,
+          "height": 1200,
+          "fit": "cover",
+          "position": "centre"
+        }
+      ]
+    },
+    {
+      "id": "devpost-hero",
+      "description": "Clear and a clean Codex task over the real homepage material, composed only from live captures.",
+      "output": "clear-devpost-hero.png",
+      "canvas": { "width": 1800, "height": 1200, "background": "#f4f5f2" },
+      "format": { "type": "png", "compressionLevel": 9 },
+      "maxBytes": 10000000,
+      "layers": [
+        {
+          "source": "homepage",
+          "x": 0,
+          "y": 0,
+          "width": 1800,
+          "height": 1200,
+          "fit": "cover",
+          "position": "centre",
+          "style": {
+            "modulate": { "brightness": 1.03, "saturation": 0.9 }
+          }
+        },
+        {
+          "source": "codexAgent",
+          "x": 92,
+          "y": 172,
+          "width": 650,
+          "height": 856,
+          "fit": "cover",
+          "position": "north",
+          "style": {
+            "opacity": 0.91,
+            "borderRadius": 30,
+            "border": { "width": 2, "color": "#ffffff", "opacity": 0.64 },
+            "shadow": {
+              "x": 0,
+              "y": 24,
+              "blur": 34,
+              "spread": 2,
+              "color": "#18201f",
+              "opacity": 0.22
+            },
+            "modulate": { "brightness": 1.03, "saturation": 0.82 }
+          }
+        },
+        {
+          "source": "boardAgent",
+          "x": 654,
+          "y": 116,
+          "width": 1054,
+          "height": 968,
+          "fit": "cover",
+          "position": "north",
+          "style": {
+            "opacity": 0.94,
+            "borderRadius": 34,
+            "border": { "width": 2, "color": "#ffffff", "opacity": 0.7 },
+            "shadow": {
+              "x": 0,
+              "y": 28,
+              "blur": 40,
+              "spread": 2,
+              "color": "#18201f",
+              "opacity": 0.24
+            },
+            "modulate": { "brightness": 1.025, "saturation": 0.9 }
+          }
+        }
+      ]
+    },
+    {
+      "id": "board-reveal",
+      "description": "The decisive requests, users, and retries evidence on the Clear board.",
+      "output": "clear-board-reveal.png",
+      "canvas": { "width": 1920, "height": 1080, "background": "#f4f5f2" },
+      "format": { "type": "png", "compressionLevel": 9 },
+      "maxBytes": 10000000,
+      "layers": [
+        {
+          "source": "boardReveal",
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "fit": "cover",
+          "position": "centre"
+        }
+      ]
+    },
+    {
+      "id": "agent-collaboration",
+      "description": "A real Codex task beside the corresponding Clear board, over the real homepage material.",
+      "output": "clear-agent-collaboration.png",
+      "canvas": { "width": 1920, "height": 1080, "background": "#f4f5f2" },
+      "format": { "type": "png", "compressionLevel": 9 },
+      "maxBytes": 10000000,
+      "layers": [
+        {
+          "source": "homepage",
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "fit": "cover",
+          "position": "centre"
+        },
+        {
+          "source": "codexAgent",
+          "x": 56,
+          "y": 64,
+          "width": 682,
+          "height": 952,
+          "fit": "cover",
+          "position": "north"
+        },
+        {
+          "source": "boardAgent",
+          "x": 778,
+          "y": 64,
+          "width": 1086,
+          "height": 952,
+          "fit": "cover",
+          "position": "north"
+        }
+      ]
+    },
+    {
+      "id": "trace-log-correlation",
+      "description": "Trace and log evidence from the same real incident time window.",
+      "output": "clear-trace-log-correlation.png",
+      "canvas": { "width": 1920, "height": 1080, "background": "#f4f5f2" },
+      "format": { "type": "png", "compressionLevel": 9 },
+      "maxBytes": 10000000,
+      "layers": [
+        {
+          "source": "traceDetail",
+          "x": 56,
+          "y": 56,
+          "width": 888,
+          "height": 968,
+          "fit": "cover",
+          "position": "north"
+        },
+        {
+          "source": "logDetail",
+          "x": 976,
+          "y": 56,
+          "width": 888,
+          "height": 968,
+          "fit": "cover",
+          "position": "north"
+        }
+      ]
+    },
+    {
+      "id": "deploy-recovery",
+      "description": "The real deploy marker and the checkout service recovering on the Clear board.",
+      "output": "clear-deploy-recovery.png",
+      "canvas": { "width": 1920, "height": 1080, "background": "#f4f5f2" },
+      "format": { "type": "png", "compressionLevel": 9 },
+      "maxBytes": 10000000,
+      "layers": [
+        {
+          "source": "recoveryBoard",
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "fit": "cover",
+          "position": "centre"
+        }
+      ]
+    }
+  ]
+}

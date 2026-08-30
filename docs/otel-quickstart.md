@@ -1,6 +1,6 @@
 # OpenTelemetry quickstart
 
-Clear accepts metrics, logs, and traces through standard OTLP. You do not need a Clear-specific SDK.
+Clear accepts metrics, logs, and traces through standard OTLP. Use the official OpenTelemetry SDK for your language or an OpenTelemetry Collector. You do not need a Clear-specific SDK, proprietary exporter, or vendor agent.
 
 ## What you need
 
@@ -8,24 +8,27 @@ Clear accepts metrics, logs, and traces through standard OTLP. You do not need a
 2. A project ingest key.
 3. A stable `service.name` for each service.
 
+The current hosted OTLP/HTTP base endpoint is `https://clear-runtime.onrender.com`. The planned `https://otlp.clear.seufert.sh` hostname is not live yet.
+
 For local development:
 
 ```sh
+export CLEAR_INGEST_KEY=local-demo-ingest-key
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-export OTEL_EXPORTER_OTLP_HEADERS=x-clear-ingest-key=local-demo-ingest-key
+export OTEL_EXPORTER_OTLP_HEADERS="x-clear-ingest-key=${CLEAR_INGEST_KEY}"
 export OTEL_SERVICE_NAME=my-service
 ```
 
-For the hosted service, use the endpoint and ingest key copied from your Clear project. Do not use the checked-in local key outside isolated development.
+For the hosted service, replace the endpoint with `https://clear-runtime.onrender.com` and use the ingest key copied from your durable Clear project. Durable project login is waiting on the custom-domain cutover, so new hosted keys cannot be created through the fallback console yet. Do not use the checked-in local key outside isolated development.
 
 ## Supported transports
 
-| Transport          | Base endpoint                   | Availability           |
-| ------------------ | ------------------------------- | ---------------------- |
-| OTLP/HTTP protobuf | `https://otlp.clear.seufert.sh` | hosted and local       |
-| OTLP/HTTP JSON     | `https://otlp.clear.seufert.sh` | hosted and local       |
-| OTLP/gRPC          | `localhost:4317`                | local development only |
+| Transport          | Local base endpoint     | Hosted base endpoint                      |
+| ------------------ | ----------------------- | ----------------------------------------- |
+| OTLP/HTTP protobuf | `http://localhost:4318` | `https://clear-runtime.onrender.com`      |
+| OTLP/HTTP JSON     | `http://localhost:4318` | `https://clear-runtime.onrender.com`      |
+| OTLP/gRPC          | `localhost:4317`        | not available in the hackathon deployment |
 
 OTLP/HTTP uses the standard signal paths:
 
@@ -40,17 +43,18 @@ x-clear-ingest-key: <key>
 Authorization: Bearer <key>
 ```
 
-If both are present, they must match.
+If both are present, they must match. Public examples use the environment variable name `CLEAR_INGEST_KEY`; the wire header is always `x-clear-ingest-key` unless the standard Bearer form is used.
 
 ## Configure an application SDK
 
-Most OpenTelemetry SDKs honor the standard environment variables above. If your SDK uses signal-specific variables, point all three at the same Collector:
+Most official OpenTelemetry SDKs honor the standard environment variables above. If your SDK uses signal-specific variables, point all three at the same Collector:
 
 ```sh
+export CLEAR_INGEST_KEY=local-demo-ingest-key
 export OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://localhost:4318/v1/metrics
 export OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://localhost:4318/v1/logs
 export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
-export OTEL_EXPORTER_OTLP_HEADERS=x-clear-ingest-key=local-demo-ingest-key
+export OTEL_EXPORTER_OTLP_HEADERS="x-clear-ingest-key=${CLEAR_INGEST_KEY}"
 ```
 
 Prefer the SDK's batch processors and normal retry behavior. Clear applies bounded backpressure and does not promise to retain data that a client drops after an export failure.
@@ -63,6 +67,10 @@ export OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=development,service.
 
 `service.name` is especially important because Clear uses it throughout the board, logs, traces, and deploy annotations.
 
+### Runnable Node example
+
+[`examples/node-otel`](../examples/node-otel/USAGE.md) is a standalone program built only from official OpenTelemetry packages. It exports one metric, one structured log, and one correlated trace over OTLP/HTTP protobuf, then flushes all processors before exiting. Its focused test starts a local OTLP receiver and verifies all three requests plus configured headers.
+
 ## Configure an upstream Collector
 
 An existing OpenTelemetry Collector can forward all signals to Clear over OTLP/HTTP:
@@ -70,9 +78,9 @@ An existing OpenTelemetry Collector can forward all signals to Clear over OTLP/H
 ```yaml
 exporters:
   otlphttp/clear:
-    endpoint: https://otlp.clear.seufert.sh
+    endpoint: https://clear-runtime.onrender.com
     headers:
-      x-clear-ingest-key: ${env:GROUNDTRUTH_INGEST_KEY}
+      x-clear-ingest-key: ${env:CLEAR_INGEST_KEY}
 
 service:
   pipelines:
@@ -84,7 +92,7 @@ service:
       exporters: [otlphttp/clear]
 ```
 
-Add the exporter to your existing receivers and processors rather than replacing them. The full examples in `apps/collector/config/examples/` show HTTP and gRPC variants.
+Add the exporter to your existing receivers and processors rather than replacing them. The complete examples in `apps/collector/config/examples/` include the surrounding receiver setup. Those internal examples retain some `GROUNDTRUTH_*` environment names for repository compatibility, but clients still send the public `x-clear-ingest-key` header.
 
 For local OTLP/gRPC:
 
@@ -95,10 +103,10 @@ exporters:
     tls:
       insecure: true
     headers:
-      x-clear-ingest-key: ${env:GROUNDTRUTH_INGEST_KEY}
+      x-clear-ingest-key: ${env:CLEAR_INGEST_KEY}
 ```
 
-Use TLS and remove `insecure: true` for any remote endpoint.
+Use TLS and remove `insecure: true` for any remote endpoint. The hosted hackathon deployment does not expose OTLP/gRPC.
 
 If the upstream Collector runs inside Docker Desktop while the local Clear stack runs on the host, replace `localhost` with `host.docker.internal`. On Linux, use an explicit host-gateway mapping or a shared container network instead of assuming that hostname exists.
 
@@ -126,6 +134,13 @@ The checked-in Collector configuration starts with:
 
 These are safety limits, not sizing promises. Review them together with API, ClickHouse, and client retry behavior before production use.
 
+## API reference
+
+- Interactive reference: [clear-runtime.onrender.com/docs](https://clear-runtime.onrender.com/docs)
+- OpenAPI document: [clear-runtime.onrender.com/openapi.json](https://clear-runtime.onrender.com/openapi.json)
+
+The API reference covers project operations and the deploy-event webhook. OTLP payload schemas follow the OpenTelemetry protocol rather than the Clear OpenAPI document.
+
 ## Troubleshooting
 
 **The exporter receives `401`**
@@ -146,4 +161,4 @@ Check request size, client timeouts, Collector logs, API health, and ClickHouse 
 
 **The local console does not show received data**
 
-Check the Collector and API health endpoints, confirm the ingest key matches the selected project, then confirm `service.name` is stable before troubleshooting the browser.
+Check the Collector and API health endpoints, confirm the ingest key matches the bootstrap project, then confirm `service.name` is stable. The local stack does not provide a supported browser login to that durable project, so use API or storage checks when developing ingest locally.

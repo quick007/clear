@@ -4,18 +4,22 @@ The hosted hackathon topology is deliberately small. ChatGPT Sites publishes the
 
 ## Topology
 
-| Component           | Local address           | Hosted address                          | Runtime                 |
-| ------------------- | ----------------------- | --------------------------------------- | ----------------------- |
-| Console             | `http://localhost:5173` | `https://clear.seufert.sh`              | ChatGPT Sites           |
-| Checkout storefront | `http://localhost:5174` | `https://checkout.clear.seufert.sh`     | ChatGPT Sites           |
-| Effect API          | `http://localhost:3000` | `https://api.clear.seufert.sh`          | stateful Render service |
-| OTLP/HTTP           | `http://localhost:4318` | `https://otlp.clear.seufert.sh`         | stateful Render service |
-| OTLP/gRPC           | `localhost:4317`        | not hosted                              | local development only  |
-| Checkout API        | `http://localhost:4101` | `https://checkout-api.clear.seufert.sh` | separate Render service |
-| Payments stub       | `http://localhost:4102` | internal route only                     | stateful Render service |
-| Load controller     | `http://localhost:4103` | internal route only                     | stateful Render service |
-| PostgreSQL          | `localhost:5432`        | internal listener on persistent disk    | stateful Render service |
-| ClickHouse HTTP     | `http://localhost:8123` | internal listener on persistent disk    | stateful Render service |
+| Component           | Local address           | Current hosted fallback                            | Runtime                 |
+| ------------------- | ----------------------- | -------------------------------------------------- | ----------------------- |
+| Console             | `http://localhost:5173` | `https://clear-observability.seufert.chatgpt.site` | ChatGPT Sites           |
+| Checkout storefront | `http://localhost:5174` | `https://clear-checkout.seufert.chatgpt.site`      | ChatGPT Sites           |
+| Effect API          | `http://localhost:3000` | `https://clear-runtime.onrender.com`               | stateful Render service |
+| OTLP/HTTP           | `http://localhost:4318` | `https://clear-runtime.onrender.com`               | stateful Render service |
+| OTLP/gRPC           | `localhost:4317`        | not hosted                                         | local development only  |
+| Checkout API        | `http://localhost:4101` | `https://clear-checkout-api.onrender.com`          | separate Render service |
+| Payments stub       | `http://localhost:4102` | `clear-runtime` authenticated internal route       | stateful Render service |
+| Load controller     | `http://localhost:4103` | `clear-runtime` authenticated internal route       | stateful Render service |
+| PostgreSQL          | `localhost:5432`        | internal listener on persistent disk               | stateful Render service |
+| ClickHouse HTTP     | `http://localhost:8123` | internal listener on persistent disk               | stateful Render service |
+
+The fallback console supports the anonymous sandbox. Durable project login is not live there because the Sites identity handoff and API session cookie require sibling custom domains. The planned production hostnames are `clear.seufert.sh`, `checkout.clear.seufert.sh`, `api.clear.seufert.sh`, `otlp.clear.seufert.sh`, and `checkout-api.clear.seufert.sh`. They remain pending until DNS records and certificates are active.
+
+The runtime exposes an interactive API reference at `https://clear-runtime.onrender.com/docs` and its OpenAPI document at `https://clear-runtime.onrender.com/openapi.json`.
 
 The stateful Render service uses the `1c-2g` plan and one 10 GB disk. Nginx receives Render's public port and routes by hostname to the API or Collector. PostgreSQL, ClickHouse, the payments stub, and the scenario controller are not exposed as standalone public services.
 
@@ -63,7 +67,7 @@ curl --fail http://localhost:4103/readyz
 
 All host-published local ports bind to `127.0.0.1`. `docker compose down` preserves database volumes. Removing volumes deletes local product state and telemetry.
 
-The local admin-token route exists for development only. The Compose topology is not a supported self-hosted release.
+The local stack bootstraps a telemetry project and ingest key for service and Collector development. It does not expose a supported admin-token browser login for that durable project. The Compose topology is not a supported self-hosted release.
 
 ## Images and limits
 

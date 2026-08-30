@@ -64,6 +64,9 @@ const toPanelView = (record: PanelRecord) =>
     ),
   });
 
+const boardRevision = (record: DashboardRecord) =>
+  record.panels.reduce((revision, panel) => revision + panel.metadata.revision, 0);
+
 const toBoardState = (record: DashboardRecord) => {
   const panels = record.panels.map(toPanelView);
   const updatedAt = panels.reduce(
@@ -76,7 +79,7 @@ const toBoardState = (record: DashboardRecord) => {
   return new BoardState({
     dashboard: record.metadata,
     panels,
-    revision: panels.reduce((revision, panel) => revision + panel.metadata.revision, 0),
+    revision: boardRevision(record),
     updatedAt,
   });
 };
@@ -120,6 +123,16 @@ export const BoardServiceLive = Layer.effect(
       panel: PanelRecord,
       change: "created" | "updated" | "removed" | "annotated",
     ) {
+      const board = yield* getRecord(projectId, panel.metadata.dashboardId).pipe(
+        Effect.catchTag(
+          "EntityNotFound",
+          () =>
+            new ServiceUnavailable({
+              service: "storage",
+              message: "Board changed but its dashboard could not be reloaded",
+            }),
+        ),
+      );
       const occurredAt = yield* DateTime.now;
       const [panelEventId, boardEventId] = yield* Effect.all([
         crypto.randomUUIDv7,
@@ -140,7 +153,7 @@ export const BoardServiceLive = Layer.effect(
           projectId,
           occurredAt,
           dashboardId: panel.metadata.dashboardId,
-          revision: panel.metadata.revision,
+          revision: boardRevision(board),
         }),
       ]);
     });

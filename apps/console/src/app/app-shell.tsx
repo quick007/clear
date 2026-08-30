@@ -28,6 +28,7 @@ function WorkspaceShell() {
   const runtime = useRuntimeQuery();
   const projectId = runtime.data?.projectId ?? null;
   const overview = useOverviewQuery(projectId);
+  const overviewState = overview.isError ? "error" : overview.data ? "ready" : "loading";
   const routeIncidentId = location.pathname.match(/^\/incidents\/([^/]+)$/)?.[1] ?? null;
   const visibleIncidentId = useVisibleIncidentId({
     openIncidentId: overview.data?.openIncident?.id ?? null,
@@ -46,9 +47,18 @@ function WorkspaceShell() {
 
   return (
     <div {...stylex.props(styles.app)}>
-      <WorkspaceSidebar overview={overview.data} session={session.data} />
+      <span aria-hidden {...stylex.props(styles.atmosphere)} />
+      <WorkspaceSidebar
+        overview={overview.data}
+        overviewState={overviewState}
+        session={session.data}
+      />
       <div {...stylex.props(styles.workspace)}>
-        <MobileWorkspaceHeader overview={overview.data} session={session.data} />
+        <MobileWorkspaceHeader
+          overview={overview.data}
+          overviewState={overviewState}
+          session={session.data}
+        />
         {isIncidentDetail ? null : (
           <SituationStrip incidentDetail={incident.data} overview={overview.data} />
         )}
@@ -67,12 +77,27 @@ const styles = stylex.create({
   app: {
     backgroundColor: colors.canvas,
     color: colors.text,
+    isolation: "isolate",
     minHeight: "100vh",
+    position: "relative",
+  },
+  atmosphere: {
+    backgroundImage:
+      "radial-gradient(ellipse at 76% 118%, rgba(116, 201, 194, 0.11) 0%, rgba(80, 131, 142, 0.045) 34%, transparent 62%), radial-gradient(ellipse at 98% 108%, rgba(215, 161, 122, 0.055) 0%, transparent 42%)",
+    bottom: 0,
+    height: "72vh",
+    left: 232,
+    pointerEvents: "none",
+    position: "fixed",
+    right: 0,
+    zIndex: -1,
+    "@media (max-width: 840px)": { left: 0 },
   },
   workspace: {
     marginLeft: { default: 232, "@media (max-width: 840px)": 0 },
     minHeight: "100vh",
     minWidth: 0,
+    position: "relative",
   },
   stage: { minHeight: "calc(100vh - 56px)", minWidth: 0 },
 });

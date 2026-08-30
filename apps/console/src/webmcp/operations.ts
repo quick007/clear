@@ -4,7 +4,7 @@ import {
   OpenIncidentRequest,
   SetHypothesisRequest,
 } from "@groundtruth/api-contract";
-import { MetricQuery } from "@groundtruth/telemetry";
+import { LogSearch, MetricQuery, TraceSearch } from "@groundtruth/telemetry";
 import { DateTime } from "effect";
 import type { BrowserApiClient } from "../api/client";
 import type { ToolSessionSource } from "../api/session-source";
@@ -31,6 +31,31 @@ import type {
 
 const relativeRange = (window: QueryMetricsInput["window"]) =>
   ({ _tag: "relative", window }) as const;
+
+export const makeLogSearch = (input: SearchLogsInput) =>
+  new LogSearch({
+    services: input.services,
+    severities: input.severities,
+    query: input.query,
+    traceId: input.traceId,
+    range: input.window === undefined ? undefined : relativeRange(input.window),
+    filters: input.filters,
+    limit: input.limit ?? 30,
+    cursor: input.cursor,
+  });
+
+export const makeTraceSearch = (input: SearchTracesInput) =>
+  new TraceSearch({
+    services: input.services,
+    operation: input.operation,
+    status: input.status,
+    minimumDurationMs: input.minimumDurationMs,
+    maximumDurationMs: input.maximumDurationMs,
+    range: input.window === undefined ? undefined : relativeRange(input.window),
+    filters: input.filters,
+    limit: input.limit ?? 30,
+    cursor: input.cursor,
+  });
 
 export const makeToolOperations = (api: BrowserApiClient, sessions: ToolSessionSource) => {
   const projectId = () => sessions.getSnapshot().projectId;
@@ -89,16 +114,7 @@ export const makeToolOperations = (api: BrowserApiClient, sessions: ToolSessionS
       api.run(
         api.client.telemetry.searchLogs({
           params: { projectId: projectId() },
-          payload: {
-            services: input.services,
-            severities: input.severities,
-            query: input.query,
-            traceId: input.traceId,
-            range: input.window === undefined ? undefined : relativeRange(input.window),
-            filters: input.filters,
-            limit: input.limit ?? 30,
-            cursor: input.cursor,
-          },
+          payload: makeLogSearch(input),
         }),
         signal,
       ),
@@ -114,17 +130,7 @@ export const makeToolOperations = (api: BrowserApiClient, sessions: ToolSessionS
       api.run(
         api.client.telemetry.searchTraces({
           params: { projectId: projectId() },
-          payload: {
-            services: input.services,
-            operation: input.operation,
-            status: input.status,
-            minimumDurationMs: input.minimumDurationMs,
-            maximumDurationMs: input.maximumDurationMs,
-            range: input.window === undefined ? undefined : relativeRange(input.window),
-            filters: input.filters,
-            limit: input.limit ?? 30,
-            cursor: input.cursor,
-          },
+          payload: makeTraceSearch(input),
         }),
         signal,
       ),

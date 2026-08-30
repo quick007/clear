@@ -9,10 +9,14 @@
   "scripts": {
     "build": "vp run -r build",
     "dev": "vp run console#dev",
+    "media:render": "vp exec node video/scripts/render-devpost-assets.mjs",
+    "media:validate": "vp exec node video/scripts/validate-devpost-assets.mjs",
+    "media:validate:manifest": "vp exec node video/scripts/validate-devpost-assets.mjs --manifest-only",
     "ready": "vp check && vp run -r test && vp run -r build",
     "test": "vp run -r test"
   },
   "devDependencies": {
+    "sharp": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

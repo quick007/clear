@@ -1,0 +1,29 @@
+{
+  "name": "node-otel-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vp exec tsc --noEmit -p tsconfig.json",
+    "check": "vp check && vp exec tsc --noEmit -p tsconfig.json",
+    "emit": "vp exec tsx src/index.ts",
+    "test": "vp test --run"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/api-logs": "0.221.0",
+    "@opentelemetry/exporter-logs-otlp-proto": "0.221.0",
+    "@opentelemetry/exporter-metrics-otlp-proto": "0.221.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "0.221.0",
+    "@opentelemetry/sdk-logs": "0.221.0",
+    "@opentelemetry/sdk-metrics": "2.10.0",
+    "@opentelemetry/sdk-node": "0.221.0",
+    "@opentelemetry/sdk-trace-base": "2.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

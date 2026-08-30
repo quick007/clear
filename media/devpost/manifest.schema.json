@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clear.seufert.sh/schemas/devpost-media-manifest.json",
+  "title": "Clear Devpost media manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "sourceDirectory", "outputDirectory", "sources", "assets"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "sourceDirectory": { "$ref": "#/$defs/relativePath" },
+    "outputDirectory": { "$ref": "#/$defs/relativePath" },
+    "sources": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/source" }
+    },
+    "assets": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/asset" }
+    }
+  },
+  "$defs": {
+    "positiveInteger": { "type": "integer", "minimum": 1 },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": { "pattern": "(^/)|(^|/)\\.\\.(/|$)" }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["route", "viewport", "state"],
+      "properties": {
+        "route": { "type": "string", "minLength": 1 },
+        "viewport": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": { "$ref": "#/$defs/positiveInteger" },
+            "height": { "$ref": "#/$defs/positiveInteger" }
+          }
+        },
+        "state": { "type": "string", "minLength": 1 }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "description", "capture"],
+      "properties": {
+        "file": { "$ref": "#/$defs/relativePath" },
+        "description": { "type": "string", "minLength": 1 },
+        "capture": { "$ref": "#/$defs/capture" }
+      }
+    },
+    "canvas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "background"],
+      "properties": {
+        "width": { "$ref": "#/$defs/positiveInteger" },
+        "height": { "$ref": "#/$defs/positiveInteger" },
+        "background": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+      }
+    },
+    "format": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "quality"],
+          "properties": {
+            "type": { "const": "jpeg" },
+            "quality": { "type": "integer", "minimum": 1, "maximum": 100 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "compressionLevel"],
+          "properties": {
+            "type": { "const": "png" },
+            "compressionLevel": { "type": "integer", "minimum": 0, "maximum": 9 }
+          }
+        }
+      ]
+    },
+    "crop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "top", "width", "height"],
+      "properties": {
+        "left": { "type": "integer", "minimum": 0 },
+        "top": { "type": "integer", "minimum": 0 },
+        "width": { "$ref": "#/$defs/positiveInteger" },
+        "height": { "$ref": "#/$defs/positiveInteger" }
+      }
+    },
+    "layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "x", "y", "width", "height", "fit", "position"],
+      "properties": {
+        "source": { "type": "string", "minLength": 1 },
+        "x": { "type": "integer", "minimum": 0 },
+        "y": { "type": "integer", "minimum": 0 },
+        "width": { "$ref": "#/$defs/positiveInteger" },
+        "height": { "$ref": "#/$defs/positiveInteger" },
+        "fit": { "enum": ["cover", "contain", "fill"] },
+        "position": { "enum": ["centre", "north", "south", "east", "west"] },
+        "crop": { "$ref": "#/$defs/crop" },
+        "style": { "$ref": "#/$defs/style" }
+      }
+    },
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "opacity": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "borderRadius": { "type": "integer", "minimum": 0 },
+        "border": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "color", "opacity"],
+          "properties": {
+            "width": { "$ref": "#/$defs/positiveInteger" },
+            "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+            "opacity": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+          }
+        },
+        "shadow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y", "blur", "spread", "color", "opacity"],
+          "properties": {
+            "x": { "type": "integer" },
+            "y": { "type": "integer" },
+            "blur": { "type": "integer", "minimum": 0 },
+            "spread": { "type": "integer", "minimum": 0 },
+            "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+            "opacity": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+          }
+        },
+        "modulate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["brightness", "saturation"],
+          "properties": {
+            "brightness": { "type": "number", "minimum": 0.5, "maximum": 1.5 },
+            "saturation": { "type": "number", "minimum": 0, "maximum": 2 }
+          }
+        }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "output", "canvas", "format", "maxBytes", "layers"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "description": { "type": "string", "minLength": 1 },
+        "output": { "$ref": "#/$defs/relativePath" },
+        "canvas": { "$ref": "#/$defs/canvas" },
+        "format": { "$ref": "#/$defs/format" },
+        "maxBytes": { "$ref": "#/$defs/positiveInteger" },
+        "layers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/layer" }
+        }
+      }
+    }
+  }
+}

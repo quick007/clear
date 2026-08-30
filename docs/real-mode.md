@@ -1,32 +1,43 @@
 # Connect a real project
 
-Real mode connects an existing OpenTelemetry-instrumented system to a durable Clear project.
+Real mode connects an existing OpenTelemetry-instrumented system to a durable Clear project. Clear accepts standard OTLP from official OpenTelemetry SDKs and Collectors. There is no Clear-specific SDK to install.
+
+## Hosted status
+
+The anonymous incident experience is live at [clear-observability.seufert.chatgpt.site](https://clear-observability.seufert.chatgpt.site/).
+
+The current API and OTLP/HTTP fallback is `https://clear-runtime.onrender.com`. Its interactive API reference is at [`/docs`](https://clear-runtime.onrender.com/docs), and the OpenAPI document is at [`/openapi.json`](https://clear-runtime.onrender.com/openapi.json).
+
+Durable project login is not live on the fallback hostnames. The ChatGPT Sites identity handoff and API session cookie require the planned sibling domains `clear.seufert.sh` and `api.clear.seufert.sh`. Until those DNS records and certificates are active, use the anonymous demo. The steps below describe the durable-project flow that becomes available after that cutover.
 
 ## Boundary
 
-Clear needs telemetry credentials, not execution credentials.
+Clear needs a telemetry ingest key, not execution credentials.
 
 Give Clear an ingest key through your OpenTelemetry exporter. Do not give it source-control tokens, cloud credentials, SSH keys, deployment keys, or access to your agent. Your own agent keeps using the repository and infrastructure access you already configured.
 
 ## 1. Create an ingest key
 
-1. Open [clear.seufert.sh](https://clear.seufert.sh) and sign in with ChatGPT.
+After durable login is enabled:
+
+1. Open `https://clear.seufert.sh` and sign in with ChatGPT.
 2. Open **Settings**, then **Ingest keys**.
 3. Create a named ingest key.
 4. Copy the secret once and store it in your application's secret manager.
 
-The API stores only a hash of the secret. Listing keys returns metadata, not the original value. Each hosted account owns one durable project and may keep up to three ingest keys active. Use separate keys for separate environments or collectors so one can be revoked without interrupting every source.
+The API stores only a hash of the secret. Listing keys returns metadata, not the original value. Each hosted account owns one durable project and may keep up to three ingest keys active. Use separate keys for separate environments or Collectors so one can be revoked without interrupting every source.
 
-For the local contributor stack, the project slug is `local` and the development key defaults to `local-demo-ingest-key`. That path exists only for isolated local development.
+For isolated local development, the project slug is `local` and the development key defaults to `local-demo-ingest-key`. The local stack bootstraps that project for telemetry development, but it does not expose a supported browser login for the durable project.
 
 ## 2. Point OTLP at Clear
 
 Set the standard OpenTelemetry variables on your service or upstream Collector:
 
 ```sh
-export OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.clear.seufert.sh
+export CLEAR_INGEST_KEY=<your-ingest-key>
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://clear-runtime.onrender.com
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-export OTEL_EXPORTER_OTLP_HEADERS=x-clear-ingest-key=<your-ingest-key>
+export OTEL_EXPORTER_OTLP_HEADERS="x-clear-ingest-key=${CLEAR_INGEST_KEY}"
 export OTEL_SERVICE_NAME=<stable-service-name>
 ```
 
@@ -54,23 +65,36 @@ Send an authenticated event after a successful deploy:
 
 ```sh
 curl --fail-with-body \
-  -X POST https://api.clear.seufert.sh/v1/events/deploy \
+  -X POST https://clear-runtime.onrender.com/v1/events/deploy \
   -H 'content-type: application/json' \
-  -H 'x-clear-ingest-key: <your-ingest-key>' \
+  -H "x-clear-ingest-key: ${CLEAR_INGEST_KEY}" \
   --data '{
     "service": "checkout-api",
     "sha": "0123456789abcdef",
-    "description": "Add bounded retry policy"
+    "description": "Add bounded retry policy",
+    "deployedAt": "2026-08-29T18:30:00Z"
   }'
 ```
 
-`url` and `deployedAt` are optional fields. Use a commit, release, or build URL that is safe to open. Clear records and displays the event. It does not trigger the deploy.
+The request contract is:
+
+- `service`: required, non-empty, trimmed text. It must exactly match the telemetry resource attribute `service.name` for Clear to annotate that service's panels.
+- `sha`: required, 7 to 64 lowercase hexadecimal characters.
+- `description`: optional, non-empty text.
+- `url`: optional `http` or `https` URL, such as a commit, release, or build page that is safe to open.
+- `deployedAt`: optional UTC timestamp. Clear uses receipt time when it is omitted.
+
+A successful request returns `201 Created` with the recorded deploy event. Common failure responses are `400` for an invalid body, `401` for a missing or rejected ingest key, `429` when the project quota is exceeded, and `503` when a required service is unavailable.
+
+This endpoint is not idempotent. Repeating the same request records another event. Do not blindly retry after a timeout or lost response. Check the project's deploy events first, then retry only when you know the event was not recorded. For an explicit retryable rejection, use capped exponential backoff and a small attempt limit.
+
+Clear records and displays this event. It does not trigger the deployment.
 
 For local development, the API base URL is `http://localhost:3000`.
 
 ## 5. Investigate with your agent
 
-Open the project in ChatGPT's in-app browser or Chrome with WebMCP enabled. The page advertises the capabilities valid for the current session and incident state. Let the agent discover that tool surface instead of pasting a static tool list into the conversation.
+Open the project in ChatGPT's in-app browser or Chrome with WebMCP enabled. The page advertises only the capabilities valid for the current session and incident state. Let the agent discover that tool surface instead of pasting a static tool list into the conversation.
 
 A useful opening prompt is:
 
@@ -93,9 +117,5 @@ Clear never becomes the executor in that loop.
 - Confirm exports with the replacement.
 - Revoke the old key in Clear.
 - Treat any key that appears in source control, screenshots, logs, or shell history as compromised.
-
-## Hosted authentication
-
-The console Worker reads ChatGPT Sites identity only at the server boundary, exchanges it with the API through a one-time handoff, and redirects the browser into a cookie-backed Clear session. The final flow must be verified in a fresh ChatGPT browser session before submission.
 
 Anonymous sandbox sessions are separate from real projects and use short-lived session identifiers rather than ingest keys. They support investigation and diagnosis only. They never synthesize a code change or deployment.

@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 
 import { errorMessage } from "../../data/format";
@@ -12,8 +12,11 @@ import {
 } from "../../data/queries";
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
+import { CopyButton } from "../../ui/copy-button";
 import { ContentState, RetryButton } from "../../ui/page";
 import { LivePanel } from "./panel-renderer";
+
+const investigationPrompt = "Investigate the active alerts and show me why.";
 
 export function BoardPage() {
   const search = useSearch({ from: "/board" });
@@ -69,6 +72,19 @@ export function BoardPage() {
         />
       ) : null}
 
+      {runtime.data?.mode === "sandbox" &&
+      overview.data?.openIncident &&
+      board.data &&
+      board.data.panels.length <= 1 ? (
+        <aside aria-label="Suggested agent prompt" {...stylex.props(styles.agentPrompt)}>
+          <span {...stylex.props(styles.agentPromptCopy)}>
+            <strong {...stylex.props(styles.agentPromptTitle)}>Ask your agent</strong>
+            <span>{investigationPrompt}</span>
+          </span>
+          <CopyButton label="Copy suggested prompt" value={investigationPrompt} />
+        </aside>
+      ) : null}
+
       {!runtime.isError && !board.isError && (runtime.isPending || board.isPending) ? (
         <ContentState kind="loading" title="Loading the board" />
       ) : null}
@@ -89,7 +105,14 @@ export function BoardPage() {
         </ContentState>
       ) : null}
       {board.data?.panels.length === 0 ? (
-        <ContentState title="This board is ready for telemetry">
+        <ContentState
+          actions={
+            <Button render={<Link to="/connect" />} tone="secondary">
+              Connect telemetry
+            </Button>
+          }
+          title="This board is ready for telemetry"
+        >
           Clear creates a useful overview when signals arrive. Your agent can shape the board for
           the questions you are investigating.
         </ContentState>
@@ -168,6 +191,31 @@ const styles = stylex.create({
     },
     paddingBottom: space.x10,
   },
+  agentPrompt: {
+    alignItems: "center",
+    backdropFilter: "blur(10px) saturate(108%)",
+    backgroundColor: colors.materialSurface,
+    borderColor: colors.materialLine,
+    borderRadius: radii.md,
+    borderStyle: "solid",
+    borderWidth: 1,
+    boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.045)",
+    color: colors.textMuted,
+    display: "flex",
+    fontSize: 13,
+    gap: space.x4,
+    justifyContent: "space-between",
+    marginBottom: space.x4,
+    paddingBlock: space.x3,
+    paddingInline: space.x4,
+  },
+  agentPromptCopy: {
+    alignItems: { default: "center", "@media (max-width: 620px)": "start" },
+    display: "flex",
+    flexDirection: { default: "row", "@media (max-width: 620px)": "column" },
+    gap: { default: space.x3, "@media (max-width: 620px)": 2 },
+  },
+  agentPromptTitle: { color: colors.text, fontWeight: 500, whiteSpace: "nowrap" },
   sandboxStart: {
     backgroundColor: colors.surface,
     borderColor: colors.line,

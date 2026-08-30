@@ -1,9 +1,12 @@
 import { assert, describe, it } from "@effect/vitest";
 import { NodeCrypto } from "@effect/platform-node";
-import { Cause, Effect, Exit, Layer, Redacted } from "effect";
+import { ServiceUnavailable } from "@groundtruth/api-contract";
+import { Cause, Effect, Exit, Layer, Logger, Redacted, Ref } from "effect";
+import { TestClock } from "effect/testing";
 import {
   AuthPrincipal,
   AuthService,
+  AuthServiceMaintenance,
   AdminLoginDisabled,
   InvalidAdminCredential,
   InvalidHandoffCode,
@@ -104,6 +107,72 @@ describe("AuthService", () => {
         ),
       );
     }).pipe(Effect.provide(AuthTest)),
+  );
+
+  it.effect("purges expired in-memory handoffs and sessions", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(Date.parse("2026-08-29T08:00:00.000Z"));
+      const auth = yield* AuthService;
+      const principal = new AuthPrincipal({
+        hostedSubject: "chatgpt-user-1",
+        email: "operator@example.com",
+        displayName: "Operator",
+      });
+      const sessionHandoff = yield* auth.issueHandoff(principal, "/projects");
+      yield* auth.redeemHandoff(sessionHandoff.code, sessionHandoff.browserNonce);
+      yield* auth.issueHandoff(principal, "/settings");
+
+      yield* TestClock.adjust("8 days");
+
+      assert.deepStrictEqual(yield* auth.purgeExpired, { handoffs: 1, sessions: 1 });
+      assert.deepStrictEqual(yield* auth.purgeExpired, { handoffs: 0, sessions: 0 });
+    }).pipe(Effect.provide(AuthTest)),
+  );
+
+  it.effect("keeps scheduled purging alive after a bounded warning", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const attempts = yield* Ref.make(0);
+        const messages: Array<unknown> = [];
+        const logger = Logger.make(({ message }) => {
+          messages.push(message);
+        });
+        const unexpected = () => Effect.die("Unexpected auth operation");
+        const auth = AuthService.of({
+          validateCollectorCredential: unexpected,
+          validateSitesCredential: unexpected,
+          validateAdminCredential: unexpected,
+          issueHandoff: unexpected,
+          redeemHandoff: unexpected,
+          authenticate: unexpected,
+          logout: unexpected,
+          purgeExpired: Ref.updateAndGet(attempts, (count) => count + 1).pipe(
+            Effect.flatMap((attempt) =>
+              attempt === 1
+                ? Effect.fail(
+                    new ServiceUnavailable({
+                      service: "authentication",
+                      message: "Authentication service is unavailable",
+                    }),
+                  )
+                : Effect.succeed({ handoffs: 0, sessions: 0 }),
+            ),
+          ),
+        });
+
+        yield* Layer.build(
+          AuthServiceMaintenance.pipe(
+            Layer.provide(Layer.succeed(AuthService, auth)),
+            Layer.provide(Logger.layer([logger], { mergeWithExisting: false })),
+          ),
+        );
+        yield* Effect.yieldNow;
+        yield* TestClock.adjust("1 day");
+
+        assert.strictEqual(yield* Ref.get(attempts), 2);
+        assert.deepStrictEqual(messages, [["Expired authentication-state cleanup failed"]]);
+      }),
+    ),
   );
 
   it.effect("disables admin login when no token is configured", () =>

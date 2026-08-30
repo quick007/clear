@@ -6,7 +6,7 @@ import { createServer } from "node:http";
 import { AlertEvaluatorRuntime } from "./alerts/AlertEvaluator.js";
 import { AlertService } from "./alerts/AlertService.js";
 import { ManualAlertService } from "./alerts/ManualAlertService.js";
-import { AuthService } from "./auth/AuthService.js";
+import { AuthService, AuthServiceMaintenance } from "./auth/AuthService.js";
 import { BoardServiceLive } from "./board/BoardServiceLive.js";
 import { BackendConfig } from "./config/BackendConfig.js";
 import { DeployService } from "./deploys/DeployService.js";
@@ -54,8 +54,10 @@ const PrimaryServicesLive = Layer.mergeAll(
   TelemetryStore.layerPersistence,
 ).pipe(Layer.provideMerge(FoundationLive));
 
+const AuthServicesLive = AuthServiceMaintenance.pipe(Layer.provideMerge(PrimaryServicesLive));
+
 const DeployServicesLive = DeployService.layerPersistence.pipe(
-  Layer.provideMerge(PrimaryServicesLive),
+  Layer.provideMerge(AuthServicesLive),
 );
 
 const AlertServicesLive = AlertEvaluatorRuntime.pipe(Layer.provideMerge(DeployServicesLive));

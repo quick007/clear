@@ -28,7 +28,7 @@ jobs:
           cache: true
       - name: Install dependencies
         run: vp install --frozen-lockfile
-      - name: Check, test, and build
+      - name: Run the fast workspace gate
         run: vp run ready
       - name: Audit production dependencies
         run: vp pm audit -- --prod --audit-level=high
@@ -48,12 +48,51 @@ jobs:
         with:
           go-version-file: apps/collector/go.mod
           cache-dependency-path: apps/collector/go.sum
-      - name: Run tests with the race detector
-        run: go test -race ./...
+      - name: Run unit tests with the race detector
+        run: go test -race ./internal/...
       - name: Run static analysis
         run: go vet ./...
+
+  collector-distribution:
+    name: Collector distribution integration
+    needs: collector
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/collector
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: apps/collector/go.mod
+          cache-dependency-path: apps/collector/go.sum
       - name: Build and validate the distribution
         run: make validate
+      - name: Exercise the generated distribution
+        run: make integration
+
+  persistence-integration:
+    name: Persistence database integration
+    needs: typescript
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GROUNDTRUTH_RUN_DATABASE_TESTS: "true"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Vite+
+        uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
+        with:
+          node-version: "24"
+          cache: true
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+      - name: Run persistence database integration tests
+        run: vp -C packages/persistence test run integration --no-file-parallelism
 
   compose:
     name: Compose configuration

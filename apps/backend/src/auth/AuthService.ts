@@ -3,6 +3,7 @@ import { DisplayName, EmailAddress, HostedSubject, SessionId } from "@groundtrut
 import {
   AuthHandoffRepository,
   HostedSessionRepository,
+  type AuthPurgeResult,
   type AuthSessionRecord,
 } from "@groundtruth/persistence";
 import {
@@ -15,6 +16,7 @@ import {
   Option,
   Redacted,
   Ref,
+  Schedule,
   Schema,
 } from "effect";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
@@ -22,6 +24,7 @@ import { BackendConfig } from "../config/BackendConfig.js";
 
 const handoffTtlMillis = 30_000; // 30 seconds
 const sessionTtlMillis = 7 * 24 * 60 * 60 * 1_000; // 7 days
+const authPurgeInterval = "1 day"; // 1 day
 
 export class AuthPrincipal extends Schema.Class<AuthPrincipal>(
   "groundtruth/backend/auth/AuthPrincipal",
@@ -157,6 +160,7 @@ export class AuthService extends Context.Service<
       sessionToken: string,
     ): Effect.Effect<SessionRecord, SessionNotFound | ServiceUnavailable>;
     logout(sessionToken: string): Effect.Effect<void, ServiceUnavailable>;
+    readonly purgeExpired: Effect.Effect<AuthPurgeResult, ServiceUnavailable>;
   }
 >()("groundtruth/backend/auth/AuthService") {
   static readonly layerMemory = Layer.effect(
@@ -281,6 +285,20 @@ export class AuthService extends Context.Service<
         }),
       );
 
+      const purgeExpired = Effect.gen(function* () {
+        const now = yield* Clock.currentTimeMillis;
+        return yield* Ref.modify(state, (current) => {
+          const active = withoutExpired(current, now);
+          return [
+            {
+              handoffs: current.handoffs.size - active.handoffs.size,
+              sessions: current.sessions.size - active.sessions.size,
+            },
+            active,
+          ];
+        });
+      }).pipe(Effect.withSpan("AuthService.purgeExpired"));
+
       return AuthService.of({
         validateCollectorCredential,
         validateSitesCredential,
@@ -289,6 +307,7 @@ export class AuthService extends Context.Service<
         redeemHandoff,
         authenticate,
         logout,
+        purgeExpired,
       });
     }),
   );
@@ -405,6 +424,12 @@ export class AuthService extends Context.Service<
         }),
       );
 
+      const purgeExpired = DateTime.now.pipe(
+        Effect.flatMap((now) => sessions.purgeExpired(now)),
+        Effect.mapError(authUnavailable),
+        Effect.withSpan("AuthService.purgeExpired"),
+      );
+
       return AuthService.of({
         validateCollectorCredential: (credential) =>
           validateCredential("collector", config.collectorSecret, credential),
@@ -415,6 +440,7 @@ export class AuthService extends Context.Service<
         redeemHandoff,
         authenticate,
         logout,
+        purgeExpired,
       });
     }),
   );
@@ -423,3 +449,13 @@ export class AuthService extends Context.Service<
 
   static readonly layerMemoryConfigured = this.layerMemory.pipe(Layer.provide(BackendConfig.layer));
 }
+
+export const AuthServiceMaintenance = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const auth = yield* AuthService;
+    const purgeExpired = auth.purgeExpired.pipe(
+      Effect.catch(() => Effect.logWarning("Expired authentication-state cleanup failed")),
+    );
+    yield* purgeExpired.pipe(Effect.repeat(Schedule.spaced(authPurgeInterval)), Effect.forkScoped);
+  }),
+);

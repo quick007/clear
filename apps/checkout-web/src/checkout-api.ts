@@ -1,8 +1,22 @@
-export type CheckoutResult = {
-  authorizationId: string;
-  requestId: string;
-  status: "confirmed";
-};
+import { Option, Schema } from "effect";
+
+const Identifier = Schema.String.check(
+  Schema.isLengthBetween(1, 160),
+  Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/),
+);
+
+const CheckoutResult = Schema.Struct({
+  authorizationId: Identifier,
+  requestId: Identifier,
+  status: Schema.Literal("confirmed"),
+});
+
+export type CheckoutResult = typeof CheckoutResult.Type;
+
+const CheckoutErrorResponse = Schema.Struct({
+  code: Schema.Literals(["invalid_request", "payments_unavailable"]),
+  message: Schema.String,
+});
 
 export type CheckoutFailure = {
   code: "invalid_request" | "payments_unavailable" | "request_failed";
@@ -11,23 +25,28 @@ export type CheckoutFailure = {
 
 const defaultApiUrl = "http://localhost:4101";
 
+const requestFailed = (): CheckoutFailure => ({
+  code: "request_failed",
+  message: "We could not place the order right now.",
+});
+
 const readFailure = async (response: Response): Promise<CheckoutFailure> => {
   try {
-    const body = (await response.json()) as { code?: unknown; message?: unknown };
-    if (body.code === "payments_unavailable") {
+    const body = Schema.decodeUnknownOption(CheckoutErrorResponse)(await response.json());
+    if (Option.isSome(body) && body.value.code === "payments_unavailable") {
       return {
         code: "payments_unavailable",
         message: "The payment service is temporarily unavailable.",
       };
     }
-    if (body.code === "invalid_request") {
+    if (Option.isSome(body) && body.value.code === "invalid_request") {
       return { code: "invalid_request", message: "The order details could not be accepted." };
     }
   } catch {
-    // The user-facing fallback below covers non-JSON upstream responses.
+    // The user-facing fallback below covers non-JSON responses.
   }
 
-  return { code: "request_failed", message: "We could not place the order right now." };
+  return requestFailed();
 };
 
 export const createCheckout = async ({
@@ -53,5 +72,14 @@ export const createCheckout = async ({
     throw await readFailure(response);
   }
 
-  return (await response.json()) as CheckoutResult;
+  try {
+    const body = Schema.decodeUnknownOption(CheckoutResult)(await response.json());
+    if (Option.isSome(body)) {
+      return body.value;
+    }
+  } catch {
+    // The user-facing fallback below covers non-JSON responses.
+  }
+
+  throw requestFailed();
 };

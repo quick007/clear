@@ -7,6 +7,7 @@ const handoffNonceMaxAgeSeconds = 60; // 1 minute
 const backendTimeoutMillis = 8 * 1000; // 8 seconds
 
 interface AuthEnv {
+  readonly ASSETS: Fetcher;
   readonly GROUNDTRUTH_API_ORIGIN: string;
   readonly GROUNDTRUTH_SITE_HANDOFF_SECRET: string;
 }
@@ -222,6 +223,8 @@ export const handleRequest = async (request: Request, env: AuthEnv) => {
   }
 
   if (url.pathname === authPath) return handleAuth(request, env, url);
+
+  if (!url.pathname.startsWith("/v1/")) return env.ASSETS.fetch(request);
 
   return jsonError("not_found", "Route not found.", 404);
 };

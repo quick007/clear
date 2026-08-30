@@ -112,7 +112,7 @@ export class BoardService extends Context.Service<
             occurredAt,
             dashboardId: mutation.board.dashboard.id,
             panelId: mutation.panelId,
-            revision: mutation.board.revision,
+            revision: mutation.panelRevision,
             change,
           }),
           new BoardChanged({
@@ -248,7 +248,11 @@ export class BoardService extends Context.Service<
         }
         yield* publishMutation(
           projectId,
-          { board: outcome.success.board, panelId },
+          {
+            board: outcome.success.board,
+            panelId,
+            panelRevision: outcome.success.panel.metadata.revision,
+          },
           "created",
           now,
           panelEventId,
@@ -317,7 +321,11 @@ export class BoardService extends Context.Service<
         }
         yield* publishMutation(
           projectId,
-          { board: outcome.success.board, panelId },
+          {
+            board: outcome.success.board,
+            panelId,
+            panelRevision: outcome.success.panel.metadata.revision,
+          },
           "updated",
           now,
           panelEventId,
@@ -373,7 +381,11 @@ export class BoardService extends Context.Service<
         }
         yield* publishMutation(
           projectId,
-          { board: outcome.success.board, panelId },
+          {
+            board: outcome.success.board,
+            panelId,
+            panelRevision: outcome.success.panel.metadata.revision,
+          },
           "annotated",
           now,
           panelEventId,
@@ -400,7 +412,11 @@ export class BoardService extends Context.Service<
           const remaining = found.board.panels.filter((panel) => panel.metadata.id !== panelId);
           const nextBoard = withPanels(found.board, normalizePositions(remaining, now), now);
           return [
-            Result.succeed({ board: nextBoard, panelId }),
+            Result.succeed({
+              board: nextBoard,
+              panelId,
+              panelRevision: found.panel.metadata.revision,
+            }),
             withBoard(memory, projectId, nextBoard),
           ];
         });

@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { handleRequest } from "./worker";
 
 const env = {
+  ASSETS: {
+    fetch: vi.fn(async () => new Response("console asset")),
+  } as unknown as Fetcher,
   GROUNDTRUTH_API_ORIGIN: "https://api.clear.seufert.sh",
   GROUNDTRUTH_SITE_HANDOFF_SECRET: "sites-handoff-secret",
 } as const;
@@ -166,6 +169,7 @@ describe("Sites authentication Worker", () => {
 
   it("keeps same-host localhost handoffs usable without a Domain or Secure attribute", async () => {
     const localEnv = {
+      ASSETS: env.ASSETS,
       GROUNDTRUTH_API_ORIGIN: "http://localhost:3000",
       GROUNDTRUTH_SITE_HANDOFF_SECRET: "sites-handoff-secret",
     } as const;
@@ -223,6 +227,13 @@ describe("Sites authentication Worker", () => {
 
     expect(response.status).toBe(404);
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+  });
+
+  it("serves application routes through the asset binding", async () => {
+    const response = await handleRequest(request("/board"), env);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("console asset");
   });
 
   it("serves a no-store health response", async () => {

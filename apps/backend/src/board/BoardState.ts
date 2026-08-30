@@ -24,6 +24,7 @@ export interface PanelMutation {
 export interface BoardMutation {
   readonly board: BoardState;
   readonly panelId: PanelId;
+  readonly panelRevision: number;
 }
 
 export const boardMissing = (dashboardId: DashboardId) =>

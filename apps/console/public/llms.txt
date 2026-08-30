@@ -28,11 +28,21 @@ Agent guidance:
 
 Documentation:
 - Repository: https://github.com/quick007/clear
+- Live anonymous demo: https://clear-observability.seufert.chatgpt.site/
+- Current API and OTLP/HTTP base: https://clear-runtime.onrender.com
+- Interactive API reference: https://clear-runtime.onrender.com/docs
+- OpenAPI document: https://clear-runtime.onrender.com/openapi.json
 - Architecture: https://github.com/quick007/clear/blob/main/docs/architecture.md
 - OpenTelemetry quickstart: https://github.com/quick007/clear/blob/main/docs/otel-quickstart.md
 - Connect a project: https://github.com/quick007/clear/blob/main/docs/real-mode.md
 
 Session modes:
 - Without an authenticated browser session, the console opens an isolated two-hour sandbox.
-- A signed-in hosted session can create a durable project and ingest key.
+- Durable project login requires the planned sibling custom domains and is not live on the fallback Sites and Render hostnames yet.
 - Read the active console's Connect page for its exact OTLP endpoint and authentication header. Do not assume localhost or a particular hosted domain.
+
+Telemetry integration:
+- Use official OpenTelemetry SDKs or an upstream OpenTelemetry Collector. Clear has no proprietary SDK.
+- Hosted OTLP/HTTP accepts metrics, logs, and traces at the standard /v1 signal paths.
+- Authenticate telemetry with the x-clear-ingest-key header. Keep the value in a secret manager.
+- A deploy event's service must exactly match the telemetry resource attribute service.name for panel annotations.

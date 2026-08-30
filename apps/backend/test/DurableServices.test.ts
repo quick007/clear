@@ -3,6 +3,7 @@ import { assert, describe, it } from "@effect/vitest";
 import { DisplayName, EmailAddress, HostedSubject, IngestKeyName } from "@groundtruth/domain";
 import { PersistenceMemory, RepositoriesMemoryControl } from "@groundtruth/persistence/testing";
 import { Context, Effect, Layer, Redacted } from "effect";
+import { TestClock } from "effect/testing";
 import { AuthPrincipal, AuthService } from "../src/auth/AuthService.js";
 import { BackendConfig } from "../src/config/BackendConfig.js";
 import { IdentityService } from "../src/identity/IdentityService.js";
@@ -87,6 +88,30 @@ describe("persistence-backed services", () => {
         (yield* Effect.flip(auth.authenticate(redeemed.sessionToken)))._tag,
         "SessionNotFound",
       );
+    }).pipe(Effect.provide(DurableServicesTest)),
+  );
+
+  it.effect("purges expired persisted authentication state", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(Date.parse("2026-08-29T08:00:00.000Z"));
+      const auth = yield* AuthService;
+      const control = yield* RepositoriesMemoryControl;
+      const principal = new AuthPrincipal({
+        hostedSubject: "chatgpt-user-1",
+        email: "operator@example.com",
+        displayName: "Operator",
+      });
+      const sessionHandoff = yield* auth.issueHandoff(principal, "/projects");
+      yield* auth.redeemHandoff(sessionHandoff.code, sessionHandoff.browserNonce);
+      yield* auth.issueHandoff(principal, "/settings");
+
+      yield* TestClock.adjust("8 days");
+
+      assert.deepStrictEqual(yield* auth.purgeExpired, { handoffs: 2, sessions: 1 });
+      assert.deepStrictEqual(yield* auth.purgeExpired, { handoffs: 0, sessions: 0 });
+      const snapshot = yield* control.snapshot;
+      assert.strictEqual(snapshot.authHandoffCount, 0);
+      assert.strictEqual(snapshot.hostedSessions.length, 0);
     }).pipe(Effect.provide(DurableServicesTest)),
   );
 

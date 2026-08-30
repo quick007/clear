@@ -1,4 +1,4 @@
-# Groundtruth
+# Clear
 
 Build the WebMCP-native OpenTelemetry observability surface described in `context.md`.
 
@@ -16,4 +16,19 @@ Build the WebMCP-native OpenTelemetry observability surface described in `contex
 
 ### Folder Structure
 
-As you implement this project, add the folder structure here pls
+```text
+apps/                 Product and incident services
+  backend/            Effect API and application services
+  collector/          Go OpenTelemetry Collector distribution
+  console/            React console and WebMCP site tools
+  checkout-api/       Intentionally broken example API
+  checkout-web/       Example storefront
+  payments-stub/      Controlled upstream dependency
+  load-generator/     Retry-storm scenario controller
+packages/             Shared contracts, models, persistence, and panel DSL
+examples/             Standalone OpenTelemetry integrations
+infra/                Local and Render infrastructure
+docs/                 Product, architecture, and operations documentation
+video/                Submission script, shot list, and media tooling
+media/                Reproducible submission assets
+```

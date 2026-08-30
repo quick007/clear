@@ -28,6 +28,10 @@ export const colors = stylex.defineVars({
   cyanStrong: "#10b981",
   cyanWash: "rgba(52, 211, 153, 0.10)",
   whiteWash: "rgba(255, 255, 255, 0.045)",
+  materialSurface: "rgba(255, 255, 255, 0.035)",
+  materialSurfaceStrong: "rgba(255, 255, 255, 0.055)",
+  materialLine: "rgba(255, 255, 255, 0.09)",
+  materialHighlight: "rgba(255, 255, 255, 0.05)",
   overlay: "rgba(12, 10, 9, 0.78)",
 });
 
