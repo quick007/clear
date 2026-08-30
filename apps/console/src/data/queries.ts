@@ -10,6 +10,7 @@ import { TraceId } from "@groundtruth/telemetry";
 import {
   AttributeFilter,
   AttributeKey,
+  type Cursor,
   LogSearch,
   MetricName,
   MetricQuery,
@@ -19,10 +20,11 @@ import {
   TraceSearch,
   type MetricAggregation,
 } from "@groundtruth/telemetry";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { getConsoleRuntime } from "../api/runtime";
 import { ConsoleNoActiveProject } from "../errors";
+import { nextPageCursor } from "./pagination";
 import { queryKeys } from "./query-keys";
 import {
   refreshInBackground,
@@ -141,12 +143,12 @@ export function useLogsQuery(
   window: TelemetryWindow,
   service?: string,
 ) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey:
       projectId === null
         ? ["groundtruth", "logs", "idle"]
         : queryKeys.logs(projectId, search, window, service),
-    queryFn: ({ signal }) =>
+    queryFn: ({ pageParam, signal }) =>
       run(
         (runtime) =>
           runtime.api.client.telemetry.searchLogs({
@@ -156,10 +158,13 @@ export function useLogsQuery(
               services: service ? [ServiceName.make(service)] : undefined,
               range: RelativeTimeRange.make({ window }),
               limit: 50,
+              cursor: pageParam,
             }),
           }),
         signal,
       ),
+    initialPageParam: undefined as Cursor | undefined,
+    getNextPageParam: nextPageCursor,
     enabled: projectId !== null,
   });
 }
@@ -170,12 +175,12 @@ export function useTracesQuery(
   window: TelemetryWindow,
   service?: string,
 ) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey:
       projectId === null
         ? ["groundtruth", "traces", "idle"]
         : queryKeys.traces(projectId, search, window, service),
-    queryFn: ({ signal }) =>
+    queryFn: ({ pageParam, signal }) =>
       run(
         (runtime) =>
           runtime.api.client.telemetry.searchTraces({
@@ -185,10 +190,13 @@ export function useTracesQuery(
               services: service ? [ServiceName.make(service)] : undefined,
               range: RelativeTimeRange.make({ window }),
               limit: 50,
+              cursor: pageParam,
             }),
           }),
         signal,
       ),
+    initialPageParam: undefined as Cursor | undefined,
+    getNextPageParam: nextPageCursor,
     enabled: projectId !== null,
   });
 }
@@ -385,23 +393,6 @@ export function useIncidentQuery(projectId: ProjectId | null, incidentId: string
   });
 }
 
-export function useDeploysQuery(projectId: ProjectId | null) {
-  return useQuery({
-    queryKey:
-      projectId === null ? ["groundtruth", "deploys", "idle"] : queryKeys.deploys(projectId),
-    queryFn: ({ signal }) =>
-      run(
-        (runtime) =>
-          runtime.api.client.deploys.listDeployEvents({
-            params: { projectId: projectId! },
-            query: { limit: 50 },
-          }),
-        signal,
-      ),
-    enabled: projectId !== null,
-  });
-}
-
 export function useIngestKeysQuery(projectId: ProjectId | null) {
   return useQuery({
     queryKey:
@@ -479,6 +470,23 @@ export function useTriggerSandboxIncident(projectId: ProjectId) {
           queryClient.invalidateQueries({ queryKey: queryKeys.runtime }),
           queryClient.invalidateQueries({ queryKey: queryKeys.overview(projectId) }),
           queryClient.invalidateQueries({ queryKey: queryKeys.board(projectId) }),
+        ]);
+      }),
+  });
+}
+
+export function useResetSandbox(projectId: ProjectId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      runMutation("Reset sandbox", (runtime) => runtime.api.client.sandbox.reset({})),
+    onSuccess: () =>
+      refreshInBackground(async (signal) => {
+        const consoleRuntime = await getConsoleRuntime();
+        await consoleRuntime.sessions.refresh(signal);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.runtime }),
+          queryClient.invalidateQueries({ queryKey: ["groundtruth", String(projectId)] }),
         ]);
       }),
   });

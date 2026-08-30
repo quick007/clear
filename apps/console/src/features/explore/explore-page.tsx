@@ -97,9 +97,9 @@ function MetricsExplorer({
     );
   }, [catalog.data, filter]);
   const activeMetric =
-    catalog.data?.find((metric) => String(metric.name) === selectedMetric) ??
-    catalog.data?.[0] ??
-    null;
+    selectedMetric === undefined
+      ? null
+      : (catalog.data?.find((metric) => String(metric.name) === selectedMetric) ?? null);
   const aggregation = activeMetric ? aggregationFor(activeMetric) : "avg";
   const metricResult = useMetricExploreQuery(
     projectId,
@@ -288,7 +288,15 @@ function MetricsExplorer({
                 <span>{activeMetric.attributes.length} attributes</span>
               </footer>
             </section>
-          ) : null}
+          ) : (
+            <div {...stylex.props(styles.metricChoice)}>
+              <ContentState title={selectedMetric ? "Metric not found" : "Choose a metric"}>
+                {selectedMetric
+                  ? "That metric is not available in this project. Choose another from the catalog."
+                  : "Select a metric from the catalog to inspect its values and recent shape."}
+              </ContentState>
+            </div>
+          )}
         </div>
       ) : null}
     </Page>
@@ -386,6 +394,7 @@ const styles = stylex.create({
     minWidth: 0,
     overflow: "hidden",
   },
+  metricChoice: { alignSelf: "start" },
   metricHeader: {
     alignItems: "start",
     borderBottomColor: colors.line,

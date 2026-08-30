@@ -185,7 +185,7 @@ function CloseIncidentDialog({
       <Dialog.Portal>
         <Dialog.Backdrop {...stylex.props(styles.backdrop)} />
         <Dialog.Popup {...stylex.props(styles.popup)}>
-          <form onSubmit={submit}>
+          <form onSubmit={submit} {...stylex.props(styles.dialogForm)}>
             <header {...stylex.props(styles.dialogHeader)}>
               <div>
                 <Dialog.Title {...stylex.props(styles.dialogTitle)}>
@@ -211,7 +211,7 @@ function CloseIncidentDialog({
                   autoFocus
                   maxLength={1_000}
                   onChange={(event) => setSummary(event.currentTarget.value)}
-                  placeholder="Retries returned to baseline after backoff and jitter were deployed."
+                  placeholder="What caused it, what proved it, and what happens next."
                   rows={5}
                   value={summary}
                   {...stylex.props(styles.textarea)}
@@ -347,12 +347,19 @@ const styles = stylex.create({
     borderWidth: 1,
     color: colors.text,
     left: "50%",
+    maxHeight: "calc(100dvh - 32px)",
     maxWidth: "calc(100vw - 32px)",
+    overflow: "hidden",
     position: "fixed",
     top: "50%",
     transform: "translate(-50%, -50%)",
     width: 560,
     zIndex: 100,
+  },
+  dialogForm: {
+    display: "grid",
+    gridTemplateRows: "auto minmax(0, 1fr) auto",
+    maxHeight: "calc(100dvh - 32px)",
   },
   dialogHeader: {
     alignItems: "start",
@@ -380,7 +387,11 @@ const styles = stylex.create({
     justifyContent: "center",
     width: 36,
   },
-  dialogContent: { padding: space.x5 },
+  dialogContent: {
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    padding: space.x5,
+  },
   field: { color: colors.textMuted, display: "grid", fontSize: 11, gap: space.x2 },
   textarea: {
     backgroundColor: colors.canvas,

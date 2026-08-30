@@ -11,6 +11,7 @@ import {
   useRuntimeQuery,
   useSessionQuery,
 } from "../data/queries";
+import { IncidentContextNotice } from "./incident-context-notice";
 import { useVisibleIncidentId } from "./incident-selection";
 import { MobileWorkspaceHeader, WorkspaceSidebar } from "./sidebar";
 import { SituationStrip } from "./situation-strip";
@@ -41,6 +42,7 @@ function WorkspaceShell() {
     routeIncidentId,
   });
   const incident = useIncidentQuery(projectId, visibleIncidentId);
+  const incidentContextError = visibleIncidentId === null ? null : incident.error;
   const session = useSessionQuery();
   const liveUpdateStatus = useLiveProjectUpdates(projectId);
   useEffect(() => {
@@ -71,7 +73,16 @@ function WorkspaceShell() {
           session={session.data}
         />
         {isIncidentDetail ? null : (
-          <SituationStrip incidentDetail={incident.data} overview={overview.data} />
+          <>
+            <SituationStrip incidentDetail={incident.data} overview={overview.data} />
+            <IncidentContextNotice
+              error={incidentContextError}
+              hasDetail={incident.data !== undefined}
+              onRetry={() => void incident.refetch()}
+              retrying={incident.isFetching}
+              returnPath={location.pathname}
+            />
+          </>
         )}
         <main {...stylex.props(styles.stage)}>
           <Outlet />

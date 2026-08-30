@@ -16,7 +16,9 @@ import { ConsoleFailureActions } from "../../ui/console-failure-actions";
 import { CopyButton } from "../../ui/copy-button";
 import { ContentState } from "../../ui/page";
 import { MetricChart } from "../overview/metric-chart";
+import { buildMetricChartSummary } from "../overview/metric-chart-summary";
 import { activeThreshold, formatPanelValue, reducePanelValues } from "./panel-format";
+import { hasRenderableChartPoints } from "./panel-layout";
 import { buildChartLegend } from "./panel-legend";
 import { PanelCard } from "./panel-card";
 import { buildPanelTableRows, tableCellValue } from "./panel-table";
@@ -167,13 +169,15 @@ function PanelContent({
   const spec = panel.spec;
   if (spec.visualization === "heatmap") {
     return (
-      <ContentState kind="error" title="Heatmap data is unavailable">
-        Heatmaps require bucket boundaries and counts. The metric query API currently returns only
-        aggregated time series, so Clear will not substitute a misleading line chart.
+      <ContentState kind="error" title="This metric cannot be shown as a heatmap">
+        This metric does not include the distribution data an accurate heatmap needs. Ask your agent
+        to use a histogram with bucket counts, or change this panel to a line chart.
       </ContentState>
     );
   }
-  if (data.results.length === 0) return <ContentState title="No data in this window" />;
+  if (!hasRenderableChartPoints(data.results)) {
+    return <ContentState title="No data in this window" />;
+  }
   if (
     spec.stacking === "percent" &&
     data.results.some((series) => series.points.some((point) => point.value < 0))
@@ -202,7 +206,14 @@ function PanelContent({
         resolvedUnits={units}
         series={data.results}
         stacking={spec.stacking}
-        summary={chartSummary(spec.title, data.results, spec.axes, units)}
+        summary={buildMetricChartSummary({
+          annotations,
+          axes: spec.axes,
+          series: data.results,
+          thresholds: spec.thresholds,
+          title: spec.title,
+          units,
+        })}
         thresholds={spec.thresholds}
         visualization={spec.visualization}
       />
@@ -283,8 +294,11 @@ function StatPanel({
           compact
           resolvedUnits={{ left: resolvedUnit }}
           series={series.slice(0, 1)}
-          summary={chartSummary(spec.title, series.slice(0, 1), [axis], {
-            left: resolvedUnit,
+          summary={buildMetricChartSummary({
+            axes: [axis],
+            series: series.slice(0, 1),
+            title: spec.title,
+            units: { left: resolvedUnit },
           })}
           visualization="line"
         />
@@ -360,22 +374,6 @@ function TableCell({
     </td>
   );
 }
-
-const chartSummary = (
-  title: string,
-  series: ReadonlyArray<PanelSeries>,
-  axes: ReadonlyArray<Axis>,
-  units: Readonly<Partial<Record<"left" | "right", string>>>,
-) => {
-  const readings = series.map((item) => {
-    const value = item.points.at(-1)?.value;
-    const axis = axes.find((candidate) => candidate.id === item.axis)!;
-    return value === undefined
-      ? `${item.label} has no values`
-      : `${item.label} last value ${formatPanelValue(value, axis.unit, units[item.axis])}`;
-  });
-  return `${title}. ${readings.join(". ")}.`;
-};
 
 const resolvePanelUnits = (panel: PanelView, catalog: ReadonlyArray<MetricCatalogEntry>) => {
   if (panel.spec._tag !== "metric-chart") return { error: null, units: {} };

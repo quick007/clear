@@ -15,6 +15,11 @@ const exploreWindow = (value: unknown): TelemetryWindow => {
   return "1h";
 };
 
+const exploreSignal = (value: unknown): "logs" | "metrics" | "traces" => {
+  if (value === "logs" || value === "traces") return value;
+  return "metrics";
+};
+
 const BoardPage = lazyRouteComponent(() => import("./features/board/board-page"), "BoardPage");
 const ExplorePage = lazyRouteComponent(
   () => import("./features/explore/explore-page"),
@@ -76,8 +81,7 @@ const exploreRoute = createRoute({
     metric: typeof search.metric === "string" ? search.metric.slice(0, 256) : undefined,
     query: typeof search.query === "string" ? search.query.slice(0, 256) : undefined,
     service: typeof search.service === "string" ? search.service.slice(0, 255) : undefined,
-    signal:
-      search.signal === "logs" || search.signal === "traces" ? search.signal : ("metrics" as const),
+    signal: exploreSignal(search.signal),
     window: exploreWindow(search.window),
   }),
 });
@@ -125,6 +129,7 @@ const traceDetailRoute = createRoute({
   validateSearch: (search: Record<string, unknown>) => ({
     query: typeof search.query === "string" ? search.query.slice(0, 256) : undefined,
     service: typeof search.service === "string" ? search.service.slice(0, 255) : undefined,
+    source: search.source === "logs" ? ("logs" as const) : ("traces" as const),
     window: exploreWindow(search.window),
   }),
 });

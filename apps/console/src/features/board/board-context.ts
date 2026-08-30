@@ -2,9 +2,11 @@ export type BoardDependencyState = "available" | "missing" | "stale";
 
 export const boardContextMessage = ({
   catalog,
+  incidentHistory,
   overview,
 }: {
   catalog: BoardDependencyState;
+  incidentHistory: BoardDependencyState;
   overview: BoardDependencyState;
 }) =>
   [
@@ -17,6 +19,11 @@ export const boardContextMessage = ({
       ? "Project and incident status could not be loaded."
       : overview === "stale"
         ? "Project and incident status use the last loaded data."
+        : null,
+    incidentHistory === "missing"
+      ? "Investigation history could not be loaded, so walkthrough actions are paused."
+      : incidentHistory === "stale"
+        ? "Investigation history uses the last loaded data."
         : null,
   ]
     .filter((detail): detail is string => detail !== null)

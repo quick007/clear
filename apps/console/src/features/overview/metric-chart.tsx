@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { useId } from "react";
+import { useId, useSyncExternalStore } from "react";
 import {
   Area,
   Bar,
@@ -15,7 +15,11 @@ import {
 
 import { formatEpochShortTime } from "../../data/format";
 import { colors } from "../../theme/tokens.stylex";
-import { formatPanelValue } from "../board/panel-format";
+import {
+  formatPanelAxisValue,
+  panelAxisAllowsDecimals,
+  panelAxisCaption,
+} from "../board/panel-format";
 import { buildMetricChartModel, type MetricChartModelInput } from "./metric-chart-model";
 import { MetricChartTooltip } from "./metric-chart-tooltip";
 
@@ -29,10 +33,26 @@ const severityColors = {
   info: "#38bdf8",
   warning: "#fbbf24",
 } as const;
+const severityRank = { critical: 3, warning: 2, info: 1 } as const;
 
 export function MetricChart({ accessibleName, summary, ...input }: MetricChartProps) {
   const descriptionId = useId();
+  const narrow = useSyncExternalStore(subscribeNarrowViewport, narrowViewport, () => false);
   const model = buildMetricChartModel(input);
+  const labeledThresholds = new Set(
+    model.thresholds
+      .map((threshold, index) => ({ index, rank: severityRank[threshold.severity] }))
+      .toSorted((left, right) => right.rank - left.rank)
+      .slice(0, thresholdLabelBudget)
+      .map(({ index }) => index),
+  );
+  const labeledAnnotations = new Set(
+    model.annotations
+      .map((annotation, index) => ({ atMs: annotation.atMs, index }))
+      .toSorted((left, right) => right.atMs - left.atMs)
+      .slice(0, annotationLabelBudget)
+      .map(({ index }) => index),
+  );
   if (model.invalidLogAxis) {
     return (
       <figure
@@ -56,149 +76,195 @@ export function MetricChart({ accessibleName, summary, ...input }: MetricChartPr
       aria-label={accessibleName}
       {...stylex.props(styles.figure, model.compact && styles.compactFigure)}
     >
-      <ResponsiveContainer
-        height="100%"
-        minHeight={model.compact ? 100 : 240}
-        minWidth={0}
-        width="100%"
-      >
-        <ComposedChart
-          accessibilityLayer
-          data={model.rows}
-          margin={model.compact ? compactMargin : chartMargin}
+      {model.compact ? null : <AxisCaptions model={model} />}
+      <div {...stylex.props(styles.chartCanvas)}>
+        <ResponsiveContainer
+          height="100%"
+          minHeight={model.compact ? 100 : 220}
+          minWidth={0}
+          width="100%"
         >
-          <CartesianGrid horizontal stroke={colors.line} strokeOpacity={0.62} vertical={false} />
-          <XAxis
-            axisLine={false}
-            dataKey="atMs"
-            domain={model.timeDomain}
-            hide={model.compact}
-            minTickGap={36}
-            scale="time"
-            tick={axisTick}
-            tickFormatter={formatEpochShortTime}
-            tickLine={false}
-            tickMargin={11}
-            type="number"
-          />
-          {model.axes.map((axis) => (
-            <YAxis
-              allowDataOverflow={axis.minimum !== undefined || axis.maximum !== undefined}
+          <ComposedChart
+            accessibilityLayer
+            data={model.rows}
+            margin={model.compact ? compactMargin : chartMargin}
+          >
+            {model.gridAxisId ? (
+              <CartesianGrid
+                horizontal
+                stroke={colors.line}
+                strokeOpacity={0.62}
+                vertical={false}
+                yAxisId={model.gridAxisId}
+              />
+            ) : null}
+            <XAxis
               axisLine={false}
-              domain={
-                model.stacking === "percent"
-                  ? [0, 1]
-                  : [axis.minimum ?? "auto", axis.maximum ?? "auto"]
-              }
+              dataKey="atMs"
+              domain={model.timeDomain}
               hide={model.compact}
-              key={axis.id}
-              orientation={axis.id}
-              scale={axis.scale === "log" ? "log" : "auto"}
+              minTickGap={36}
+              scale="time"
               tick={axisTick}
-              tickFormatter={(value: number) =>
-                model.stacking === "percent"
-                  ? `${Math.round(value * 100)}%`
-                  : formatPanelValue(value, axis.unit, model.resolvedUnits[axis.id])
-              }
+              tickFormatter={formatEpochShortTime}
               tickLine={false}
-              tickMargin={axis.id === "left" ? 10 : 8}
-              width={model.compact ? 0 : axis.id === "left" ? 74 : 62}
-              yAxisId={axis.id}
+              tickMargin={11}
+              type="number"
             />
-          ))}
-          <Tooltip
-            content={(tooltip) => <MetricChartTooltip {...tooltip} model={model} />}
-            cursor={{ stroke: colors.lineStrong, strokeDasharray: "3 4", strokeWidth: 1 }}
-            isAnimationActive={false}
-            wrapperStyle={{ outline: "none", zIndex: 4 }}
-          />
-          {model.compact
-            ? null
-            : model.thresholds.map((threshold, index) => (
-                <ReferenceLine
-                  ifOverflow="extendDomain"
-                  key={`${threshold.axis}-${threshold.value}-${index}`}
-                  label={{
-                    fill: severityColors[threshold.severity],
-                    fontSize: 10,
-                    position: "insideTopRight",
-                    value: threshold.label ?? threshold.severity,
-                  }}
-                  stroke={severityColors[threshold.severity]}
-                  strokeDasharray="4 4"
-                  strokeOpacity={0.78}
-                  y={threshold.value}
-                  yAxisId={threshold.axis}
-                />
-              ))}
-          {model.compact
-            ? null
-            : model.annotations.map((annotation, index) => (
-                <ReferenceLine
-                  key={`${annotation._tag}-${annotation.atMs}-${index}`}
-                  label={{
-                    angle: -90,
-                    fill: annotation._tag === "deploy" ? colors.amber : colors.blue,
-                    fontSize: 10,
-                    offset: 8,
-                    position: "insideTopLeft",
-                    value: annotation.label,
-                  }}
-                  stroke={annotation._tag === "deploy" ? colors.amber : colors.blue}
-                  strokeDasharray="4 4"
-                  strokeOpacity={0.72}
-                  x={annotation.atMs}
-                />
-              ))}
-          {model.series.map((series) => {
-            const common = {
-              activeDot: { fill: series.color, r: 4, stroke: colors.surface, strokeWidth: 2 },
-              dataKey: series.key,
-              isAnimationActive: false,
-              key: series.key,
-              name: series.label,
-              stackId: series.stackId,
-              stroke: series.color,
-              strokeDasharray: series.lineStyle === "dashed" ? "6 5" : undefined,
-              strokeWidth: 2,
-              type: "linear" as const,
-              yAxisId: series.axis,
-            };
-            if (model.visualization === "bar") {
-              return (
-                <Bar
-                  dataKey={series.key}
-                  fill={series.color}
-                  fillOpacity={0.82}
-                  isAnimationActive={false}
-                  key={series.key}
-                  maxBarSize={24}
-                  name={series.label}
-                  radius={[4, 4, 1, 1]}
-                  stackId={series.stackId}
-                  yAxisId={series.axis}
-                />
-              );
-            }
-            if (model.visualization === "area") {
-              return (
-                <Area
-                  {...common}
-                  connectNulls={false}
-                  dot={false}
-                  fill={series.color}
-                  fillOpacity={series.fillOpacity}
-                />
-              );
-            }
-            return <Line {...common} connectNulls={false} dot={false} />;
-          })}
-        </ComposedChart>
-      </ResponsiveContainer>
+            {model.axes.map((axis) => (
+              <YAxis
+                allowDecimals={model.stacking === "percent" || panelAxisAllowsDecimals(axis.unit)}
+                allowDataOverflow={axis.minimum !== undefined || axis.maximum !== undefined}
+                axisLine={false}
+                domain={model.stacking === "percent" ? [0, 1] : model.axisDomains[axis.id]}
+                hide={model.compact}
+                key={axis.id}
+                orientation={axis.id}
+                scale={axis.scale === "log" ? "log" : "auto"}
+                tick={narrow ? narrowAxisTick : axisTick}
+                tickFormatter={(value: number) =>
+                  model.stacking === "percent"
+                    ? `${Math.round(value * 100)}%`
+                    : formatPanelAxisValue(value, axis.unit, model.resolvedUnits[axis.id])
+                }
+                tickLine={false}
+                tickCount={narrow ? 4 : undefined}
+                tickMargin={narrow ? 4 : axis.id === "left" ? 10 : 8}
+                width={
+                  model.compact
+                    ? 0
+                    : narrow
+                      ? axis.id === "left"
+                        ? 46
+                        : 36
+                      : axis.id === "left"
+                        ? 64
+                        : 48
+                }
+                yAxisId={axis.id}
+              />
+            ))}
+            <Tooltip
+              content={(tooltip) => <MetricChartTooltip {...tooltip} model={model} />}
+              cursor={{ stroke: colors.lineStrong, strokeDasharray: "3 4", strokeWidth: 1 }}
+              isAnimationActive={false}
+              wrapperStyle={{ outline: "none", zIndex: 4 }}
+            />
+            {model.compact
+              ? null
+              : model.thresholds.map((threshold, index) => (
+                  <ReferenceLine
+                    ifOverflow="extendDomain"
+                    key={`${threshold.axis}-${threshold.value}-${index}`}
+                    label={
+                      labeledThresholds.has(index)
+                        ? {
+                            fill: severityColors[threshold.severity],
+                            fontSize: 10,
+                            position: "insideTopRight",
+                            value: threshold.label ?? threshold.severity,
+                          }
+                        : undefined
+                    }
+                    stroke={severityColors[threshold.severity]}
+                    strokeDasharray="4 4"
+                    strokeOpacity={0.78}
+                    y={threshold.value}
+                    yAxisId={threshold.axis}
+                  />
+                ))}
+            {model.compact
+              ? null
+              : model.annotations.map((annotation, index) => (
+                  <ReferenceLine
+                    key={`${annotation._tag}-${annotation.atMs}-${index}`}
+                    label={
+                      labeledAnnotations.has(index)
+                        ? {
+                            angle: -90,
+                            fill: annotation._tag === "deploy" ? colors.amber : colors.blue,
+                            fontSize: 10,
+                            offset: 8,
+                            position: "insideTopLeft",
+                            value: annotation.label,
+                          }
+                        : undefined
+                    }
+                    stroke={annotation._tag === "deploy" ? colors.amber : colors.blue}
+                    strokeDasharray="4 4"
+                    strokeOpacity={0.72}
+                    x={annotation.atMs}
+                  />
+                ))}
+            {model.series.map((series) => {
+              const common = {
+                activeDot: { fill: series.color, r: 4, stroke: colors.surface, strokeWidth: 2 },
+                dataKey: series.key,
+                isAnimationActive: false,
+                key: series.key,
+                name: series.label,
+                stackId: series.stackId,
+                stroke: series.color,
+                strokeDasharray: series.lineStyle === "dashed" ? "6 5" : undefined,
+                strokeWidth: 2,
+                type: "linear" as const,
+                yAxisId: series.axis,
+              };
+              if (model.visualization === "bar") {
+                return (
+                  <Bar
+                    dataKey={series.key}
+                    fill={series.color}
+                    fillOpacity={0.82}
+                    isAnimationActive={false}
+                    key={series.key}
+                    maxBarSize={24}
+                    name={series.label}
+                    radius={[4, 4, 1, 1]}
+                    stackId={series.stackId}
+                    yAxisId={series.axis}
+                  />
+                );
+              }
+              if (model.visualization === "area") {
+                return (
+                  <Area
+                    {...common}
+                    connectNulls={false}
+                    dot={false}
+                    fill={series.color}
+                    fillOpacity={series.fillOpacity}
+                  />
+                );
+              }
+              return <Line {...common} connectNulls={false} dot={false} />;
+            })}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
       <figcaption id={descriptionId} {...stylex.props(styles.screenReaderOnly)}>
         {summary}
       </figcaption>
     </figure>
+  );
+}
+
+function AxisCaptions({ model }: { readonly model: ReturnType<typeof buildMetricChartModel> }) {
+  return (
+    <div aria-hidden {...stylex.props(styles.axisCaptions)}>
+      {model.axes.map((axis) => {
+        const unit = panelAxisCaption(axis.unit, model.resolvedUnits[axis.id]);
+        const caption = [axis.label, unit].filter(Boolean).join(" · ");
+        return caption ? (
+          <span
+            key={axis.id}
+            {...stylex.props(styles.axisCaption, axis.id === "right" && styles.rightAxisCaption)}
+          >
+            {caption}
+          </span>
+        ) : null;
+      })}
+    </div>
   );
 }
 
@@ -207,13 +273,49 @@ const axisTick = {
   fontFamily: "IBM Plex Mono, monospace",
   fontSize: 10,
 };
+const narrowAxisTick = { ...axisTick, fontSize: 9 };
+
+const thresholdLabelBudget = 2;
+const annotationLabelBudget = 2;
+
+const narrowViewportQuery = "(max-width: 520px)";
+const narrowViewport = () =>
+  typeof window !== "undefined" && window.matchMedia(narrowViewportQuery).matches;
+const subscribeNarrowViewport = (onChange: () => void) => {
+  if (typeof window === "undefined") return () => undefined;
+  const query = window.matchMedia(narrowViewportQuery);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+};
 
 const chartMargin = { bottom: 2, left: 4, right: 4, top: 20 } as const;
 const compactMargin = { bottom: 2, left: 2, right: 2, top: 8 } as const;
 
 const styles = stylex.create({
-  figure: { height: "100%", margin: 0, minHeight: 240, width: "100%" },
+  figure: {
+    display: "flex",
+    flexDirection: "column",
+    height: "100%",
+    margin: 0,
+    minHeight: 240,
+    width: "100%",
+  },
   compactFigure: { minHeight: 100 },
+  chartCanvas: { flex: 1, minHeight: 0, minWidth: 0 },
+  axisCaptions: {
+    alignItems: "center",
+    color: colors.textSubtle,
+    display: "flex",
+    fontFamily: "IBM Plex Mono, monospace",
+    fontSize: 9,
+    gap: 12,
+    justifyContent: "space-between",
+    lineHeight: 1.4,
+    minHeight: 14,
+    paddingInline: { default: 68, "@media (max-width: 520px)": 48 },
+  },
+  axisCaption: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  rightAxisCaption: { textAlign: "right" },
   invalidScale: {
     alignItems: "center",
     color: colors.textMuted,

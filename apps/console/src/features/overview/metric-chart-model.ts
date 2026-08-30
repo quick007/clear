@@ -41,8 +41,12 @@ export type MetricChartSeries = {
 
 export type MetricChartModel = {
   readonly annotations: ReadonlyArray<RenderAnnotation>;
+  readonly axisDomains: Readonly<
+    Record<"left" | "right", readonly [number | "auto", number | "auto"]>
+  >;
   readonly axes: ReadonlyArray<Axis>;
   readonly compact: boolean;
+  readonly gridAxisId?: "left" | "right";
   readonly invalidLogAxis?: "left" | "right";
   readonly resolvedUnits: Readonly<Partial<Record<"left" | "right", string>>>;
   readonly rows: ReadonlyArray<MetricChartRow>;
@@ -94,13 +98,29 @@ export function buildMetricChartModel({
   const invalidLogAxis = axes.find(
     (axis) =>
       axis.scale === "log" &&
-      series.some((item) => item.axis === axis.id && item.points.some((point) => point.value <= 0)),
+      (series.some(
+        (item) => item.axis === axis.id && item.points.some((point) => point.value <= 0),
+      ) ||
+        thresholds.some((threshold) => threshold.axis === axis.id && threshold.value <= 0)),
   )?.id;
+  const gridAxisId = axes.find((axis) => axis.showGrid !== false)?.id;
+  const axisDomains = Object.fromEntries(
+    (["left", "right"] as const).map((axisId) => [
+      axisId,
+      axisDomain(
+        axes.find((axis) => axis.id === axisId),
+        series.filter((item) => item.axis === axisId),
+        thresholds.filter((threshold) => threshold.axis === axisId),
+      ),
+    ]),
+  ) as Record<"left" | "right", readonly [number | "auto", number | "auto"]>;
 
   return {
     annotations,
+    axisDomains,
     axes,
     compact,
+    gridAxisId,
     invalidLogAxis,
     resolvedUnits,
     rows,
@@ -111,6 +131,31 @@ export function buildMetricChartModel({
     visualization,
   };
 }
+
+const axisDomain = (
+  axis: Axis | undefined,
+  series: ReadonlyArray<PanelSeries>,
+  thresholds: ReadonlyArray<ChartThreshold>,
+): readonly [number | "auto", number | "auto"] => {
+  if (!axis) return ["auto", "auto"];
+  const values = [
+    ...series.flatMap((item) => item.points.map((point) => point.value)),
+    ...thresholds.map((threshold) => threshold.value),
+  ];
+  if (values.length === 0) return [axis.minimum ?? "auto", axis.maximum ?? "auto"];
+
+  const smallest = Math.min(...values);
+  const largest = Math.max(...values);
+  const span = largest - smallest;
+  const fallbackSpan = Math.max(Math.abs(largest), 1);
+  const padding = (span === 0 ? fallbackSpan : span) * 0.06;
+  if (axis.scale === "log") {
+    return [axis.minimum ?? smallest, axis.maximum ?? largest + padding];
+  }
+  const minimum = axis.minimum ?? smallest - padding;
+  const maximum = axis.maximum ?? largest + padding;
+  return minimum === maximum ? [minimum, maximum + fallbackSpan] : [minimum, maximum];
+};
 
 const percentTotals = (series: ReadonlyArray<PanelSeries>) => {
   const totals = new Map<string, number>();

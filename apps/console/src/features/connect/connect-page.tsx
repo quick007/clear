@@ -1,10 +1,21 @@
-import { CheckmarkCircle02Icon, CloudUploadIcon, Key01Icon } from "@hugeicons/core-free-icons";
+import {
+  ArrowRight01Icon,
+  CheckmarkCircle02Icon,
+  CloudUploadIcon,
+  Key01Icon,
+} from "@hugeicons/core-free-icons";
 import * as stylex from "@stylexjs/stylex";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { getConsoleConfig } from "../../config";
 import { errorMessage, formatRelativeTime } from "../../data/format";
-import { useCreateIngestKey, useOverviewQuery, useRuntimeQuery } from "../../data/queries";
+import {
+  useCreateIngestKey,
+  useIngestKeysQuery,
+  useOverviewQuery,
+  useRuntimeQuery,
+} from "../../data/queries";
 import { mutationOutcomeIsUnknown } from "../../errors";
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
@@ -15,23 +26,35 @@ import { MutationFailureNotice } from "../../ui/mutation-failure-notice";
 import { ContentState, Page, PageHeader } from "../../ui/page";
 import { StaleDataNotice } from "../../ui/stale-data-notice";
 import { StatusDot } from "../../ui/status";
+import { ConnectStep, ConnectionSummary } from "./connect-progress-ui";
+import { deriveConnectionProgress } from "./connection-progress";
+import { DeployWebhookSetup } from "./deploy-webhook-setup";
 
 export function ConnectPage() {
-  const endpoint = getConsoleConfig().otlpOrigin;
+  const { apiOrigin, otlpOrigin: endpoint } = getConsoleConfig();
   const runtime = useRuntimeQuery();
   const projectId = runtime.data?.projectId ?? null;
   const overview = useOverviewQuery(projectId);
+  const hostedProjectId = runtime.data?.mode === "hosted" ? projectId : null;
+  const keys = useIngestKeysQuery(hostedProjectId);
   const createKey = useCreateIngestKey(projectId!);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const hosted = runtime.data?.mode === "hosted";
   const connectionLoading =
-    (runtime.isPending && !runtime.data) || (overview.isPending && !overview.data);
-  const connectionUnavailable = !runtime.data || !projectId || !overview.data;
-  const failure = runtime.isError && !runtime.data ? runtime.error : overview.error;
-  const staleFailure = connectionUnavailable ? null : (runtime.error ?? overview.error);
+    (runtime.isPending && !runtime.data) ||
+    (overview.isPending && !overview.data) ||
+    (hosted && keys.isPending && !keys.data);
+  const connectionUnavailable =
+    !runtime.data || !projectId || !overview.data || (hosted && !keys.data);
+  const failure = runtime.isError && !runtime.data ? runtime.error : (overview.error ?? keys.error);
+  const staleFailure = connectionUnavailable
+    ? null
+    : (runtime.error ?? overview.error ?? keys.error);
   const retryFailedQueries = () => {
     if (runtime.isError) void runtime.refetch();
     if (runtime.isError && !runtime.data) return;
     if (overview.isError) void overview.refetch();
+    if (keys.isError) void keys.refetch();
   };
   const createKeyOutcomeUnknown = createKey.isError && mutationOutcomeIsUnknown(createKey.error);
 
@@ -63,7 +86,6 @@ export function ConnectPage() {
     );
   }
 
-  const hosted = runtime.data.mode === "hosted";
   if (!hosted) {
     return (
       <Page>
@@ -76,11 +98,10 @@ export function ConnectPage() {
             <Icon icon={CloudUploadIcon} size={21} />
           </span>
           <div {...stylex.props(styles.sandboxGateCopy)}>
-            <h2 {...stylex.props(styles.sandboxGateTitle)}>Keep the sandbox separate</h2>
+            <h2 {...stylex.props(styles.sandboxGateTitle)}>The sandbox cannot receive your data</h2>
             <p {...stylex.props(styles.sandboxGateDetail)}>
-              This temporary workspace is ready for the guided incident. Sign in with ChatGPT to
-              create your own project, issue an ingest key, and connect any OpenTelemetry SDK or
-              Collector.
+              It only holds the guided checkout incident. Sign in with ChatGPT to create your own
+              project, then point any OpenTelemetry SDK or Collector at it.
             </p>
           </div>
           <Button large render={<a href="/auth/chatgpt?returnPath=%2Fconnect" />} tone="primary">
@@ -90,12 +111,28 @@ export function ConnectPage() {
       </Page>
     );
   }
+  const activeKeys = (keys.data?.items ?? []).filter((key) => key.status === "active");
+  const progress = deriveConnectionProgress({
+    activeKeyCount: activeKeys.length + (createdKey === null ? 0 : 1),
+    signalHealth: overview.data.signalHealth,
+  });
   const exporterSnippet = `export OTEL_EXPORTER_OTLP_ENDPOINT=${endpoint}\nexport OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf\nexport OTEL_EXPORTER_OTLP_HEADERS="x-clear-ingest-key=${createdKey ?? "<your-key>"}"\nexport OTEL_SERVICE_NAME=your-service`;
 
   return (
     <Page>
       <PageHeader
-        description="Point any OpenTelemetry SDK or Collector at Clear. No proprietary agent is required."
+        actions={
+          progress.hasObservedSignal ? (
+            <Button render={<Link search={{ guide: undefined }} to="/board" />} tone="primary">
+              Open board <Icon icon={ArrowRight01Icon} size={15} />
+            </Button>
+          ) : undefined
+        }
+        description={
+          progress.hasObservedSignal
+            ? "Your project is connected. Open the board to explore its telemetry with your agent."
+            : "Connect any OpenTelemetry SDK or Collector in three short steps."
+        }
         title="Connect OpenTelemetry"
       />
       <StaleDataNotice
@@ -103,27 +140,54 @@ export function ConnectPage() {
         error={staleFailure}
         notFound={{ href: "/", label: "Return home" }}
         onRetry={retryFailedQueries}
-        retrying={runtime.isFetching || overview.isFetching}
+        retrying={runtime.isFetching || overview.isFetching || keys.isFetching}
         returnPath="/connect"
+      />
+      <ConnectionSummary
+        completedCount={progress.completedCount}
+        connected={progress.hasObservedSignal}
+        healthy={progress.hasHealthySignal}
+        nextStep={progress.nextStep}
       />
       <div {...stylex.props(styles.layout)}>
         <section {...stylex.props(styles.steps)}>
-          <ConnectStep icon={Key01Icon} number="1" title="Create an ingest key">
+          <ConnectStep
+            icon={Key01Icon}
+            number="1"
+            status={progress.keyStatus}
+            title="Create an ingest key"
+          >
             <p {...stylex.props(styles.copy)}>
-              Keys belong to {overview.data.project.name}. You can keep up to three active keys and
-              the secret is shown only once.
+              This key belongs to {overview.data.project.name}. Its secret is shown only once.
             </p>
-            <Button
-              disabled={createKey.isPending || createKeyOutcomeUnknown}
-              onClick={() =>
-                createKey.mutate("primary-exporter", {
-                  onSuccess: (result) => setCreatedKey(result.key),
-                })
-              }
-              tone="secondary"
-            >
-              {createKey.isPending ? "Creating key" : "Create ingest key"}
-            </Button>
+            {progress.hasActiveKey ? (
+              <div {...stylex.props(styles.keyReady)}>
+                <StatusDot tone="healthy" />
+                <span {...stylex.props(styles.keyReadyCopy)}>
+                  <strong>Ingest key ready</strong>
+                  <small>
+                    {activeKeys.length > 0
+                      ? `${activeKeys.length} active ${activeKeys.length === 1 ? "key" : "keys"}`
+                      : "New key created"}
+                  </small>
+                </span>
+                <Button compact render={<Link to="/settings/project" />} tone="ghost">
+                  Manage keys
+                </Button>
+              </div>
+            ) : (
+              <Button
+                disabled={createKey.isPending || createKeyOutcomeUnknown}
+                onClick={() =>
+                  createKey.mutate("primary-exporter", {
+                    onSuccess: (result) => setCreatedKey(result.key),
+                  })
+                }
+                tone="primary"
+              >
+                {createKey.isPending ? "Creating key" : "Create ingest key"}
+              </Button>
+            )}
             {createdKey ? (
               <div {...stylex.props(styles.secret)}>
                 <span {...stylex.props(styles.secretCopy)}>
@@ -147,43 +211,86 @@ export function ConnectPage() {
             ) : null}
           </ConnectStep>
 
-          <ConnectStep icon={CloudUploadIcon} number="2" title="Point your exporter at Clear">
-            <div {...stylex.props(styles.endpoint)}>
-              <span {...stylex.props(styles.endpointCopy)}>
-                <small {...stylex.props(styles.endpointLabel)}>OTLP endpoint</small>
-                <code {...stylex.props(styles.endpointValue)}>{endpoint}</code>
-              </span>
-              <CopyButton label="Copy endpoint" value={endpoint} />
-            </div>
-            <div {...stylex.props(styles.codeWrap)}>
-              <pre {...stylex.props(styles.code)}>
-                <code>{exporterSnippet}</code>
-              </pre>
-              <span {...stylex.props(styles.codeCopyButton)}>
-                <CopyButton label="Copy exporter configuration" value={exporterSnippet} />
-              </span>
-            </div>
+          <ConnectStep
+            icon={CloudUploadIcon}
+            number="2"
+            status={progress.exporterStatus}
+            title="Point your exporter at Clear"
+          >
+            {progress.hasActiveKey ? (
+              <>
+                <p {...stylex.props(styles.copy)}>
+                  {createdKey
+                    ? "This configuration already includes the key you just created."
+                    : "Use the secret you saved when the key was created. Clear cannot reveal an existing secret again."}
+                </p>
+                <div {...stylex.props(styles.endpoint)}>
+                  <span {...stylex.props(styles.endpointCopy)}>
+                    <small {...stylex.props(styles.endpointLabel)}>OTLP endpoint</small>
+                    <code {...stylex.props(styles.endpointValue)}>{endpoint}</code>
+                  </span>
+                  <CopyButton label="Copy endpoint" value={endpoint} />
+                </div>
+                <div {...stylex.props(styles.codeWrap)}>
+                  <pre {...stylex.props(styles.code)}>
+                    <code>{exporterSnippet}</code>
+                  </pre>
+                  <span {...stylex.props(styles.codeCopyButton)}>
+                    <CopyButton label="Copy exporter configuration" value={exporterSnippet} />
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p {...stylex.props(styles.lockedCopy)}>
+                Create an ingest key first. Your endpoint and a ready-to-paste exporter
+                configuration appear here.
+              </p>
+            )}
           </ConnectStep>
 
-          <ConnectStep icon={CheckmarkCircle02Icon} number="3" title="Verify your signals">
+          <ConnectStep
+            icon={CheckmarkCircle02Icon}
+            number="3"
+            status={progress.signalStatus}
+            title="Verify your signals"
+          >
             <p {...stylex.props(styles.copy)}>
-              Clear accepts OTLP/HTTP protobuf and JSON for metrics, logs, and traces.
+              Run your service. Metrics, logs, and traces light up here as they arrive. One is
+              enough to open the board.
             </p>
-            <div aria-label="Signal status" {...stylex.props(styles.signalGrid)}>
+            <div aria-label="Signal status" role="group" {...stylex.props(styles.signalGrid)}>
               {overview.data.signalHealth.map((signal) => (
                 <span key={signal.signal} {...stylex.props(styles.signal)}>
-                  <StatusDot tone={signal.status === "healthy" ? "healthy" : "neutral"} />
+                  <StatusDot
+                    tone={
+                      signal.status === "healthy"
+                        ? "healthy"
+                        : signal.status === "delayed"
+                          ? "attention"
+                          : "neutral"
+                    }
+                  />
                   <span {...stylex.props(styles.signalCopy)}>
                     <strong {...stylex.props(styles.signalName)}>{signal.signal}</strong>
                     <small {...stylex.props(styles.signalDetail)}>
                       {signal.lastSeenAt
                         ? `Last received ${formatRelativeTime(signal.lastSeenAt)}`
-                        : "Waiting for first signal"}
+                        : "Not received yet"}
                     </small>
                   </span>
                 </span>
               ))}
             </div>
+            {!progress.hasHealthySignal ? (
+              <Button
+                compact
+                disabled={overview.isFetching}
+                onClick={() => void overview.refetch()}
+                tone="secondary"
+              >
+                {overview.isFetching ? "Checking signals" : "Check signal status"}
+              </Button>
+            ) : null}
           </ConnectStep>
         </section>
 
@@ -193,39 +300,13 @@ export function ConnectPage() {
             Existing OpenTelemetry pipelines can add Clear as another OTLP exporter. Keep your
             current sampling, processors, and destinations.
           </p>
-          <a
-            href="https://github.com/quick007/clear/blob/main/docs/otel-quickstart.md"
-            {...stylex.props(styles.helpLink)}
-          >
-            Open the integration guide
+          <a href="#deploy-events" {...stylex.props(styles.helpLink)}>
+            Add deploy annotations
           </a>
         </aside>
       </div>
+      <DeployWebhookSetup apiOrigin={apiOrigin} />
     </Page>
-  );
-}
-
-function ConnectStep({
-  children,
-  icon,
-  number,
-  title,
-}: {
-  children: React.ReactNode;
-  icon: Parameters<typeof Icon>[0]["icon"];
-  number: string;
-  title: string;
-}) {
-  return (
-    <article {...stylex.props(styles.step)}>
-      <span {...stylex.props(styles.stepNumber)}>{number}</span>
-      <div {...stylex.props(styles.stepBody)}>
-        <h2 {...stylex.props(styles.stepTitle)}>
-          <Icon icon={icon} size={17} /> {title}
-        </h2>
-        {children}
-      </div>
-    </article>
   );
 }
 
@@ -280,41 +361,37 @@ const styles = stylex.create({
     borderWidth: 1,
     overflow: "hidden",
   },
-  step: {
-    borderBottomColor: colors.line,
-    borderBottomStyle: "solid",
-    borderBottomWidth: { default: 1, ":last-child": 0 },
-    display: "grid",
-    gap: space.x4,
-    gridTemplateColumns: "32px minmax(0, 1fr)",
-    padding: { default: space.x6, "@media (max-width: 620px)": space.x4 },
-  },
-  stepNumber: {
+  copy: { color: colors.textMuted, fontSize: 12, lineHeight: 1.6, marginBlock: 0, maxWidth: 700 },
+  keyReady: {
     alignItems: "center",
-    backgroundColor: colors.amberWash,
-    borderRadius: radii.pill,
-    color: colors.amber,
+    backgroundColor: colors.greenWash,
+    borderColor: "rgba(52, 211, 153, 0.20)",
+    borderRadius: radii.md,
+    borderStyle: "solid",
+    borderWidth: 1,
     display: "flex",
-    fontFamily: "IBM Plex Mono, monospace",
-    fontSize: 10,
-    height: 28,
-    justifyContent: "center",
-    width: 28,
+    gap: space.x3,
+    padding: space.x3,
   },
-  stepBody: {
+  keyReadyCopy: {
     display: "grid",
-    gap: space.x4,
+    flex: 1,
+    fontSize: 11,
+    gap: 2,
     minWidth: 0,
   },
-  stepTitle: {
-    alignItems: "center",
-    display: "flex",
-    fontSize: 14,
-    fontWeight: 500,
-    gap: space.x2,
-    marginBlock: 3,
+  lockedCopy: {
+    backgroundColor: colors.canvas,
+    borderColor: colors.line,
+    borderRadius: radii.md,
+    borderStyle: "solid",
+    borderWidth: 1,
+    color: colors.textSubtle,
+    fontSize: 12,
+    lineHeight: 1.6,
+    margin: 0,
+    padding: space.x4,
   },
-  copy: { color: colors.textMuted, fontSize: 12, lineHeight: 1.6, marginBlock: 0, maxWidth: 700 },
   secret: {
     alignItems: { default: "center", "@media (max-width: 620px)": "stretch" },
     backgroundColor: colors.greenWash,
@@ -397,9 +474,11 @@ const styles = stylex.create({
     borderRadius: radii.lg,
     borderStyle: "solid",
     borderWidth: 1,
+    display: "grid",
+    gap: space.x3,
     padding: space.x5,
   },
   helpTitle: { fontSize: 14, fontWeight: 500, marginBlock: 0 },
-  helpCopy: { color: colors.textMuted, fontSize: 12, lineHeight: 1.6, marginBlock: space.x3 },
+  helpCopy: { color: colors.textMuted, fontSize: 12, lineHeight: 1.6, marginBlock: 0 },
   helpLink: { color: colors.amber, fontSize: 11, textDecoration: "none" },
 });

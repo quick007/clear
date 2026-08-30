@@ -63,6 +63,46 @@ export const formatPanelValue = (value: number, unit: DisplayUnit, resolvedAutoU
     : `${compactNumber.format(value)} ${suffix}`;
 };
 
+export const formatPanelAxisValue = (
+  value: number,
+  unit: DisplayUnit,
+  resolvedAutoUnit?: string,
+) => {
+  if (unit._tag === "rate") {
+    const factor = unit.per === "second" ? 1 : unit.per === "minute" ? 60 : 3_600;
+    return compactNumber.format(value * factor);
+  }
+  if (unit._tag === "number" && unit.format !== "scientific") {
+    return unit.format === "short"
+      ? compactNumber.format(value)
+      : decimal(value, unit.decimals ?? 2);
+  }
+  if (unit._tag === "percent") {
+    return decimal(unit.input === "ratio" ? value * 100 : value, unit.decimals ?? 1);
+  }
+  if (unit._tag === "duration") {
+    const seconds = value * durationSeconds[unit.input];
+    const display = unit.display === "auto" ? unit.input : unit.display;
+    return decimal(seconds / durationSeconds[display], unit.decimals ?? 2);
+  }
+  if (unit._tag === "bytes" || unit._tag === "auto") return compactNumber.format(value);
+  if (unit._tag === "custom") return decimal(value, unit.decimals ?? 2);
+  return formatPanelValue(value, unit, resolvedAutoUnit);
+};
+
+export const panelAxisCaption = (unit: DisplayUnit, resolvedAutoUnit?: string) => {
+  if (unit._tag === "rate") return `/${shortPeriod(unit.per)}`;
+  if (unit._tag === "percent") return "%";
+  if (unit._tag === "duration") return unit.display === "auto" ? unit.input : unit.display;
+  if (unit._tag === "bytes") return unit.input;
+  if (unit._tag === "custom") return unit.symbol;
+  if (unit._tag === "auto") return normalizeAutoUnit(resolvedAutoUnit);
+  return "";
+};
+
+export const panelAxisAllowsDecimals = (unit: DisplayUnit) =>
+  unit._tag !== "number" || unit.format !== "decimal" || (unit.decimals ?? 2) > 0;
+
 const autoDurationUnit = (seconds: number): "ns" | "us" | "ms" | "s" => {
   const magnitude = Math.abs(seconds);
   if (magnitude >= 1) return "s";

@@ -181,7 +181,11 @@ const styles = stylex.create({
     width: 18,
   },
   legendSwatchDashed: { borderTopStyle: "dashed" },
-  body: { flex: 1, height: 278, minWidth: 0 },
+  body: {
+    flex: 1,
+    height: { default: 278, "@media (max-width: 520px)": 238 },
+    minWidth: 0,
+  },
   footer: {
     alignItems: "center",
     borderTopColor: colors.line,

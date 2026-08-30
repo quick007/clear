@@ -16,6 +16,8 @@ import {
   type PanelSeries,
 } from "../../data/panels";
 import { buildMetricChartModel } from "../overview/metric-chart-model";
+import { buildMetricChartSummary } from "../overview/metric-chart-summary";
+import { chartNeedsFullWidth, hasRenderableChartPoints } from "./panel-layout";
 import { buildChartLegend } from "./panel-legend";
 import { buildPanelTableRows, tableCellValue } from "./panel-table";
 
@@ -43,6 +45,24 @@ const series = ({
 });
 
 describe("panel query and chart rendering", () => {
+  it("gives grouped evidence charts enough room and detects empty series", () => {
+    const empty = series({
+      label: "retries",
+      queryRef: RetryAmplificationPanel.queries[0].refId,
+      values: [],
+    });
+    expect(chartNeedsFullWidth(RetryAmplificationPanel)).toBe(true);
+    expect(hasRenderableChartPoints([empty])).toBe(false);
+    expect(
+      hasRenderableChartPoints([
+        {
+          ...empty,
+          points: [new MetricSeriesPoint({ at: at("2026-08-28T08:00:00Z"), value: 2 })],
+        },
+      ]),
+    ).toBe(true);
+  });
+
   it("distinguishes a full stale result from an incomplete multi-query panel", () => {
     const plans = buildPanelPlans(RequestsVsUsersPanel.queries).plans;
     const offline = new Error("offline");
@@ -216,6 +236,75 @@ describe("panel query and chart rendering", () => {
         visualization: "line",
       }).invalidLogAxis,
     ).toBe("left");
+  });
+
+  it("includes thresholds in the chart domain so quiet baselines retain useful ticks", () => {
+    const model = buildMetricChartModel({
+      axes: [{ id: "left", minimum: 0, unit: { _tag: "rate", per: "second" } }],
+      series: [
+        series({
+          label: "errors",
+          queryRef: UpstreamPressurePanel.queries[0].refId,
+          values: [["2026-08-28T08:00:00Z", 0]],
+        }),
+      ],
+      thresholds: [{ axis: "left", condition: "at_or_above", severity: "critical", value: 5 }],
+      visualization: "line",
+    });
+
+    expect(model.axisDomains.left[0]).toBe(0);
+    expect(model.axisDomains.left[1]).toBeGreaterThan(5);
+  });
+
+  it("respects grid preferences and rejects nonpositive log thresholds", () => {
+    const metricSeries = series({
+      label: "latency",
+      queryRef: RequestsVsUsersPanel.queries[0].refId,
+      values: [["2026-08-28T08:00:00Z", 2]],
+    });
+    expect(
+      buildMetricChartModel({
+        axes: [{ id: "left", showGrid: false, unit: { _tag: "auto" } }],
+        series: [metricSeries],
+        visualization: "line",
+      }).gridAxisId,
+    ).toBeUndefined();
+    expect(
+      buildMetricChartModel({
+        axes: [{ id: "left", scale: "log", unit: { _tag: "auto" } }],
+        series: [metricSeries],
+        thresholds: [{ axis: "left", condition: "at_or_above", severity: "warning", value: 0 }],
+        visualization: "line",
+      }).invalidLogAxis,
+    ).toBe("left");
+  });
+
+  it("describes thresholds and annotations outside the visual chart", () => {
+    const summary = buildMetricChartSummary({
+      annotations: [
+        { _tag: "note", atMs: Date.parse("2026-08-28T08:00:00Z"), label: "Fix landed" },
+      ],
+      axes: RequestsVsUsersPanel.axes,
+      series: [
+        series({
+          label: "requests",
+          queryRef: RequestsVsUsersPanel.queries[0].refId,
+          values: [["2026-08-28T08:00:00Z", 12]],
+        }),
+      ],
+      thresholds: [
+        {
+          axis: "left",
+          condition: "at_or_above",
+          severity: "warning",
+          value: 10,
+        },
+      ],
+      title: "Traffic",
+      units: {},
+    });
+    expect(summary).toContain("Thresholds: warning at 10.0 upstream requests/s");
+    expect(summary).toContain("Annotations: Note Fix landed at");
   });
 
   it("rejects query features the backend cannot preserve instead of weakening them", () => {

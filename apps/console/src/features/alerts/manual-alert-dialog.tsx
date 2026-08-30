@@ -103,7 +103,7 @@ export function ManualAlertDialog({
       <Dialog.Portal>
         <Dialog.Backdrop {...stylex.props(styles.backdrop)} />
         <Dialog.Popup {...stylex.props(styles.popup)}>
-          <form onSubmit={submit}>
+          <form onSubmit={submit} {...stylex.props(styles.form)}>
             <header {...stylex.props(styles.header)}>
               <span {...stylex.props(styles.headerIcon)}>
                 <Icon icon={Alert02Icon} size={18} />
@@ -253,12 +253,19 @@ const styles = stylex.create({
     borderWidth: 1,
     color: colors.text,
     left: "50%",
+    maxHeight: "calc(100dvh - 32px)",
     maxWidth: "calc(100vw - 32px)",
+    overflow: "hidden",
     position: "fixed",
     top: "50%",
     transform: "translate(-50%, -50%)",
     width: 500,
     zIndex: 100,
+  },
+  form: {
+    display: "grid",
+    gridTemplateRows: "auto minmax(0, 1fr) auto",
+    maxHeight: "calc(100dvh - 32px)",
   },
   header: {
     alignItems: "start",
@@ -297,7 +304,13 @@ const styles = stylex.create({
     justifyContent: "center",
     width: 36,
   },
-  content: { display: "grid", gap: space.x5, padding: space.x5 },
+  content: {
+    display: "grid",
+    gap: space.x5,
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    padding: space.x5,
+  },
   field: { color: colors.textMuted, display: "grid", fontSize: 11, gap: space.x2 },
   fieldLabel: { color: colors.textMuted, fontSize: 11 },
   fieldError: { color: colors.red, fontSize: 10 },

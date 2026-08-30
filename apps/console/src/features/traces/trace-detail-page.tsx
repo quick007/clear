@@ -1,6 +1,6 @@
-import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+import { ArrowLeft01Icon, Rocket01Icon } from "@hugeicons/core-free-icons";
 import * as stylex from "@stylexjs/stylex";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useParams, useSearch } from "@tanstack/react-router";
 
 import {
   attributesText,
@@ -10,6 +10,7 @@ import {
 } from "../../data/format";
 import { useRuntimeQuery, useTraceQuery } from "../../data/queries";
 import { colors, radii, space } from "../../theme/tokens.stylex";
+import { Button } from "../../ui/button";
 import { ConsoleFailureActions } from "../../ui/console-failure-actions";
 import { CopyButton } from "../../ui/copy-button";
 import { Icon } from "../../ui/icon";
@@ -17,9 +18,15 @@ import { ContentState, Page, PageHeader } from "../../ui/page";
 import { StaleDataNotice } from "../../ui/stale-data-notice";
 import { StatusPill } from "../../ui/status";
 import { traceSpanGeometry } from "./trace-geometry";
+import {
+  traceContextPath,
+  traceExplorerSearch,
+  type TraceNavigationContext,
+} from "./trace-navigation";
 
 export function TraceDetailPage() {
   const { traceId } = useParams({ from: "/traces/$traceId" });
+  const traceContext = useSearch({ from: "/traces/$traceId" });
   const runtime = useRuntimeQuery();
   const trace = useTraceQuery(runtime.data?.projectId ?? null, traceId);
   const validTraceId = /^(?!0{32}$)[0-9a-f]{32}$/.test(traceId);
@@ -27,6 +34,9 @@ export function TraceDetailPage() {
   const traceUnavailable = !runtime.data || !trace.data;
   const failure = runtime.isError && !runtime.data ? runtime.error : trace.error;
   const staleFailure = traceUnavailable ? null : (runtime.error ?? trace.error);
+  const sourceLabel = traceContext.source === "logs" ? "logs" : "traces";
+  const sourcePath = traceContextPath("/explore", traceContext, true);
+  const detailReturnPath = traceContextPath(`/traces/${encodeURIComponent(traceId)}`, traceContext);
   const retryFailedQueries = () => {
     if (runtime.isError) void runtime.refetch();
     if (runtime.isError && !runtime.data) return;
@@ -36,7 +46,7 @@ export function TraceDetailPage() {
   if (!validTraceId) {
     return (
       <Page>
-        <BackLink />
+        <BackLink context={traceContext} />
         <ContentState title="Invalid trace ID">
           Trace IDs contain 32 lowercase hexadecimal characters.
         </ContentState>
@@ -46,7 +56,7 @@ export function TraceDetailPage() {
   if (traceLoading) {
     return (
       <Page>
-        <BackLink />
+        <BackLink context={traceContext} />
         <ContentState kind="loading" title="Loading trace" />
       </Page>
     );
@@ -54,17 +64,17 @@ export function TraceDetailPage() {
   if (traceUnavailable) {
     return (
       <Page>
-        <BackLink />
+        <BackLink context={traceContext} />
         <ContentState
           actions={
             <ConsoleFailureActions
               error={failure}
               notFound={{
-                href: "/explore?signal=traces&window=1h",
-                label: "Back to traces",
+                href: sourcePath,
+                label: `Back to ${sourceLabel}`,
               }}
               onRetry={retryFailedQueries}
-              returnPath={`/traces/${encodeURIComponent(traceId)}`}
+              returnPath={detailReturnPath}
             />
           }
           kind="error"
@@ -86,20 +96,38 @@ export function TraceDetailPage() {
 
   return (
     <Page>
-      <BackLink />
+      <BackLink context={traceContext} />
       <StaleDataNotice
         copy="Showing the last loaded trace."
         error={staleFailure}
         notFound={{
-          href: "/explore?signal=traces&window=1h",
-          label: "Back to traces",
+          href: sourcePath,
+          label: `Back to ${sourceLabel}`,
         }}
         onRetry={retryFailedQueries}
         retrying={runtime.isFetching || trace.isFetching}
-        returnPath={`/traces/${encodeURIComponent(traceId)}`}
+        returnPath={detailReturnPath}
       />
       <PageHeader
-        actions={<CopyButton compact={false} label="Copy link" value={window.location.href} />}
+        actions={
+          <>
+            <Button
+              render={
+                <Link
+                  search={{
+                    service: String(detail.summary.rootServiceName),
+                    window: traceContext.window,
+                  }}
+                  to="/deploys"
+                />
+              }
+              tone="secondary"
+            >
+              <Icon icon={Rocket01Icon} size={15} /> View nearby deploys
+            </Button>
+            <CopyButton compact={false} label="Copy link" value={window.location.href} />
+          </>
+        }
         description={`Trace ${traceId} · started ${formatUnixNanoTime(rootStart)} · ${detail.summary.spanCount} spans across ${detail.summary.services.length} services`}
         title={detail.summary.rootSpanName}
       />
@@ -164,10 +192,10 @@ export function TraceDetailPage() {
   );
 }
 
-function BackLink() {
+function BackLink({ context }: { context: TraceNavigationContext }) {
   return (
-    <Link to="/traces" {...stylex.props(styles.back)}>
-      <Icon icon={ArrowLeft01Icon} size={15} /> Back to traces
+    <Link search={traceExplorerSearch(context)} to="/explore" {...stylex.props(styles.back)}>
+      <Icon icon={ArrowLeft01Icon} size={15} /> Back to {context.source}
     </Link>
   );
 }

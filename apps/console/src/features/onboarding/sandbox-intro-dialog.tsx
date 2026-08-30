@@ -9,16 +9,16 @@ import { Icon } from "../../ui/icon";
 
 const steps = [
   {
-    title: "Start the checkout incident",
-    detail: "A small upstream failure will expose the service's aggressive retry behavior.",
+    title: "Break checkout",
+    detail: "An alert fires and the board fills with symptoms. The cause is not labelled.",
   },
   {
-    title: "Investigate with your agent",
-    detail: "Your agent can query the same metrics, logs, traces, and board you are watching.",
+    title: "Ask for a first read",
+    detail: "Let your agent orient from the alert and the evidence already on screen.",
   },
   {
-    title: "Pressure-test the explanation",
-    detail: "Follow the evidence until retries, not real users, explain the extra traffic.",
+    title: "Challenge the leading explanation",
+    detail: "When the first story looks plausible, ask for the comparison that could disprove it.",
   },
 ] as const;
 
@@ -26,16 +26,20 @@ export function SandboxIntroDialog({
   blocked,
   error,
   onOpenChange,
+  onRestart,
   onStart,
   open,
   pending,
+  state,
 }: {
   blocked: boolean;
   error?: ReactNode;
   onOpenChange: (open: boolean) => void;
+  onRestart: () => void;
   onStart: () => void;
   open: boolean;
   pending: boolean;
+  state: "active" | "baseline" | "complete";
 }) {
   return (
     <Dialog.Root
@@ -55,11 +59,14 @@ export function SandboxIntroDialog({
             </span>
             <div {...stylex.props(styles.heading)}>
               <Dialog.Title {...stylex.props(styles.title)}>
-                Find the cause of a checkout incident
+                {state === "complete"
+                  ? "Run the checkout investigation again"
+                  : "Find the cause of a checkout incident"}
               </Dialog.Title>
               <Dialog.Description {...stylex.props(styles.description)}>
-                This is an isolated two-hour workspace. The failure is controlled, but the
-                OpenTelemetry evidence and the investigation are real.
+                {state === "complete"
+                  ? "Your previous investigation stays in Incidents. Restarting returns the sandbox to a clean baseline, ready for another run."
+                  : "A private sandbox with a checkout incident about to unfold. The OpenTelemetry evidence is yours and your agent's to investigate."}
               </Dialog.Description>
             </div>
             <Dialog.Close
@@ -91,13 +98,23 @@ export function SandboxIntroDialog({
           </div>
 
           <footer {...stylex.props(styles.footer)}>
-            <Dialog.Close
-              disabled={pending || blocked}
-              render={<Button tone="ghost">View healthy baseline</Button>}
-            />
-            <Button disabled={pending || blocked} onClick={onStart} tone="primary">
-              {pending ? "Starting incident" : "Start incident"}
-            </Button>
+            {state === "active" ? (
+              <Dialog.Close render={<Button tone="primary">Return to investigation</Button>} />
+            ) : state === "complete" ? (
+              <Button disabled={pending || blocked} onClick={onRestart} tone="primary">
+                {pending ? "Restarting walkthrough" : "Restart walkthrough"}
+              </Button>
+            ) : (
+              <>
+                <Dialog.Close
+                  disabled={pending || blocked}
+                  render={<Button tone="ghost">View healthy baseline</Button>}
+                />
+                <Button disabled={pending || blocked} onClick={onStart} tone="primary">
+                  {pending ? "Starting incident" : "Start incident"}
+                </Button>
+              </>
+            )}
           </footer>
         </Dialog.Popup>
       </Dialog.Portal>

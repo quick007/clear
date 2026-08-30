@@ -1,9 +1,11 @@
 import { ArrowUpRight01Icon, CodeIcon, Rocket01Icon } from "@hugeicons/core-free-icons";
 import * as stylex from "@stylexjs/stylex";
-import { Link } from "@tanstack/react-router";
+import { useSearch } from "@tanstack/react-router";
 
-import { errorMessage, formatClockTime } from "../../data/format";
-import { useDeploysQuery, useRuntimeQuery } from "../../data/queries";
+import { useDeploysQuery } from "../../data/deploy-queries";
+import { errorMessage, formatClockTime, formatRelativeTime } from "../../data/format";
+import { uniquePageItems } from "../../data/pagination";
+import { useOverviewQuery, useRuntimeQuery } from "../../data/queries";
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
 import { ConsoleFailureActions } from "../../ui/console-failure-actions";
@@ -11,108 +13,158 @@ import { Icon } from "../../ui/icon";
 import { ContentState, Page, PageHeader } from "../../ui/page";
 import { StaleDataNotice } from "../../ui/stale-data-notice";
 import { StatusPill } from "../../ui/status";
+import { ChangesNavigation } from "../explore/explore-navigation";
 
 export function DeploysPage() {
+  const search = useSearch({ from: "/deploys" });
   const runtime = useRuntimeQuery();
-  const deploys = useDeploysQuery(runtime.data?.projectId ?? null);
+  const projectId = runtime.data?.projectId ?? null;
+  const overview = useOverviewQuery(projectId);
+  const deploys = useDeploysQuery(projectId, search.service, search.window);
+  const events = deploys.data
+    ? uniquePageItems(
+        deploys.data.pages,
+        (page) => page.events,
+        (event) => event.id,
+      )
+    : [];
   const deploysUnavailable =
     (runtime.isError && !runtime.data) || (deploys.isError && !deploys.data);
   const failure = runtime.isError && !runtime.data ? runtime.error : deploys.error;
   const staleFailure =
-    deploysUnavailable || !deploys.data ? null : (runtime.error ?? deploys.error);
+    deploysUnavailable || !deploys.data ? null : (runtime.error ?? deploys.error ?? overview.error);
+  const returnPath = `/deploys?window=${search.window}${search.service ? `&service=${encodeURIComponent(search.service)}` : ""}`;
   const retryFailedQueries = () => {
     if (runtime.isError) void runtime.refetch();
     if (runtime.isError && !runtime.data) return;
-    if (deploys.isError) void deploys.refetch();
+    if (deploys.isFetchNextPageError) void deploys.fetchNextPage();
+    else if (deploys.isError) void deploys.refetch();
+    if (overview.isError) void overview.refetch();
   };
 
   return (
-    <Page>
-      <PageHeader
-        description="Inbound deploy events annotate panels for the affected service."
-        title="Deploy events"
-      />
-      {!deploysUnavailable && !deploys.data && (runtime.isPending || deploys.isPending) ? (
-        <ContentState kind="loading" title="Loading deploy events" />
-      ) : null}
-      {deploysUnavailable ? (
-        <ContentState
-          actions={
-            <ConsoleFailureActions
-              error={failure}
-              notFound={{ href: "/connect", label: "Open connection setup" }}
-              onRetry={retryFailedQueries}
-              returnPath="/deploys"
-            />
+    <>
+      <ChangesNavigation services={overview.data?.services ?? []} />
+      <Page>
+        <PageHeader
+          description="Correlate deploys with telemetry from the same service and time window."
+          title="Deploys"
+        />
+        {!deploysUnavailable && !deploys.data && (runtime.isPending || deploys.isPending) ? (
+          <ContentState kind="loading" title="Loading deploys" />
+        ) : null}
+        {deploysUnavailable ? (
+          <ContentState
+            actions={
+              <ConsoleFailureActions
+                error={failure}
+                notFound={{ href: "/connect", label: "Open connection setup" }}
+                onRetry={retryFailedQueries}
+                returnPath={returnPath}
+              />
+            }
+            kind="error"
+            title="Deploys are unavailable"
+          >
+            {errorMessage(failure)}
+          </ContentState>
+        ) : null}
+        <StaleDataNotice
+          copy={
+            deploys.isFetchNextPageError
+              ? "Older deploys could not be loaded. The changes shown are still available."
+              : "Some deploy data or service context may be out of date."
           }
-          kind="error"
-          title="Deploy events are unavailable"
-        >
-          {errorMessage(failure)}
-        </ContentState>
-      ) : null}
-      <StaleDataNotice
-        copy="Showing the last loaded deploy events."
-        error={staleFailure}
-        notFound={{ href: "/connect", label: "Open connection setup" }}
-        onRetry={retryFailedQueries}
-        retrying={runtime.isFetching || deploys.isFetching}
-        returnPath="/deploys"
-      />
-      {deploys.data?.events.length === 0 ? (
-        <ContentState
-          actions={
-            <Button render={<Link to="/connect" />} tone="secondary">
-              Connect deploy events
-            </Button>
-          }
-          title="No deploy events yet"
-        >
-          Connect your deployment webhook to correlate changes with telemetry.
-        </ContentState>
-      ) : null}
-      {deploys.data && deploys.data.events.length > 0 ? (
-        <section aria-label="Deploy history" {...stylex.props(styles.timeline)}>
-          {deploys.data.events.map((deploy) => (
-            <article key={deploy.id} {...stylex.props(styles.event)}>
-              <time {...stylex.props(styles.time)}>{formatClockTime(deploy.deployedAt)}</time>
-              <span {...stylex.props(styles.axis)}>
-                <span {...stylex.props(styles.marker)}>
-                  <Icon icon={Rocket01Icon} size={15} />
-                </span>
-              </span>
-              <div {...stylex.props(styles.content)}>
-                <div {...stylex.props(styles.eventHeader)}>
-                  <span {...stylex.props(styles.service)}>{deploy.serviceName}</span>
-                  <StatusPill tone="healthy">Recorded</StatusPill>
-                </div>
-                <p {...stylex.props(styles.description)}>
-                  {deploy.description ?? "Deployment recorded"}
-                </p>
-                <div {...stylex.props(styles.meta)}>
-                  <span>
-                    <Icon icon={CodeIcon} size={14} /> <code>{deploy.sha.slice(0, 12)}</code>
+          error={staleFailure}
+          notFound={{ href: "/connect", label: "Open connection setup" }}
+          onRetry={retryFailedQueries}
+          retrying={runtime.isFetching || deploys.isFetching || overview.isFetching}
+          returnPath={returnPath}
+        />
+        {deploys.data && events.length === 0 ? (
+          <ContentState
+            actions={
+              search.service ? undefined : (
+                <Button render={<a href="/connect#deploy-events" />} tone="primary">
+                  Configure deploy events
+                </Button>
+              )
+            }
+            title="No deploys in this window"
+          >
+            {search.service
+              ? `No deploys were recorded for ${search.service}. Try another service or time range.`
+              : "Add Clear's deploy-event webhook to your deployment pipeline to correlate code changes with telemetry."}
+          </ContentState>
+        ) : null}
+        {deploys.data && events.length > 0 ? (
+          <section
+            aria-busy={deploys.isFetchingNextPage}
+            aria-label="Deploy history"
+            {...stylex.props(styles.timeline)}
+          >
+            {events.map((deploy) => (
+              <article key={deploy.id} {...stylex.props(styles.event)}>
+                <time title={formatClockTime(deploy.deployedAt)} {...stylex.props(styles.time)}>
+                  {formatRelativeTime(deploy.deployedAt)}
+                </time>
+                <span {...stylex.props(styles.axis)}>
+                  <span {...stylex.props(styles.marker)}>
+                    <Icon icon={Rocket01Icon} size={15} />
                   </span>
-                  {deploy.url ? (
-                    <a
-                      href={deploy.url}
-                      rel="noreferrer"
-                      target="_blank"
-                      {...stylex.props(styles.openLink)}
-                    >
-                      Open deployment <Icon icon={ArrowUpRight01Icon} size={13} />
-                    </a>
-                  ) : null}
+                </span>
+                <div {...stylex.props(styles.content)}>
+                  <div {...stylex.props(styles.eventHeader)}>
+                    <span {...stylex.props(styles.service)}>{deploy.serviceName}</span>
+                    <StatusPill tone="healthy">Deployed</StatusPill>
+                  </div>
+                  <p {...stylex.props(styles.description)}>
+                    {deploy.description ?? "Deployment recorded"}
+                  </p>
+                  <div {...stylex.props(styles.meta)}>
+                    <span>
+                      <Icon icon={CodeIcon} size={14} /> <code>{deploy.sha.slice(0, 12)}</code>
+                    </span>
+                    {deploy.url ? (
+                      <a
+                        href={deploy.url}
+                        rel="noreferrer"
+                        target="_blank"
+                        {...stylex.props(styles.openLink)}
+                      >
+                        Open deployment <Icon icon={ArrowUpRight01Icon} size={13} />
+                      </a>
+                    ) : null}
+                  </div>
                 </div>
+              </article>
+            ))}
+            {deploys.hasNextPage ? (
+              <div aria-live="polite" {...stylex.props(styles.pagination)}>
+                <Button
+                  aria-label={
+                    deploys.isFetchingNextPage
+                      ? "Loading older deploys"
+                      : deploys.isFetchNextPageError
+                        ? "Try loading older deploys again"
+                        : "Load older deploys"
+                  }
+                  disabled={deploys.isFetchingNextPage}
+                  onClick={() => void deploys.fetchNextPage()}
+                  tone="secondary"
+                >
+                  {deploys.isFetchingNextPage
+                    ? "Loading older"
+                    : deploys.isFetchNextPageError
+                      ? "Try again"
+                      : "Load older"}
+                </Button>
               </div>
-            </article>
-          ))}
-          {deploys.data.hasMore ? (
-            <p {...stylex.props(styles.more)}>Showing the newest 50 deploy events.</p>
-          ) : null}
-        </section>
-      ) : null}
-    </Page>
+            ) : null}
+          </section>
+        ) : null}
+      </Page>
+    </>
   );
 }
 
@@ -135,6 +187,7 @@ const styles = stylex.create({
     fontFamily: "IBM Plex Mono, monospace",
     fontSize: 11,
     paddingTop: 9,
+    whiteSpace: "nowrap",
   },
   axis: {
     alignSelf: "stretch",
@@ -185,5 +238,5 @@ const styles = stylex.create({
     gap: 5,
     textDecoration: "none",
   },
-  more: { color: colors.textSubtle, fontSize: 11, marginBottom: 0 },
+  pagination: { display: "flex", justifyContent: "center", paddingTop: space.x4 },
 });

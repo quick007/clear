@@ -24,6 +24,8 @@ export function SituationStrip({
       <div {...stylex.props(styles.alertBlock)}>
         {isClosed ? (
           <StatusPill tone="healthy">Resolved</StatusPill>
+        ) : firingCount === 0 ? (
+          <StatusPill>Investigation open</StatusPill>
         ) : (
           <StatusPill tone="critical">
             {firingCount} {firingCount === 1 ? "alert" : "alerts"} firing

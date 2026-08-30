@@ -17,7 +17,7 @@ vi.mock("./registry", () => ({
   },
 }));
 
-import { startGroundtruthTools, stopGroundtruthTools } from "./bootstrap";
+import { getGroundtruthToolStatus, startGroundtruthTools, stopGroundtruthTools } from "./bootstrap";
 
 beforeEach(() => {
   stopGroundtruthTools();
@@ -55,12 +55,33 @@ describe("WebMCP bootstrap", () => {
     expect(mocks.makeToolOperations).toHaveBeenCalledWith(runtime.api, runtime.sessions);
   });
 
-  it("does not retry a non-recoverable runtime failure", async () => {
+  it("marks tool status failed after a non-recoverable runtime failure", async () => {
     const failure = new ConsoleAuthenticationRequired();
     mocks.getConsoleRuntime.mockRejectedValueOnce(failure);
 
     await expect(startGroundtruthTools()).rejects.toBe(failure);
+    expect(getGroundtruthToolStatus()).toBe("failed");
     expect(mocks.getConsoleRuntime).toHaveBeenCalledOnce();
     expect(mocks.registryStart).not.toHaveBeenCalled();
+  });
+
+  it("does not return to ready after tools stop while registration is pending", async () => {
+    const runtime = { api: { id: "api" }, sessions: { id: "sessions" } };
+    let finishRegistration!: () => void;
+    mocks.getConsoleRuntime.mockResolvedValueOnce(runtime);
+    mocks.registryStart.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRegistration = resolve;
+        }),
+    );
+
+    const started = startGroundtruthTools();
+    await vi.waitFor(() => expect(mocks.registryStart).toHaveBeenCalledOnce());
+    stopGroundtruthTools();
+    finishRegistration();
+    await expect(started).resolves.toBeUndefined();
+
+    expect(getGroundtruthToolStatus()).toBe("idle");
   });
 });

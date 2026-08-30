@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [stylex.vite({ devMode: "full", useCSSLayers: true }), react(), sites(), cloudflare()],
+    resolve: {
+      dedupe: ["react", "react-dom"],
+    },
     test: {
       environment: "jsdom",
     },

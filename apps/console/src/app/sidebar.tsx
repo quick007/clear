@@ -2,9 +2,7 @@ import type { ConsoleOverview, SessionView } from "@groundtruth/api-contract";
 import {
   Alert02Icon,
   Cancel01Icon,
-  Chart01Icon,
   DashboardSquare01Icon,
-  Logout01Icon,
   Menu01Icon,
   Search02Icon,
   Settings01Icon,
@@ -15,13 +13,11 @@ import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { useLogoutMutation } from "../data/queries";
-import { mutationOutcomeIsUnknown } from "../errors";
 import { colors, radii, space } from "../theme/tokens.stylex";
 import { ClearMark } from "../ui/clear-mark";
 import { Icon } from "../ui/icon";
-import { MutationFailureNotice } from "../ui/mutation-failure-notice";
-import { accountInitials, serviceSummary } from "./sidebar-format";
+import { SidebarAccountFooter } from "./sidebar-account-footer";
+import { serviceSummary } from "./sidebar-format";
 import { SidebarNavLink } from "./sidebar-nav-link";
 import { navigationStyles } from "./sidebar-navigation.styles";
 
@@ -88,11 +84,7 @@ function SidebarContent({
   overviewState,
   session,
 }: WorkspaceNavigationProps & { readonly onNavigate?: () => void }) {
-  const logout = useLogoutMutation();
-  const logoutOutcomeUnknown = logout.isError && mutationOutcomeIsUnknown(logout.error);
   const account = session?.account;
-  const accountName = account?.displayName ?? account?.email ?? "Account";
-  const initials = accountInitials(accountName);
   const firingCount = overview?.alerts.filter((alert) => alert.status === "firing").length ?? 0;
   const projectName =
     overviewState === "error"
@@ -100,7 +92,7 @@ function SidebarContent({
       : (overview?.project.name ?? "Opening workspace");
   const projectSummary =
     overviewState === "error"
-      ? "Try again from the page"
+      ? "Project unavailable"
       : overviewState === "loading"
         ? "Loading signals"
         : overview?.services.length
@@ -148,6 +140,7 @@ function SidebarContent({
           onClick={onNavigate}
           search={{
             metric: undefined,
+            query: undefined,
             service: undefined,
             signal: "metrics" as const,
             window: "1h",
@@ -184,53 +177,7 @@ function SidebarContent({
         />
       </nav>
 
-      <div {...stylex.props(styles.bottom)}>
-        {account ? (
-          <div>
-            <div {...stylex.props(styles.account)}>
-              <span {...stylex.props(styles.avatar)}>{initials}</span>
-              <span {...stylex.props(styles.accountCopy)}>
-                <strong {...stylex.props(styles.accountName)}>{accountName}</strong>
-                <span {...stylex.props(styles.accountDetail)}>{account.email}</span>
-              </span>
-              <button
-                aria-label="Sign out"
-                disabled={logout.isPending || logoutOutcomeUnknown}
-                onClick={() => {
-                  logout.reset();
-                  logout.mutate();
-                }}
-                type="button"
-                {...stylex.props(styles.logout)}
-              >
-                <Icon icon={Logout01Icon} size={17} />
-              </button>
-            </div>
-            {logout.isError ? (
-              <MutationFailureNotice
-                checkLabel="Check session"
-                compact
-                error={logout.error}
-                onCheckState={() => window.location.reload()}
-              />
-            ) : null}
-          </div>
-        ) : (
-          <a
-            href="/auth/chatgpt?returnPath=%2Fconnect"
-            onClick={onNavigate}
-            {...stylex.props(styles.login)}
-          >
-            <span {...stylex.props(styles.avatar, styles.guestAvatar)}>
-              <Icon icon={Chart01Icon} size={16} />
-            </span>
-            <span {...stylex.props(styles.accountCopy)}>
-              <strong {...stylex.props(styles.accountName)}>Log in</strong>
-              <span {...stylex.props(styles.accountDetail)}>Create your project</span>
-            </span>
-          </a>
-        )}
-      </div>
+      <SidebarAccountFooter onNavigate={onNavigate} session={session} />
     </div>
   );
 }
@@ -328,86 +275,6 @@ const styles = stylex.create({
     display: "block",
     height: 6,
     width: 6,
-  },
-  bottom: {
-    borderTopColor: colors.line,
-    borderTopStyle: "solid",
-    borderTopWidth: 1,
-    marginTop: "auto",
-    paddingTop: space.x4,
-  },
-  account: {
-    alignItems: "center",
-    display: "grid",
-    gap: space.x3,
-    gridTemplateColumns: "32px minmax(0, 1fr) 32px",
-  },
-  login: {
-    alignItems: "center",
-    borderRadius: radii.sm,
-    color: colors.text,
-    display: "grid",
-    gap: space.x3,
-    gridTemplateColumns: "32px minmax(0, 1fr)",
-    padding: space.x2,
-    textDecoration: "none",
-    ":hover": { backgroundColor: colors.whiteWash },
-  },
-  avatar: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceRaised,
-    borderColor: colors.lineStrong,
-    borderRadius: radii.pill,
-    borderStyle: "solid",
-    borderWidth: 1,
-    color: colors.text,
-    display: "flex",
-    fontFamily: "IBM Plex Mono, monospace",
-    fontSize: 11,
-    height: 32,
-    justifyContent: "center",
-    width: 32,
-  },
-  guestAvatar: { color: colors.amber },
-  accountCopy: {
-    display: "flex",
-    flexDirection: "column",
-    minWidth: 0,
-  },
-  accountName: {
-    fontSize: 12,
-    fontWeight: 500,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-  accountDetail: {
-    color: colors.textSubtle,
-    fontSize: 11,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-  logout: {
-    alignItems: "center",
-    backgroundColor: { default: "transparent", ":hover": colors.whiteWash },
-    borderColor: "transparent",
-    borderRadius: radii.sm,
-    borderStyle: "solid",
-    borderWidth: 1,
-    color: colors.textSubtle,
-    cursor: "pointer",
-    display: "flex",
-    height: 32,
-    justifyContent: "center",
-    width: 32,
-  },
-  logoutError: {
-    color: colors.red,
-    fontSize: 10,
-    lineHeight: 1.4,
-    marginBlock: space.x2,
-    paddingInline: space.x2,
   },
   mobileHeader: {
     alignItems: "center",

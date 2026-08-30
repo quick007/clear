@@ -1,10 +1,10 @@
 import { LinkSquare02Icon } from "@hugeicons/core-free-icons";
 import type { TelemetryWindow } from "@groundtruth/telemetry";
 import * as stylex from "@stylexjs/stylex";
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 
 import { attributesText, errorMessage, formatUnixNanoTime, logBodyText } from "../../data/format";
+import { uniquePageItems } from "../../data/pagination";
 import { useLogsQuery, useRuntimeQuery } from "../../data/queries";
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
@@ -26,18 +26,37 @@ export function LogsPage({
   service?: string;
   window: TelemetryWindow;
 }) {
-  const [search, setSearch] = useState("");
+  const routeSearch = useSearch({ from: "/explore" });
+  const navigate = useNavigate({ from: "/explore" });
+  const query = routeSearch.query ?? "";
   const runtime = useRuntimeQuery();
-  const logs = useLogsQuery(runtime.data?.projectId ?? null, search.trim(), window, service);
+  const logs = useLogsQuery(runtime.data?.projectId ?? null, query.trim(), window, service);
+  const records = logs.data
+    ? uniquePageItems(
+        logs.data.pages,
+        (page) => page.records,
+        (log) =>
+          [
+            String(log.timeUnixNano),
+            String(log.observedTimeUnixNano),
+            log.traceId,
+            log.spanId,
+            log.serviceName,
+            log.severity,
+            logBodyText(log.body),
+          ].join(":"),
+      )
+    : [];
   const logsUnavailable = (runtime.isError && !runtime.data) || (logs.isError && !logs.data);
   const failure = runtime.isError && !runtime.data ? runtime.error : logs.error;
-  const returnPath = `/explore?signal=logs&window=${window}${service ? `&service=${encodeURIComponent(service)}` : ""}`;
+  const returnPath = `/explore?signal=logs&window=${window}${service ? `&service=${encodeURIComponent(service)}` : ""}${query ? `&query=${encodeURIComponent(query)}` : ""}`;
   const staleFailure =
     logsUnavailable || !logs.data ? null : (runtime.error ?? logs.error ?? contextFailure);
   const retryFailedQueries = () => {
     if (runtime.isError) void runtime.refetch();
     if (runtime.isError && !runtime.data) return;
-    if (logs.isError) void logs.refetch();
+    if (logs.isFetchNextPageError) void logs.fetchNextPage();
+    else if (logs.isError) void logs.refetch();
     if (contextFailure !== null && contextFailure !== undefined) onRetryContext?.();
   };
 
@@ -50,9 +69,14 @@ export function LogsPage({
       <Toolbar>
         <SearchField
           label="Search logs"
-          onChange={setSearch}
+          onChange={(nextQuery) =>
+            void navigate({
+              replace: true,
+              search: (current) => ({ ...current, query: nextQuery || undefined }),
+            })
+          }
           placeholder="Search message or attribute"
-          value={search}
+          value={query}
         />
       </Toolbar>
 
@@ -80,7 +104,11 @@ export function LogsPage({
         </ContentState>
       ) : null}
       <StaleDataNotice
-        copy="Some log data or service context may be out of date."
+        copy={
+          logs.isFetchNextPageError
+            ? "Older logs could not be loaded. The events shown are still available."
+            : "Some log data or service context may be out of date."
+        }
         error={staleFailure}
         invalidRequest={{ href: "/explore?signal=logs&window=1h", label: "Clear filters" }}
         notFound={{ href: "/connect", label: "Open connection setup" }}
@@ -88,10 +116,10 @@ export function LogsPage({
         retrying={runtime.isFetching || logs.isFetching || contextRetrying}
         returnPath={returnPath}
       />
-      {logs.data && logs.data.records.length === 0 ? (
+      {logs.data && records.length === 0 ? (
         <ContentState
           actions={
-            search ? undefined : (
+            query ? undefined : (
               <Button render={<Link to="/connect" />} tone="secondary">
                 Connect telemetry
               </Button>
@@ -99,16 +127,20 @@ export function LogsPage({
           }
           title="No logs found"
         >
-          {search ? "Try a broader search." : "Send OTLP logs to this project to see them here."}
+          {query ? "Try a broader search." : "Send OTLP logs to this project to see them here."}
         </ContentState>
       ) : null}
-      {logs.data && logs.data.records.length > 0 ? (
-        <section aria-label="Log results" {...stylex.props(styles.stream)}>
+      {logs.data && records.length > 0 ? (
+        <section
+          aria-busy={logs.isFetchingNextPage}
+          aria-label="Log results"
+          {...stylex.props(styles.stream)}
+        >
           <div {...stylex.props(styles.resultMeta)}>
-            <span>{logs.data.records.length} events</span>
-            <span>{logs.data.hasMore ? "Showing newest 50" : "Newest first"}</span>
+            <span>{records.length} events loaded</span>
+            <span>Newest first</span>
           </div>
-          {logs.data.records.map((log, index) => (
+          {records.map((log, index) => (
             <article
               key={`${String(log.timeUnixNano)}-${log.spanId ?? index}`}
               {...stylex.props(styles.row)}
@@ -126,6 +158,7 @@ export function LogsPage({
                 <Link
                   aria-label={`Open trace ${log.traceId}`}
                   params={{ traceId: log.traceId }}
+                  search={{ query: query || undefined, service, source: "logs", window }}
                   to="/traces/$traceId"
                   {...stylex.props(styles.traceLink)}
                 >
@@ -135,6 +168,28 @@ export function LogsPage({
               ) : null}
             </article>
           ))}
+          {logs.hasNextPage ? (
+            <div aria-live="polite" {...stylex.props(styles.pagination)}>
+              <Button
+                aria-label={
+                  logs.isFetchingNextPage
+                    ? "Loading older logs"
+                    : logs.isFetchNextPageError
+                      ? "Try loading older logs again"
+                      : "Load older logs"
+                }
+                disabled={logs.isFetchingNextPage}
+                onClick={() => void logs.fetchNextPage()}
+                tone="secondary"
+              >
+                {logs.isFetchingNextPage
+                  ? "Loading older"
+                  : logs.isFetchNextPageError
+                    ? "Try again"
+                    : "Load older"}
+              </Button>
+            </div>
+          ) : null}
         </section>
       ) : null}
     </Page>
@@ -251,4 +306,12 @@ const styles = stylex.create({
     ":hover": { color: colors.blue },
   },
   traceId: { display: { default: "inline", "@media (max-width: 620px)": "none" } },
+  pagination: {
+    borderTopColor: colors.line,
+    borderTopStyle: "solid",
+    borderTopWidth: 1,
+    display: "flex",
+    justifyContent: "center",
+    padding: space.x4,
+  },
 });

@@ -1,10 +1,10 @@
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import type { TelemetryWindow } from "@groundtruth/telemetry";
 import * as stylex from "@stylexjs/stylex";
-import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 
 import { errorMessage, formatDuration, formatUnixNanoTime } from "../../data/format";
+import { uniquePageItems } from "../../data/pagination";
 import { useRuntimeQuery, useTracesQuery } from "../../data/queries";
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
@@ -27,18 +27,28 @@ export function TracesPage({
   service?: string;
   window: TelemetryWindow;
 }) {
-  const [search, setSearch] = useState("");
+  const routeSearch = useSearch({ from: "/explore" });
+  const navigate = useNavigate({ from: "/explore" });
+  const query = routeSearch.query ?? "";
   const runtime = useRuntimeQuery();
-  const traces = useTracesQuery(runtime.data?.projectId ?? null, search.trim(), window, service);
+  const traces = useTracesQuery(runtime.data?.projectId ?? null, query.trim(), window, service);
+  const traceResults = traces.data
+    ? uniquePageItems(
+        traces.data.pages,
+        (page) => page.traces,
+        (trace) => trace.traceId,
+      )
+    : [];
   const tracesUnavailable = (runtime.isError && !runtime.data) || (traces.isError && !traces.data);
   const failure = runtime.isError && !runtime.data ? runtime.error : traces.error;
-  const returnPath = `/explore?signal=traces&window=${window}${service ? `&service=${encodeURIComponent(service)}` : ""}`;
+  const returnPath = `/explore?signal=traces&window=${window}${service ? `&service=${encodeURIComponent(service)}` : ""}${query ? `&query=${encodeURIComponent(query)}` : ""}`;
   const staleFailure =
     tracesUnavailable || !traces.data ? null : (runtime.error ?? traces.error ?? contextFailure);
   const retryFailedQueries = () => {
     if (runtime.isError) void runtime.refetch();
     if (runtime.isError && !runtime.data) return;
-    if (traces.isError) void traces.refetch();
+    if (traces.isFetchNextPageError) void traces.fetchNextPage();
+    else if (traces.isError) void traces.refetch();
     if (contextFailure !== null && contextFailure !== undefined) onRetryContext?.();
   };
 
@@ -51,9 +61,14 @@ export function TracesPage({
       <Toolbar>
         <SearchField
           label="Search traces"
-          onChange={setSearch}
+          onChange={(nextQuery) =>
+            void navigate({
+              replace: true,
+              search: (current) => ({ ...current, query: nextQuery || undefined }),
+            })
+          }
           placeholder="Search root operation"
-          value={search}
+          value={query}
         />
       </Toolbar>
 
@@ -81,7 +96,11 @@ export function TracesPage({
         </ContentState>
       ) : null}
       <StaleDataNotice
-        copy="Some trace data or service context may be out of date."
+        copy={
+          traces.isFetchNextPageError
+            ? "Older traces could not be loaded. The traces shown are still available."
+            : "Some trace data or service context may be out of date."
+        }
         error={staleFailure}
         invalidRequest={{ href: "/explore?signal=traces&window=1h", label: "Clear filters" }}
         notFound={{ href: "/connect", label: "Open connection setup" }}
@@ -89,10 +108,10 @@ export function TracesPage({
         retrying={runtime.isFetching || traces.isFetching || contextRetrying}
         returnPath={returnPath}
       />
-      {traces.data && traces.data.traces.length === 0 ? (
+      {traces.data && traceResults.length === 0 ? (
         <ContentState
           actions={
-            search ? undefined : (
+            query ? undefined : (
               <Button render={<Link to="/connect" />} tone="secondary">
                 Connect telemetry
               </Button>
@@ -100,16 +119,18 @@ export function TracesPage({
           }
           title="No traces found"
         >
-          {search
-            ? "Try a broader operation search."
-            : "Send OTLP traces to inspect request paths."}
+          {query ? "Try a broader operation search." : "Send OTLP traces to inspect request paths."}
         </ContentState>
       ) : null}
-      {traces.data && traces.data.traces.length > 0 ? (
-        <section aria-label="Trace results" {...stylex.props(styles.results)}>
+      {traces.data && traceResults.length > 0 ? (
+        <section
+          aria-busy={traces.isFetchingNextPage}
+          aria-label="Trace results"
+          {...stylex.props(styles.results)}
+        >
           <div {...stylex.props(styles.resultMeta)}>
-            <span>{traces.data.traces.length} traces</span>
-            <span>{traces.data.hasMore ? "Showing newest 50" : "Newest first"}</span>
+            <span>{traceResults.length} traces loaded</span>
+            <span>Newest first</span>
           </div>
           <div {...stylex.props(styles.tableHeader)}>
             <span>Start</span>
@@ -120,10 +141,11 @@ export function TracesPage({
             <span>Status</span>
             <span />
           </div>
-          {traces.data.traces.map((trace) => (
+          {traceResults.map((trace) => (
             <Link
               key={trace.traceId}
               params={{ traceId: trace.traceId }}
+              search={{ query: query || undefined, service, source: "traces", window }}
               to="/traces/$traceId"
               {...stylex.props(styles.traceRow)}
             >
@@ -145,6 +167,28 @@ export function TracesPage({
               </span>
             </Link>
           ))}
+          {traces.hasNextPage ? (
+            <div aria-live="polite" {...stylex.props(styles.pagination)}>
+              <Button
+                aria-label={
+                  traces.isFetchingNextPage
+                    ? "Loading older traces"
+                    : traces.isFetchNextPageError
+                      ? "Try loading older traces again"
+                      : "Load older traces"
+                }
+                disabled={traces.isFetchingNextPage}
+                onClick={() => void traces.fetchNextPage()}
+                tone="secondary"
+              >
+                {traces.isFetchingNextPage
+                  ? "Loading older"
+                  : traces.isFetchNextPageError
+                    ? "Try again"
+                    : "Load older"}
+              </Button>
+            </div>
+          ) : null}
         </section>
       ) : null}
     </Page>
@@ -228,5 +272,13 @@ const styles = stylex.create({
   traceArrow: {
     gridColumn: { default: "auto", "@media (max-width: 620px)": "2" },
     gridRow: { default: "auto", "@media (max-width: 620px)": "1" },
+  },
+  pagination: {
+    borderTopColor: colors.line,
+    borderTopStyle: "solid",
+    borderTopWidth: 1,
+    display: "flex",
+    justifyContent: "center",
+    padding: space.x4,
   },
 });

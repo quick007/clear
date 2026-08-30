@@ -182,7 +182,7 @@ export function AlertsPage() {
 
       {alerts.data && alerts.data.length > 0 ? (
         <AlertSection
-          description="Telemetry conditions created and maintained with your agent."
+          description="Metric thresholds Clear watches for you. Your agent can create and tune them."
           title="Threshold rules"
         >
           {alerts.data.map((alert) => (

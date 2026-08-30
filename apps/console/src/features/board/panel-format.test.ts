@@ -2,7 +2,10 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   activeThreshold,
+  formatPanelAxisValue,
   formatPanelValue,
+  panelAxisAllowsDecimals,
+  panelAxisCaption,
   reducePanelValues,
   summarizeValues,
 } from "./panel-format";
@@ -27,6 +30,24 @@ describe("panel value formatting", () => {
       formatPanelValue(42, { _tag: "custom", symbol: "$", position: "before", decimals: 0 }),
     ).toBe("$42");
     expect(formatPanelValue(512, { _tag: "auto" }, "By")).toBe("512 B");
+  });
+
+  it("keeps chart axes compact without losing their unit context", () => {
+    const integer = { _tag: "number", format: "decimal", decimals: 0 } as const;
+    expect(formatPanelAxisValue(1.6, integer)).toBe("2");
+    expect(panelAxisAllowsDecimals(integer)).toBe(false);
+    expect(panelAxisAllowsDecimals({ _tag: "number", format: "decimal", decimals: 1 })).toBe(true);
+    expect(panelAxisCaption({ _tag: "rate", per: "second", noun: "requests" })).toBe("/s");
+    expect(
+      formatPanelAxisValue(1_500, {
+        _tag: "duration",
+        decimals: 1,
+        display: "s",
+        input: "ms",
+      }),
+    ).toBe("1.5");
+    expect(panelAxisCaption({ _tag: "duration", display: "s", input: "ms" })).toBe("s");
+    expect(panelAxisCaption({ _tag: "auto" }, "By")).toBe("B");
   });
 
   it("reduces and summarizes values deterministically", () => {

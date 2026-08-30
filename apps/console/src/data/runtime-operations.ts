@@ -21,7 +21,10 @@ export const runGroundtruthQuery = async <A, E>(
   signal?: AbortSignal,
 ) => {
   const runtime = await getConsoleRuntime();
-  return runtime.api.run(operation(runtime), signal);
+  return runtime.api.run(
+    Effect.suspend(() => operation(runtime)),
+    signal,
+  );
 };
 
 export const runGroundtruthMutation = async <A, E>(
@@ -30,6 +33,8 @@ export const runGroundtruthMutation = async <A, E>(
 ) => {
   const runtime = await getConsoleRuntime();
   return runtime.api.run(
-    operation(runtime).pipe(normalizeConsoleMutationEffect(`${context} failed`)),
+    Effect.suspend(() => operation(runtime)).pipe(
+      normalizeConsoleMutationEffect(`${context} failed`),
+    ),
   );
 };

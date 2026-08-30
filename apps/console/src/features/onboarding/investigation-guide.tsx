@@ -25,14 +25,19 @@ const stageCopy = {
       "If this were a real traffic surge, unique users should rise with request volume. Ask your agent to test that.",
   },
   evidence: {
-    title: "Follow the retry evidence",
+    title: "Find where the extra requests come from",
     detail:
-      "Compare incoming requests, unique users, and payment attempts until the amplification is visible.",
+      "Same users, triple the requests. Break checkout and payment calls down by attempt number.",
   },
   diagnosed: {
     title: "Diagnosis complete",
     detail:
       "The evidence now supports retry amplification. Review the hypotheses and timeline before closing the incident.",
+  },
+  reviewed: {
+    title: "Investigation recorded",
+    detail:
+      "The incident is closed, but the panels and timeline remain available as a shared record.",
   },
 } satisfies Record<InvestigationStage, { title: string; detail: string }>;
 
@@ -42,17 +47,20 @@ const stageIndex: Record<InvestigationStage, number> = {
   challenge: 1,
   evidence: 1,
   diagnosed: 2,
+  reviewed: 3,
 };
 
 const journey = ["Orient", "Test the explanation", "Confirm the cause"] as const;
 
 export function InvestigationGuide({
   action,
+  agentUnavailable,
   onOpenGuide,
   prompt,
   stage,
 }: {
   action?: ReactNode;
+  agentUnavailable: boolean;
   onOpenGuide: () => void;
   prompt: string;
   stage: InvestigationStage;
@@ -65,7 +73,11 @@ export function InvestigationGuide({
         <div {...stylex.props(styles.heading)}>
           <span {...stylex.props(styles.guideIcon)}>
             <Icon
-              icon={stage === "diagnosed" ? CheckmarkCircle02Icon : InformationCircleIcon}
+              icon={
+                stage === "diagnosed" || stage === "reviewed"
+                  ? CheckmarkCircle02Icon
+                  : InformationCircleIcon
+              }
               size={17}
             />
           </span>
@@ -84,6 +96,7 @@ export function InvestigationGuide({
       <ol aria-label="Investigation steps" {...stylex.props(styles.journey)}>
         {journey.map((label, index) => (
           <li
+            aria-current={index === activeIndex ? "step" : undefined}
             key={label}
             {...stylex.props(
               styles.journeyStep,
@@ -95,13 +108,23 @@ export function InvestigationGuide({
               {index < activeIndex ? "✓" : index + 1}
             </span>
             <span>{label}</span>
+            <span {...stylex.props(styles.screenReaderOnly)}>
+              {index < activeIndex ? "Completed" : index === activeIndex ? "Current step" : ""}
+            </span>
           </li>
         ))}
       </ol>
 
       <div {...stylex.props(styles.actions)}>
-        {stage === "baseline" ? action : null}
-        {stage === "orient" || stage === "challenge" ? (
+        {action}
+        {agentUnavailable &&
+        (stage === "orient" || stage === "challenge" || stage === "evidence") ? (
+          <p role="status" {...stylex.props(styles.agentNotice)}>
+            Your agent cannot see this board from here. Open Clear inside ChatGPT so it can read the
+            same panels you do and add new ones.
+          </p>
+        ) : null}
+        {stage === "orient" || stage === "challenge" || stage === "evidence" ? (
           <div {...stylex.props(styles.prompt)}>
             <span {...stylex.props(styles.promptCopy)}>
               <small>Suggested prompt</small>
@@ -127,7 +150,13 @@ const styles = stylex.create({
     marginBottom: space.x6,
     padding: { default: space.x5, "@media (max-width: 620px)": space.x4 },
   },
-  header: { alignItems: "start", display: "flex", gap: space.x4, justifyContent: "space-between" },
+  header: {
+    alignItems: { default: "start", "@media (max-width: 620px)": "stretch" },
+    display: "flex",
+    flexDirection: { default: "row", "@media (max-width: 620px)": "column" },
+    gap: space.x4,
+    justifyContent: "space-between",
+  },
   heading: { alignItems: "start", display: "flex", gap: space.x3, minWidth: 0 },
   guideIcon: {
     alignItems: "center",
@@ -180,17 +209,39 @@ const styles = stylex.create({
     width: 20,
   },
   actions: { display: "grid", gap: space.x3 },
+  agentNotice: {
+    backgroundColor: colors.blueWash,
+    borderColor: colors.lineStrong,
+    borderRadius: radii.md,
+    borderStyle: "solid",
+    borderWidth: 1,
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 1.5,
+    margin: 0,
+    padding: space.x3,
+  },
   prompt: {
-    alignItems: "center",
+    alignItems: { default: "center", "@media (max-width: 620px)": "stretch" },
     backgroundColor: colors.canvas,
     borderColor: colors.line,
     borderRadius: radii.md,
     borderStyle: "solid",
     borderWidth: 1,
     display: "flex",
+    flexDirection: { default: "row", "@media (max-width: 620px)": "column" },
     gap: space.x4,
     justifyContent: "space-between",
     padding: space.x3,
   },
   promptCopy: { color: colors.textMuted, display: "grid", fontSize: 12, gap: 3, lineHeight: 1.45 },
+  screenReaderOnly: {
+    clip: "rect(0, 0, 0, 0)",
+    clipPath: "inset(50%)",
+    height: 1,
+    overflow: "hidden",
+    position: "absolute",
+    whiteSpace: "nowrap",
+    width: 1,
+  },
 });

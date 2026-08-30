@@ -7,6 +7,21 @@ import { GroundtruthToolRegistry } from "./registry";
 let registry: GroundtruthToolRegistry | null = null;
 let bootstrap: Promise<void> | null = null;
 let generation = 0;
+export type GroundtruthToolStatus = "failed" | "idle" | "ready" | "starting" | "unsupported";
+let status: GroundtruthToolStatus = "idle";
+const statusListeners = new Set<() => void>();
+
+const setStatus = (nextStatus: GroundtruthToolStatus) => {
+  if (status === nextStatus) return;
+  status = nextStatus;
+  for (const listener of statusListeners) listener();
+};
+
+export const getGroundtruthToolStatus = () => status;
+export const subscribeGroundtruthToolStatus = (listener: () => void) => {
+  statusListeners.add(listener);
+  return () => statusListeners.delete(listener);
+};
 
 const runtimeRetryDelay = 250; // 250 milliseconds
 const runtimeRetryCount = 5;
@@ -41,13 +56,25 @@ const loadRuntime = (currentGeneration: number) =>
 export const startGroundtruthTools = () => {
   if (bootstrap !== null) return bootstrap;
   if (registry !== null) return Promise.resolve();
+  setStatus("starting");
   const currentGeneration = generation + 1;
   generation = currentGeneration;
   const attempt = (async () => {
     const modelContext = document.modelContext;
-    if (typeof modelContext?.registerTool !== "function") return;
+    if (typeof modelContext?.registerTool !== "function") {
+      setStatus("unsupported");
+      return;
+    }
 
-    const runtime = await Effect.runPromise(loadRuntime(currentGeneration));
+    const runtime = await Effect.runPromise(
+      loadRuntime(currentGeneration).pipe(
+        Effect.tapError(() =>
+          Effect.sync(() => {
+            if (generation === currentGeneration) setStatus("failed");
+          }),
+        ),
+      ),
+    );
     if (runtime === null) return;
     const { api, sessions } = runtime;
     if (generation !== currentGeneration) return;
@@ -59,8 +86,13 @@ export const startGroundtruthTools = () => {
     registry = nextRegistry;
     try {
       await nextRegistry.start();
-      if (generation !== currentGeneration) nextRegistry.stop();
+      if (generation !== currentGeneration) {
+        nextRegistry.stop();
+        return;
+      }
+      setStatus("ready");
     } catch (error) {
+      if (generation === currentGeneration) setStatus("failed");
       nextRegistry.stop();
       if (registry === nextRegistry) registry = null;
       throw error;
@@ -81,4 +113,5 @@ export const stopGroundtruthTools = () => {
   registry?.stop();
   registry = null;
   bootstrap = null;
+  setStatus("idle");
 };

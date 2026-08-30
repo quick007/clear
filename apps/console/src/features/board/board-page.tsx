@@ -1,12 +1,15 @@
 import * as stylex from "@stylexjs/stylex";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { useSyncExternalStore } from "react";
 
 import { errorMessage } from "../../data/format";
 import {
   useBoardQuery,
   useIncidentQuery,
+  useIncidentsQuery,
   useMetricCatalogQuery,
   useOverviewQuery,
+  useResetSandbox,
   useRuntimeQuery,
   useTriggerSandboxIncident,
 } from "../../data/queries";
@@ -20,10 +23,21 @@ import { InvestigationGuide } from "../onboarding/investigation-guide";
 import { investigationStage } from "../onboarding/investigation-progress";
 import { SandboxIntroDialog } from "../onboarding/sandbox-intro-dialog";
 import { boardContextMessage, type BoardDependencyState } from "./board-context";
+import { chartNeedsFullWidth } from "./panel-layout";
 import { LivePanel } from "./panel-renderer";
+import { getGroundtruthToolStatus, subscribeGroundtruthToolStatus } from "../../webmcp/bootstrap";
 
-const investigationPrompt =
-  "Investigate the active checkout alert. Compare request volume with unique users and retries, then show the evidence on the board.";
+const investigationPrompts = {
+  baseline: "",
+  orient:
+    "Investigate the active checkout alert. Tell me the leading explanation and show the most useful first panel on the board.",
+  challenge:
+    "Requests tripled. If this is real traffic, where are the users? Compare request volume with unique users and show the result on the board.",
+  evidence:
+    "Same users, triple the requests. Where are the extra requests coming from? Break down checkout and payment calls by attempt number, show it on the board, and tell me whether the leading hypothesis survives.",
+  diagnosed: "",
+  reviewed: "",
+} as const;
 
 export function BoardPage() {
   const search = useSearch({ from: "/board" });
@@ -33,24 +47,40 @@ export function BoardPage() {
   const board = useBoardQuery(projectId);
   const catalog = useMetricCatalogQuery(projectId);
   const overview = useOverviewQuery(projectId);
+  const incidents = useIncidentsQuery(projectId);
   const incident = useIncidentQuery(projectId, overview.data?.openIncident?.id ?? null);
   const triggerIncident = useTriggerSandboxIncident(projectId!);
+  const resetSandbox = useResetSandbox(projectId!);
+  const toolStatus = useSyncExternalStore(
+    subscribeGroundtruthToolStatus,
+    getGroundtruthToolStatus,
+    getGroundtruthToolStatus,
+  );
   const boardUnavailable = (runtime.isError && !runtime.data) || (board.isError && !board.data);
   const boardFailure = runtime.isError && !runtime.data ? runtime.error : board.error;
   const catalogState = dependencyState(catalog.isError, catalog.data !== undefined);
+  const incidentHistoryState = dependencyState(incidents.isError, incidents.data !== undefined);
   const overviewState = dependencyState(overview.isError, overview.data !== undefined);
-  const dependencyFailure = catalogState !== "available" || overviewState !== "available";
+  const dependencyFailure =
+    catalogState !== "available" ||
+    incidentHistoryState !== "available" ||
+    overviewState !== "available";
   const triggerOutcomeUnknown =
     triggerIncident.isError && mutationOutcomeIsUnknown(triggerIncident.error);
+  const resetOutcomeUnknown = resetSandbox.isError && mutationOutcomeIsUnknown(resetSandbox.error);
   const closeGuide = () => void navigate({ replace: true, search: { guide: undefined } });
   const startIncident = () => {
     if (triggerOutcomeUnknown || triggerIncident.isPending) return;
     triggerIncident.mutate(undefined, { onSuccess: closeGuide });
   };
-  const mutationError = triggerIncident.isError ? (
+  const restartWalkthrough = () => {
+    if (resetOutcomeUnknown || resetSandbox.isPending) return;
+    resetSandbox.mutate(undefined, { onSuccess: closeGuide });
+  };
+  const triggerError = triggerIncident.isError ? (
     <MutationFailureNotice
       checkLabel="Check incident state"
-      checking={overview.isFetching || board.isFetching}
+      checking={overview.isFetching || board.isFetching || incidents.isFetching}
       error={triggerIncident.error}
       onCheckState={() => {
         void Promise.all([overview.refetch(), board.refetch()]).then(
@@ -63,7 +93,34 @@ export function BoardPage() {
       }}
     />
   ) : null;
+  const resetError = resetSandbox.isError ? (
+    <MutationFailureNotice
+      checkLabel="Check walkthrough state"
+      checking={overview.isFetching || board.isFetching}
+      error={resetSandbox.error}
+      onCheckState={() => {
+        void Promise.all([overview.refetch(), board.refetch(), incidents.refetch()]).then(
+          ([overviewResult, boardResult, incidentsResult]) => {
+            if (!overviewResult.isSuccess || !boardResult.isSuccess || !incidentsResult.isSuccess) {
+              return;
+            }
+            if (
+              overviewResult.data.openIncident ||
+              boardResult.data.panels.length !== 1 ||
+              incidentsResult.data.items.length > 0
+            ) {
+              return;
+            }
+            resetSandbox.reset();
+            closeGuide();
+          },
+        );
+      }}
+    />
+  ) : null;
   const stage = investigationStage({
+    hasClosedIncident:
+      incidents.data?.items.some((candidate) => candidate.status === "closed") ?? false,
     hasOpenIncident:
       overview.data?.openIncident !== null && overview.data?.openIncident !== undefined,
     hypotheses: incident.data?.hypotheses ?? [],
@@ -83,33 +140,60 @@ export function BoardPage() {
         </div>
       </header>
 
-      {runtime.data?.mode === "sandbox" && overview.data ? (
+      {runtime.data?.mode === "sandbox" && overview.data && incidents.data ? (
         <>
           <SandboxIntroDialog
-            blocked={triggerOutcomeUnknown}
-            error={mutationError}
+            blocked={triggerOutcomeUnknown || resetOutcomeUnknown}
+            error={stage === "reviewed" ? resetError : triggerError}
             onOpenChange={(open) => {
               if (!open) closeGuide();
             }}
+            onRestart={restartWalkthrough}
             onStart={startIncident}
             open={search.guide === true}
-            pending={triggerIncident.isPending}
+            pending={triggerIncident.isPending || resetSandbox.isPending}
+            state={
+              stage === "reviewed" ? "complete" : overview.data.openIncident ? "active" : "baseline"
+            }
           />
           <InvestigationGuide
             action={
-              <Button
-                disabled={triggerIncident.isPending || triggerOutcomeUnknown}
-                onClick={startIncident}
-                tone="primary"
-              >
-                {triggerIncident.isPending ? "Starting incident" : "Start incident"}
-              </Button>
+              stage === "baseline" ? (
+                <Button
+                  disabled={triggerIncident.isPending || triggerOutcomeUnknown}
+                  onClick={startIncident}
+                  tone="primary"
+                >
+                  {triggerIncident.isPending ? "Starting incident" : "Start incident"}
+                </Button>
+              ) : stage === "diagnosed" && overview.data.openIncident ? (
+                <Button
+                  render={
+                    <Link
+                      params={{ incidentId: overview.data.openIncident.id }}
+                      to="/incidents/$incidentId"
+                    />
+                  }
+                  tone="secondary"
+                >
+                  Review investigation
+                </Button>
+              ) : stage === "reviewed" ? (
+                <Button
+                  disabled={resetSandbox.isPending || resetOutcomeUnknown}
+                  onClick={restartWalkthrough}
+                  tone="secondary"
+                >
+                  {resetSandbox.isPending ? "Restarting walkthrough" : "Restart walkthrough"}
+                </Button>
+              ) : null
             }
+            agentUnavailable={toolStatus === "failed" || toolStatus === "unsupported"}
             onOpenGuide={() => void navigate({ search: { guide: true } })}
-            prompt={investigationPrompt}
+            prompt={investigationPrompts[stage]}
             stage={stage}
           />
-          {search.guide ? null : mutationError}
+          {search.guide ? null : stage === "reviewed" ? resetError : triggerError}
         </>
       ) : null}
 
@@ -137,13 +221,15 @@ export function BoardPage() {
       {board.data && dependencyFailure ? (
         <BoardContextNotice
           catalog={catalogState}
-          error={catalog.error ?? overview.error}
+          error={catalog.error ?? overview.error ?? incidents.error}
+          incidentHistory={incidentHistoryState}
           onRetry={() => {
             if (catalog.isError) void catalog.refetch();
             if (overview.isError) void overview.refetch();
+            if (incidents.isError) void incidents.refetch();
           }}
           overview={overviewState}
-          retrying={catalog.isFetching || overview.isFetching}
+          retrying={catalog.isFetching || overview.isFetching || incidents.isFetching}
         />
       ) : null}
       {board.data?.panels.length === 0 ? (
@@ -164,7 +250,7 @@ export function BoardPage() {
           {board.data.panels.map((panel) => (
             <LivePanel
               catalog={catalog.data ?? []}
-              fullWidth={panel.spec._tag === "metric-chart"}
+              fullWidth={panel.spec._tag === "metric-chart" && chartNeedsFullWidth(panel.spec)}
               key={panel.metadata.id}
               panel={panel}
             />
@@ -178,12 +264,14 @@ export function BoardPage() {
 function BoardContextNotice({
   catalog,
   error,
+  incidentHistory,
   onRetry,
   overview,
   retrying,
 }: {
   catalog: BoardDependencyState;
   error: unknown;
+  incidentHistory: BoardDependencyState;
   onRetry: () => void;
   overview: BoardDependencyState;
   retrying: boolean;
@@ -191,7 +279,7 @@ function BoardContextNotice({
   return (
     <aside aria-live="polite" role="status" {...stylex.props(styles.contextNotice)}>
       <span {...stylex.props(styles.contextNoticeCopy)}>
-        {boardContextMessage({ catalog, overview })}
+        {boardContextMessage({ catalog, incidentHistory, overview })}
       </span>
       <ConsoleFailureActions
         compact

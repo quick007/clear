@@ -5,7 +5,7 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { colors, space } from "../../theme/tokens.stylex";
 import { SelectControl, type SelectOption } from "../../ui/select";
 
-const tabs = [
+const signalTabs = [
   { label: "Metrics", signal: "metrics" },
   { label: "Logs", signal: "logs" },
   { label: "Traces", signal: "traces" },
@@ -22,58 +22,150 @@ const windowOptions = [
 export function ExploreNavigation({ services }: { services: ReadonlyArray<{ name: string }> }) {
   const search = useSearch({ from: "/explore" });
   const navigate = useNavigate({ from: "/explore" });
-  const serviceOptions = [
-    { label: "All services", value: "*" },
-    ...services.map((service) => ({ label: service.name, value: String(service.name) })),
-  ];
 
   return (
     <div {...stylex.props(styles.navigationWrap)}>
-      <nav aria-label="Telemetry signals" {...stylex.props(styles.signalNav)}>
-        {tabs.map((tab) => (
-          <Link
-            aria-current={search.signal === tab.signal ? "page" : undefined}
-            key={tab.signal}
-            search={{ ...search, signal: tab.signal }}
-            to="/explore"
-            {...stylex.props(
-              styles.signalLink,
-              search.signal === tab.signal && styles.signalLinkActive,
-            )}
-          >
-            {tab.label}
-          </Link>
-        ))}
-      </nav>
-      <div {...stylex.props(styles.contextControls)}>
-        {services.length > 1 ? (
-          <span {...stylex.props(styles.serviceControl)}>
-            <SelectControl
-              ariaLabel="Filter by service"
-              onChange={(service) =>
-                void navigate({
-                  search: (current) => ({
-                    ...current,
-                    service: service === "*" ? undefined : service,
-                  }),
-                })
-              }
-              options={serviceOptions}
-              placeholder="All services"
-              value={search.service ?? "*"}
-            />
-          </span>
-        ) : null}
-        <span {...stylex.props(styles.windowControl)}>
+      <ExploreTabs
+        active={search.signal}
+        metric={search.metric}
+        query={search.query}
+        service={search.service}
+        window={search.window}
+      />
+      <ContextControls
+        onServiceChange={(service) =>
+          void navigate({
+            search: (current) => ({
+              ...current,
+              service: service === "*" ? undefined : service,
+            }),
+          })
+        }
+        onWindowChange={(window) =>
+          void navigate({ search: (current) => ({ ...current, window }) })
+        }
+        service={search.service}
+        services={services}
+        window={search.window}
+      />
+    </div>
+  );
+}
+
+export function ChangesNavigation({ services }: { services: ReadonlyArray<{ name: string }> }) {
+  const search = useSearch({ from: "/deploys" });
+  const navigate = useNavigate({ from: "/deploys" });
+
+  return (
+    <div {...stylex.props(styles.navigationWrap)}>
+      <ExploreTabs active="changes" service={search.service} window={search.window} />
+      <ContextControls
+        onServiceChange={(service) =>
+          void navigate({
+            search: (current) => ({
+              ...current,
+              service: service === "*" ? undefined : service,
+            }),
+          })
+        }
+        onWindowChange={(window) =>
+          void navigate({ search: (current) => ({ ...current, window }) })
+        }
+        service={search.service}
+        services={services}
+        window={search.window}
+      />
+    </div>
+  );
+}
+
+function ExploreTabs({
+  active,
+  metric,
+  query,
+  service,
+  window,
+}: {
+  active: "changes" | "logs" | "metrics" | "traces";
+  metric?: string;
+  query?: string;
+  service?: string;
+  window: TelemetryWindow;
+}) {
+  return (
+    <nav aria-label="Investigation data" {...stylex.props(styles.signalNav)}>
+      {signalTabs.map((tab) => (
+        <Link
+          aria-current={active === tab.signal ? "page" : undefined}
+          key={tab.signal}
+          search={{
+            metric: tab.signal === "metrics" ? metric : undefined,
+            query:
+              tab.signal === active && (tab.signal === "logs" || tab.signal === "traces")
+                ? query
+                : undefined,
+            service,
+            signal: tab.signal,
+            window,
+          }}
+          to="/explore"
+          {...stylex.props(styles.signalLink, active === tab.signal && styles.signalLinkActive)}
+        >
+          {tab.label}
+        </Link>
+      ))}
+      <Link
+        aria-current={active === "changes" ? "page" : undefined}
+        search={{ service, window }}
+        to="/deploys"
+        {...stylex.props(styles.signalLink, active === "changes" && styles.signalLinkActive)}
+      >
+        Deploys
+      </Link>
+    </nav>
+  );
+}
+
+function ContextControls({
+  onServiceChange,
+  onWindowChange,
+  service,
+  services,
+  window,
+}: {
+  onServiceChange: (service: string) => void;
+  onWindowChange: (window: TelemetryWindow) => void;
+  service?: string;
+  services: ReadonlyArray<{ name: string }>;
+  window: TelemetryWindow;
+}) {
+  const serviceOptions = [
+    { label: "All services", value: "*" },
+    ...services.map((item) => ({ label: item.name, value: String(item.name) })),
+  ];
+
+  return (
+    <div {...stylex.props(styles.contextControls)}>
+      {services.length > 1 ? (
+        <span {...stylex.props(styles.serviceControl)}>
           <SelectControl
-            ariaLabel="Select time range"
-            onChange={(window) => void navigate({ search: (current) => ({ ...current, window }) })}
-            options={windowOptions}
-            placeholder="Last hour"
-            value={search.window}
+            ariaLabel="Filter by service"
+            onChange={onServiceChange}
+            options={serviceOptions}
+            placeholder="All services"
+            value={service ?? "*"}
           />
         </span>
-      </div>
+      ) : null}
+      <span {...stylex.props(styles.windowControl)}>
+        <SelectControl
+          ariaLabel="Select time range"
+          onChange={onWindowChange}
+          options={windowOptions}
+          placeholder="Last hour"
+          value={window}
+        />
+      </span>
     </div>
   );
 }

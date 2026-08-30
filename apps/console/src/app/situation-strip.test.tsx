@@ -46,6 +46,28 @@ describe("HypothesisList", () => {
 });
 
 describe("SituationStrip", () => {
+  it("does not report zero firing alerts for a manual investigation", () => {
+    const incidentDetail = new IncidentDetail({
+      incident: Schema.decodeUnknownSync(Incident)({
+        id: incidentId,
+        projectId,
+        title: "Checkout behavior needs investigation",
+        status: "open",
+        summary: null,
+        openedAt: "2026-08-28T06:00:00.000Z",
+        closedAt: null,
+        createdAt: "2026-08-28T06:00:00.000Z",
+        updatedAt: "2026-08-28T06:00:00.000Z",
+      }),
+      hypotheses: [],
+      timeline: [],
+    });
+    const html = renderToStaticMarkup(<SituationStrip incidentDetail={incidentDetail} />);
+
+    expect(html).toContain("Investigation open");
+    expect(html).not.toContain("0 alerts firing");
+  });
+
   it("keeps a resolved incident and its summary visible without an open overview incident", () => {
     const incidentDetail = new IncidentDetail({
       incident: Schema.decodeUnknownSync(Incident)({

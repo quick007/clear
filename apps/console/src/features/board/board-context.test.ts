@@ -4,14 +4,30 @@ import { boardContextMessage } from "./board-context";
 
 describe("board dependency recovery", () => {
   it("makes missing metric units visible instead of silently formatting without them", () => {
-    expect(boardContextMessage({ catalog: "missing", overview: "available" })).toBe(
-      "Metric details could not be loaded. Some values may appear without units.",
-    );
+    expect(
+      boardContextMessage({
+        catalog: "missing",
+        incidentHistory: "available",
+        overview: "available",
+      }),
+    ).toBe("Metric details could not be loaded. Some values may appear without units.");
   });
 
   it("explains which stale dependencies remain visible", () => {
-    expect(boardContextMessage({ catalog: "stale", overview: "stale" })).toBe(
+    expect(
+      boardContextMessage({ catalog: "stale", incidentHistory: "available", overview: "stale" }),
+    ).toBe(
       "Metric details could not be refreshed. Values use the last loaded units where available. Project and incident status use the last loaded data.",
     );
+  });
+
+  it("pauses the walkthrough when incident history is unavailable", () => {
+    expect(
+      boardContextMessage({
+        catalog: "available",
+        incidentHistory: "missing",
+        overview: "available",
+      }),
+    ).toBe("Investigation history could not be loaded, so walkthrough actions are paused.");
   });
 });

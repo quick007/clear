@@ -24,7 +24,8 @@ export function HomePage() {
 
           <h1 {...stylex.props(styles.title)}>Your agent knows the code. Give it the evidence.</h1>
           <p {...stylex.props(styles.description)}>
-            Metrics, logs, traces, and deploys in one live OpenTelemetry workspace for both of you.
+            Metrics, logs, traces, and deploys in one live OpenTelemetry workspace shared by you and
+            the coding agent you already use.
           </p>
 
           <div {...stylex.props(styles.actions)}>
