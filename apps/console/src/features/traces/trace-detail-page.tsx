@@ -10,9 +10,11 @@ import {
 } from "../../data/format";
 import { useRuntimeQuery, useTraceQuery } from "../../data/queries";
 import { colors, radii, space } from "../../theme/tokens.stylex";
+import { ConsoleFailureActions } from "../../ui/console-failure-actions";
 import { CopyButton } from "../../ui/copy-button";
 import { Icon } from "../../ui/icon";
-import { ContentState, Page, PageHeader, RetryButton } from "../../ui/page";
+import { ContentState, Page, PageHeader } from "../../ui/page";
+import { StaleDataNotice } from "../../ui/stale-data-notice";
 import { StatusPill } from "../../ui/status";
 import { traceSpanGeometry } from "./trace-geometry";
 
@@ -21,6 +23,15 @@ export function TraceDetailPage() {
   const runtime = useRuntimeQuery();
   const trace = useTraceQuery(runtime.data?.projectId ?? null, traceId);
   const validTraceId = /^(?!0{32}$)[0-9a-f]{32}$/.test(traceId);
+  const traceLoading = (runtime.isPending && !runtime.data) || (trace.isPending && !trace.data);
+  const traceUnavailable = !runtime.data || !trace.data;
+  const failure = runtime.isError && !runtime.data ? runtime.error : trace.error;
+  const staleFailure = traceUnavailable ? null : (runtime.error ?? trace.error);
+  const retryFailedQueries = () => {
+    if (runtime.isError) void runtime.refetch();
+    if (runtime.isError && !runtime.data) return;
+    if (trace.isError) void trace.refetch();
+  };
 
   if (!validTraceId) {
     return (
@@ -32,7 +43,7 @@ export function TraceDetailPage() {
       </Page>
     );
   }
-  if (!runtime.isError && !trace.isError && (runtime.isPending || trace.isPending)) {
+  if (traceLoading) {
     return (
       <Page>
         <BackLink />
@@ -40,23 +51,26 @@ export function TraceDetailPage() {
       </Page>
     );
   }
-  if (runtime.isError || trace.isError || !trace.data) {
+  if (traceUnavailable) {
     return (
       <Page>
         <BackLink />
         <ContentState
           actions={
-            <RetryButton
-              onRetry={() => {
-                void runtime.refetch();
-                void trace.refetch();
+            <ConsoleFailureActions
+              error={failure}
+              notFound={{
+                href: "/explore?signal=traces&window=1h",
+                label: "Back to traces",
               }}
+              onRetry={retryFailedQueries}
+              returnPath={`/traces/${encodeURIComponent(traceId)}`}
             />
           }
           kind="error"
           title="Trace is unavailable"
         >
-          {errorMessage(runtime.error ?? trace.error)}
+          {errorMessage(failure)}
         </ContentState>
       </Page>
     );
@@ -73,6 +87,17 @@ export function TraceDetailPage() {
   return (
     <Page>
       <BackLink />
+      <StaleDataNotice
+        copy="Showing the last loaded trace."
+        error={staleFailure}
+        notFound={{
+          href: "/explore?signal=traces&window=1h",
+          label: "Back to traces",
+        }}
+        onRetry={retryFailedQueries}
+        retrying={runtime.isFetching || trace.isFetching}
+        returnPath={`/traces/${encodeURIComponent(traceId)}`}
+      />
       <PageHeader
         actions={<CopyButton compact={false} label="Copy link" value={window.location.href} />}
         description={`Trace ${traceId} · started ${formatUnixNanoTime(rootStart)} · ${detail.summary.spanCount} spans across ${detail.summary.services.length} services`}

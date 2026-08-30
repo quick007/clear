@@ -28,6 +28,7 @@ import type {
   SetHypothesisInput,
   UpdatePanelInput,
 } from "./schemas";
+import { NoActiveIncident } from "./failures";
 
 const relativeRange = (window: QueryMetricsInput["window"]) =>
   ({ _tag: "relative", window }) as const;
@@ -61,7 +62,7 @@ export const makeToolOperations = (api: BrowserApiClient, sessions: ToolSessionS
   const projectId = () => sessions.getSnapshot().projectId;
   const incidentId = () => {
     const incident = sessions.getSnapshot().incident;
-    if (incident === null) throw new Error("No incident is currently open");
+    if (incident === null) throw new NoActiveIncident();
     return incident.id;
   };
 
@@ -225,7 +226,7 @@ export const makeToolOperations = (api: BrowserApiClient, sessions: ToolSessionS
         signal,
       );
     },
-    refreshSession: () => sessions.refresh(),
+    refreshSession: (signal?: AbortSignal) => sessions.refresh(signal),
     triggerSandboxIncident: async (signal?: AbortSignal) => {
       const result = await api.run(api.client.sandbox.triggerIncident({}), signal);
       await sessions.refresh(signal);

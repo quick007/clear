@@ -1,12 +1,17 @@
-import { LiveEvent } from "@groundtruth/api-contract";
+import { LiveEvent, StreamFailure } from "@groundtruth/api-contract";
 import { ProjectId } from "@groundtruth/domain";
+import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import { describe, expect, it } from "vite-plus/test";
-import { Schema } from "effect";
+import { Effect, Exit, Schema } from "effect";
 import {
   changesIncidentScope,
+  commitLiveEvent,
   createLiveCursorState,
+  invalidateLiveQueries,
+  isRetryableLiveFailure,
   type LiveCursorStorage,
   reconnectDelay,
+  shouldShowLiveUpdateNotice,
 } from "./live";
 
 const projectId = Schema.decodeUnknownSync(ProjectId)("01890f6e-7c00-7000-8000-000000000001");
@@ -79,5 +84,78 @@ describe("live project cursor", () => {
       500, 1_000, 2_000, 4_000, 8_000, 15_000, 15_000,
     ]);
     expect(reconnectDelay(100)).toBe(15_000);
+  });
+
+  it("keeps transient reconnects out of the product UI", () => {
+    expect(shouldShowLiveUpdateNotice(1)).toBe(false);
+    expect(shouldShowLiveUpdateNotice(2)).toBe(false);
+    expect(shouldShowLiveUpdateNotice(3)).toBe(true);
+  });
+
+  it("honors the stream failure retryability contract", () => {
+    expect(
+      isRetryableLiveFailure(new StreamFailure({ message: "temporary", retryable: true })),
+    ).toBe(true);
+    expect(
+      isRetryableLiveFailure(new StreamFailure({ message: "terminal", retryable: false })),
+    ).toBe(false);
+  });
+
+  it("does not commit an event cursor when an active query refetch fails", async () => {
+    const storage = makeStorage();
+    const cursor = createLiveCursorState(projectId, storage);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+    });
+    let refetchFails = false;
+    const queryOptions = {
+      queryKey: ["groundtruth", String(projectId), "overview"] as const,
+      queryFn: async () => {
+        if (refetchFails) throw new StreamFailure({ message: "refetch failed", retryable: true });
+        return { status: "ready" };
+      },
+    };
+    await queryClient.fetchQuery(queryOptions);
+    const observer = new QueryObserver(queryClient, queryOptions);
+    const unsubscribe = observer.subscribe(() => undefined);
+    refetchFails = true;
+
+    const exit = await Effect.runPromiseExit(
+      commitLiveEvent(productEvent(), {
+        invalidateQueries: () => invalidateLiveQueries(queryClient, projectId),
+        observe: cursor.observe,
+        refreshSession: async () => undefined,
+        updateRuntimeSnapshot: () => undefined,
+      }),
+    );
+
+    expect(Exit.isFailure(exit)).toBe(true);
+    expect(cursor.query()).toEqual({});
+    unsubscribe();
+    queryClient.clear();
+  });
+
+  it("commits heartbeat cursors without refreshing queries", async () => {
+    const cursor = createLiveCursorState(projectId, makeStorage());
+    let invalidations = 0;
+    const heartbeat = decodeEvent({
+      _tag: "Heartbeat",
+      occurredAt: "2026-08-28T08:00:01.000Z",
+      cursor: "43",
+    });
+
+    await Effect.runPromise(
+      commitLiveEvent(heartbeat, {
+        invalidateQueries: async () => {
+          invalidations += 1;
+        },
+        observe: cursor.observe,
+        refreshSession: async () => undefined,
+        updateRuntimeSnapshot: () => undefined,
+      }),
+    );
+
+    expect(cursor.query()).toEqual({ cursor: "43" });
+    expect(invalidations).toBe(0);
   });
 });

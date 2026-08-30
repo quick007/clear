@@ -7,15 +7,40 @@ import { useState } from "react";
 import { errorMessage, formatDuration, formatUnixNanoTime } from "../../data/format";
 import { useRuntimeQuery, useTracesQuery } from "../../data/queries";
 import { colors, radii, space } from "../../theme/tokens.stylex";
-import { Icon } from "../../ui/icon";
 import { Button } from "../../ui/button";
-import { ContentState, Page, PageHeader, RetryButton, SearchField, Toolbar } from "../../ui/page";
+import { ConsoleFailureActions } from "../../ui/console-failure-actions";
+import { Icon } from "../../ui/icon";
+import { ContentState, Page, PageHeader, SearchField, Toolbar } from "../../ui/page";
+import { StaleDataNotice } from "../../ui/stale-data-notice";
 import { StatusDot } from "../../ui/status";
 
-export function TracesPage({ service, window }: { service?: string; window: TelemetryWindow }) {
+export function TracesPage({
+  contextFailure,
+  contextRetrying = false,
+  onRetryContext,
+  service,
+  window,
+}: {
+  contextFailure?: unknown;
+  contextRetrying?: boolean;
+  onRetryContext?: () => void;
+  service?: string;
+  window: TelemetryWindow;
+}) {
   const [search, setSearch] = useState("");
   const runtime = useRuntimeQuery();
   const traces = useTracesQuery(runtime.data?.projectId ?? null, search.trim(), window, service);
+  const tracesUnavailable = (runtime.isError && !runtime.data) || (traces.isError && !traces.data);
+  const failure = runtime.isError && !runtime.data ? runtime.error : traces.error;
+  const returnPath = `/explore?signal=traces&window=${window}${service ? `&service=${encodeURIComponent(service)}` : ""}`;
+  const staleFailure =
+    tracesUnavailable || !traces.data ? null : (runtime.error ?? traces.error ?? contextFailure);
+  const retryFailedQueries = () => {
+    if (runtime.isError) void runtime.refetch();
+    if (runtime.isError && !runtime.data) return;
+    if (traces.isError) void traces.refetch();
+    if (contextFailure !== null && contextFailure !== undefined) onRetryContext?.();
+  };
 
   return (
     <Page>
@@ -32,25 +57,38 @@ export function TracesPage({ service, window }: { service?: string; window: Tele
         />
       </Toolbar>
 
-      {!runtime.isError && !traces.isError && (runtime.isPending || traces.isPending) ? (
+      {!tracesUnavailable && !traces.data && (runtime.isPending || traces.isPending) ? (
         <ContentState kind="loading" title="Loading traces" />
       ) : null}
-      {runtime.isError || traces.isError ? (
+      {tracesUnavailable ? (
         <ContentState
           actions={
-            <RetryButton
-              onRetry={() => {
-                void runtime.refetch();
-                void traces.refetch();
+            <ConsoleFailureActions
+              error={failure}
+              invalidRequest={{
+                href: "/explore?signal=traces&window=1h",
+                label: "Clear filters",
               }}
+              notFound={{ href: "/connect", label: "Open connection setup" }}
+              onRetry={retryFailedQueries}
+              returnPath={returnPath}
             />
           }
           kind="error"
           title="Traces are unavailable"
         >
-          {errorMessage(runtime.error ?? traces.error)}
+          {errorMessage(failure)}
         </ContentState>
       ) : null}
+      <StaleDataNotice
+        copy="Some trace data or service context may be out of date."
+        error={staleFailure}
+        invalidRequest={{ href: "/explore?signal=traces&window=1h", label: "Clear filters" }}
+        notFound={{ href: "/connect", label: "Open connection setup" }}
+        onRetry={retryFailedQueries}
+        retrying={runtime.isFetching || traces.isFetching || contextRetrying}
+        returnPath={returnPath}
+      />
       {traces.data && traces.data.traces.length === 0 ? (
         <ContentState
           actions={

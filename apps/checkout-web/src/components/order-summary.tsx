@@ -1,8 +1,16 @@
 import { MinusSignIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import * as stylex from "@stylexjs/stylex";
-import type { Submission } from "../app";
+import { Effect } from "effect";
+import { useEffect, useState } from "react";
 import productImage from "../assets/ridge-weekender.webp";
+import type { Submission } from "../app";
+import {
+  checkoutFailurePresentation,
+  checkoutRetryAfterSeconds,
+  type CheckoutFailure,
+} from "../checkout-api";
 import { calculateOrder, formatMoney } from "../pricing";
+import { runRetryCountdown } from "../retry-countdown";
 import { colors, radii, space } from "../theme/tokens.stylex";
 import { Button } from "../ui/button";
 import { Icon } from "../ui/icon";
@@ -12,16 +20,21 @@ type Order = ReturnType<typeof calculateOrder>;
 export function OrderSummary({
   onPlaceOrder,
   onQuantityChange,
+  onReload,
   order,
   quantity,
   submission,
 }: {
   onPlaceOrder: () => void;
   onQuantityChange: (quantity: number) => void;
+  onReload: () => void;
   order: Order;
   quantity: number;
   submission: Exclude<Submission, { status: "success" }>;
 }) {
+  const failure =
+    submission.status === "error" ? checkoutFailurePresentation(submission.error) : undefined;
+
   return (
     <aside aria-label="Order summary" {...stylex.props(styles.summary)}>
       <h2 {...stylex.props(styles.summaryTitle)}>Order summary</h2>
@@ -39,7 +52,11 @@ export function OrderSummary({
             <p {...stylex.props(styles.variant)}>Graphite · 32 L</p>
           </div>
           <span {...stylex.props(styles.price)}>{formatMoney(14_800)}</span>
-          <Quantity value={quantity} onChange={onQuantityChange} />
+          <Quantity
+            disabled={submission.status === "pending"}
+            value={quantity}
+            onChange={onQuantityChange}
+          />
         </div>
       </div>
       <dl {...stylex.props(styles.totals)}>
@@ -48,40 +65,124 @@ export function OrderSummary({
         <Total label="Estimated tax" value={formatMoney(order.taxCents)} />
         <Total emphasis label="Total" value={formatMoney(order.totalCents)} />
       </dl>
-      {submission.status === "error" ? (
+      {failure === undefined ? null : (
         <div role="alert" {...stylex.props(styles.error)}>
-          <strong>Order not placed</strong>
-          <span>{submission.error.message}</span>
+          <strong>{failure.title}</strong>
+          <span>{failure.detail}</span>
         </div>
-      ) : null}
-      <Button
-        aria-describedby="request-status"
-        disabled={submission.status === "pending"}
-        kind="primary"
-        onClick={onPlaceOrder}
-        wide
-      >
-        {submission.status === "pending"
-          ? "Placing order…"
-          : `Place order · ${formatMoney(order.totalCents)}`}
-      </Button>
-      <p aria-live="polite" id="request-status" {...stylex.props(styles.requestStatus)}>
-        {submission.status === "pending"
-          ? "Confirming your order."
-          : submission.status === "error"
-            ? "Your order is not confirmed. Try again when ready."
-            : "Review your order, then place it when ready."}
-      </p>
+      )}
+      {submission.status === "error" ? (
+        <FailureAction failure={submission.error} onReload={onReload} onRetry={onPlaceOrder} />
+      ) : (
+        <>
+          <Button
+            aria-describedby="request-status"
+            disabled={submission.status === "pending"}
+            kind="primary"
+            onClick={onPlaceOrder}
+            wide
+          >
+            {submission.status === "pending"
+              ? "Placing order…"
+              : `Place order · ${formatMoney(order.totalCents)}`}
+          </Button>
+          <p aria-live="polite" id="request-status" {...stylex.props(styles.requestStatus)}>
+            {submission.status === "pending"
+              ? "Confirming your order."
+              : "Review your order, then place it when ready."}
+          </p>
+        </>
+      )}
     </aside>
   );
 }
 
-function Quantity({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+function FailureAction({
+  failure,
+  onReload,
+  onRetry,
+}: {
+  failure: CheckoutFailure;
+  onReload: () => void;
+  onRetry: () => void;
+}) {
+  const presentation = checkoutFailurePresentation(failure);
+
+  if (presentation.recovery === "reload") {
+    return (
+      <>
+        <Button aria-describedby="request-status" kind="primary" onClick={onReload} wide>
+          {presentation.actionLabel}
+        </Button>
+        <p aria-live="polite" id="request-status" {...stylex.props(styles.requestStatus)}>
+          Your order is not confirmed. Reload checkout to continue.
+        </p>
+      </>
+    );
+  }
+
+  if (presentation.recovery === "none") return null;
+
+  return <RetryAction failure={failure} label={presentation.actionLabel} onRetry={onRetry} />;
+}
+
+function RetryAction({
+  failure,
+  label,
+  onRetry,
+}: {
+  failure: CheckoutFailure;
+  label: string;
+  onRetry: () => void;
+}) {
+  const retryAfter = checkoutRetryAfterSeconds(failure) ?? 0;
+  const [remaining, setRemaining] = useState(retryAfter);
+
+  useEffect(() => {
+    if (retryAfter === 0) return;
+    const fiber = Effect.runFork(runRetryCountdown(retryAfter, setRemaining));
+    return () => fiber.interruptUnsafe();
+  }, [retryAfter]);
+
+  const waiting = remaining > 0;
+  const retryLabel = waiting
+    ? `Try again in ${remaining} second${remaining === 1 ? "" : "s"}`
+    : label;
+
+  return (
+    <>
+      <Button
+        aria-describedby="request-status"
+        disabled={waiting}
+        kind="primary"
+        onClick={onRetry}
+        wide
+      >
+        {retryLabel}
+      </Button>
+      <p aria-live="polite" id="request-status" {...stylex.props(styles.requestStatus)}>
+        {waiting
+          ? "Your order is not confirmed. Please wait before trying again."
+          : "Your order is not confirmed. You can try again now."}
+      </p>
+    </>
+  );
+}
+
+function Quantity({
+  disabled,
+  value,
+  onChange,
+}: {
+  disabled: boolean;
+  value: number;
+  onChange: (value: number) => void;
+}) {
   return (
     <div aria-label="Quantity" {...stylex.props(styles.quantity)}>
       <button
         aria-label="Decrease quantity"
-        disabled={value === 1}
+        disabled={disabled || value === 1}
         onClick={() => onChange(value - 1)}
         type="button"
         {...stylex.props(styles.quantityButton)}
@@ -93,7 +194,7 @@ function Quantity({ value, onChange }: { value: number; onChange: (value: number
       </output>
       <button
         aria-label="Increase quantity"
-        disabled={value === 4}
+        disabled={disabled || value === 4}
         onClick={() => onChange(value + 1)}
         type="button"
         {...stylex.props(styles.quantityButton)}

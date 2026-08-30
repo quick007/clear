@@ -9,7 +9,12 @@ import { MetricSeriesPoint } from "@groundtruth/telemetry";
 import { DateTime, Schema } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
-import { buildPanelPlans, type PanelSeries } from "../../data/panels";
+import {
+  buildPanelPlans,
+  findMissingPanelQueries,
+  panelQueryDiagnosis,
+  type PanelSeries,
+} from "../../data/panels";
 import { buildMetricChartOption } from "../overview/metric-chart-options";
 import { buildChartLegend } from "./panel-legend";
 import { buildPanelTableRows, tableCellValue } from "./panel-table";
@@ -38,6 +43,24 @@ const series = ({
 });
 
 describe("panel query and chart rendering", () => {
+  it("distinguishes a full stale result from an incomplete multi-query panel", () => {
+    const plans = buildPanelPlans(RequestsVsUsersPanel.queries).plans;
+    const offline = new Error("offline");
+
+    expect(
+      findMissingPanelQueries(plans, [
+        { data: {}, error: null },
+        { data: undefined, error: offline },
+      ]),
+    ).toEqual([{ label: "Unique users", queryRef: RequestsVsUsersPanel.queries[1]!.refId }]);
+    expect(
+      findMissingPanelQueries(plans, [
+        { data: {}, error: null },
+        { data: {}, error: offline },
+      ]),
+    ).toEqual([]);
+  });
+
   it("keeps the seeded upstream pressure panel on supported exact-match semantics", () => {
     const planning = buildPanelPlans(UpstreamPressurePanel.queries);
     expect(planning.error).toBeNull();
@@ -188,7 +211,16 @@ describe("panel query and chart rendering", () => {
       version: 1,
       visualization: "line",
     });
-    expect(buildPanelPlans(panel.queries).error?.message).toContain("range filters");
+    const issue = buildPanelPlans(panel.queries).error;
+    expect(issue).toMatchObject({
+      _tag: "UnsupportedPanelQuery",
+      diagnosis: "numeric range filters are not available yet",
+      queryRef: "A",
+    });
+    expect(issue).toBeDefined();
+    expect(panelQueryDiagnosis(issue!)).toBe(
+      "Panel query A needs an update: numeric range filters are not available yet.",
+    );
   });
 });
 

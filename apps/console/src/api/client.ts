@@ -3,6 +3,7 @@ import { Effect, Layer } from "effect";
 import { FetchHttpClient, HttpClientRequest } from "effect/unstable/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/unstable/httpapi";
 import { getConsoleConfig } from "../config";
+import { normalizeConsoleEffect } from "../errors";
 
 export type GroundtruthClient = HttpApiClient.ForApi<typeof GroundtruthApi>;
 
@@ -75,11 +76,18 @@ export const makeBrowserApiClient = async (
   const requestInitLayer = Layer.succeed(FetchHttpClient.RequestInit, {
     credentials: "include",
   });
+  const baseUrl =
+    options.baseUrl ??
+    (await Effect.runPromise(
+      Effect.sync(() => getConsoleConfig().apiOrigin).pipe(
+        normalizeConsoleEffect("Console configuration failed"),
+      ),
+    ));
 
   const client = await Effect.runPromise(
     HttpApiClient.make(GroundtruthApi, {
-      baseUrl: options.baseUrl ?? getConsoleConfig().apiOrigin,
-    }).pipe(Effect.provide(clientLayer)),
+      baseUrl,
+    }).pipe(normalizeConsoleEffect("API client setup failed"), Effect.provide(clientLayer)),
   );
 
   return {
@@ -92,6 +100,9 @@ export const makeBrowserApiClient = async (
       },
     },
     run: (effect, signal) =>
-      Effect.runPromise(effect.pipe(Effect.provide(requestInitLayer)), { signal }),
+      Effect.runPromise(
+        effect.pipe(normalizeConsoleEffect("API request failed"), Effect.provide(requestInitLayer)),
+        { signal },
+      ),
   };
 };

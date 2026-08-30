@@ -4,7 +4,7 @@ import { HttpRouter } from "effect/unstable/http";
 import { CheckoutService } from "./checkout-service.js";
 import { CheckoutConfig } from "./config.js";
 import { CheckoutResponse } from "./contracts.js";
-import { PaymentUnavailable } from "./errors.js";
+import { CheckoutConflict, PaymentUnavailable } from "./errors.js";
 import { Routes } from "./routes.js";
 
 const checkoutOrigin = "https://checkout.clear.test";
@@ -115,6 +115,33 @@ describe("checkout routes", () => {
           assert.strictEqual(unavailable.status, 503);
         }),
       ),
+    );
+  });
+
+  it.effect("returns a conflict when a request id is reused for another order", () => {
+    const ConflictService = CheckoutService.of({
+      checkout: (checkoutRequest) =>
+        Effect.fail(new CheckoutConflict({ requestId: checkoutRequest.requestId })),
+    });
+
+    return withHandler(ConflictService, (handler) =>
+      Effect.gen(function* () {
+        const response = yield* Effect.promise(() =>
+          handler(
+            new Request(checkoutUrl, {
+              body: JSON.stringify(validRequest),
+              headers: { "content-type": "application/json", origin: checkoutOrigin },
+              method: "POST",
+            }),
+          ),
+        );
+
+        assert.strictEqual(response.status, 409);
+        assert.deepStrictEqual(yield* Effect.promise(() => response.json()), {
+          code: "invalid_request",
+          message: "This checkout request was already used for a different order",
+        });
+      }),
     );
   });
 

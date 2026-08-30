@@ -1,6 +1,18 @@
 import * as stylex from "@stylexjs/stylex";
+import { Effect, Exit } from "effect";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createCheckout, type CheckoutFailure } from "./checkout-api";
+import {
+  CheckoutClientFailure,
+  CheckoutServerFailure,
+  createCheckout,
+  type CheckoutFailure,
+} from "./checkout-api";
+import {
+  claimCheckout,
+  nextCheckoutAttempt,
+  releaseCheckout,
+  type CheckoutAttempt,
+} from "./checkout-attempt";
 import { CheckoutDetails } from "./components/checkout-details";
 import { Confirmation } from "./components/confirmation";
 import { OrderSummary } from "./components/order-summary";
@@ -26,34 +38,81 @@ export function App() {
   const [quantity, setQuantity] = useState(1);
   const [submission, setSubmission] = useState<Submission>({ status: "idle" });
   const abortRef = useRef<AbortController | null>(null);
+  const attemptRef = useRef<CheckoutAttempt | null>(null);
+  const inFlightRef = useRef(false);
+  const isMountedRef = useRef(true);
   const order = useMemo(() => calculateOrder(quantity), [quantity]);
 
-  useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      abortRef.current?.abort();
+    };
+  }, []);
 
-  const placeOrder = async () => {
-    if (submission.status === "pending") return;
+  const placeOrder = () => {
+    if (submission.status === "pending" || !claimCheckout(inFlightRef)) return;
     const controller = new AbortController();
     abortRef.current = controller;
     setSubmission({ status: "pending" });
-    try {
-      const result = await createCheckout({
-        amountCents: order.totalCents,
-        itemCount: quantity,
-        signal: controller.signal,
-        userId: getUserId(),
+    const checkout = Effect.gen(function* () {
+      const attempt = yield* Effect.try({
+        try: () =>
+          nextCheckoutAttempt(attemptRef.current, {
+            amountCents: order.totalCents,
+            itemCount: quantity,
+          }),
+        catch: () => new CheckoutClientFailure(),
       });
-      setSubmission({ authorizationId: result.authorizationId, status: "success" });
-    } catch (cause) {
-      if (controller.signal.aborted) return;
-      const error =
-        typeof cause === "object" && cause !== null && "code" in cause && "message" in cause
-          ? (cause as CheckoutFailure)
-          : ({
-              code: "request_failed",
-              message: "We could not place the order right now.",
-            } as const);
-      setSubmission({ error, status: "error" });
-    }
+      yield* Effect.sync(() => {
+        attemptRef.current = attempt;
+      });
+      const userId = yield* Effect.try({
+        try: getUserId,
+        catch: () => new CheckoutClientFailure(),
+      });
+      return yield* createCheckout({
+        amountCents: attempt.amountCents,
+        itemCount: attempt.itemCount,
+        requestId: attempt.requestId,
+        signal: controller.signal,
+        userId,
+      });
+    }).pipe(
+      Effect.match({
+        onFailure: (error) =>
+          error._tag === "CheckoutCancelled"
+            ? { _tag: "CheckoutCancelled" as const }
+            : { _tag: "CheckoutFailure" as const, error },
+        onSuccess: (result) => ({ _tag: "CheckoutSuccess" as const, result }),
+      }),
+    );
+
+    void Effect.runPromiseExit(checkout).then(
+      Exit.match({
+        onFailure: () => {
+          if (!isMountedRef.current || abortRef.current !== controller) return;
+          abortRef.current = null;
+          releaseCheckout(inFlightRef);
+          setSubmission({ error: new CheckoutServerFailure(), status: "error" });
+        },
+        onSuccess: (outcome) => {
+          if (!isMountedRef.current || abortRef.current !== controller) return;
+          abortRef.current = null;
+          releaseCheckout(inFlightRef);
+
+          if (outcome._tag === "CheckoutCancelled") {
+            setSubmission({ status: "idle" });
+          } else if (outcome._tag === "CheckoutFailure") {
+            setSubmission({ error: outcome.error, status: "error" });
+          } else {
+            attemptRef.current = null;
+            setSubmission({ authorizationId: outcome.result.authorizationId, status: "success" });
+          }
+        },
+      }),
+    );
   };
 
   if (submission.status === "success") {
@@ -68,6 +127,7 @@ export function App() {
         <OrderSummary
           onPlaceOrder={placeOrder}
           onQuantityChange={setQuantity}
+          onReload={() => window.location.reload()}
           order={order}
           quantity={quantity}
           submission={submission}

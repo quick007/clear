@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-router";
 
 import { AppShell } from "./app/app-shell";
+import { NotFoundSurface, RouteErrorSurface } from "./app/app-error-boundary";
 
 const exploreWindow = (value: unknown): TelemetryWindow => {
   if (value === "15m" || value === "6h" || value === "24h" || value === "7d") return value;
@@ -46,7 +47,11 @@ const ProjectSettingsPage = lazyRouteComponent(
   "ProjectSettingsPage",
 );
 
-const rootRoute = createRootRoute({ component: AppShell });
+const rootRoute = createRootRoute({
+  component: AppShell,
+  errorComponent: RouteErrorSurface,
+  notFoundComponent: NotFoundSurface,
+});
 
 const indexRoute = createRoute({
   component: HomePage,

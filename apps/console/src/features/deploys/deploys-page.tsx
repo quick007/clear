@@ -5,14 +5,26 @@ import { Link } from "@tanstack/react-router";
 import { errorMessage, formatClockTime } from "../../data/format";
 import { useDeploysQuery, useRuntimeQuery } from "../../data/queries";
 import { colors, radii, space } from "../../theme/tokens.stylex";
-import { Icon } from "../../ui/icon";
 import { Button } from "../../ui/button";
-import { ContentState, Page, PageHeader, RetryButton } from "../../ui/page";
+import { ConsoleFailureActions } from "../../ui/console-failure-actions";
+import { Icon } from "../../ui/icon";
+import { ContentState, Page, PageHeader } from "../../ui/page";
+import { StaleDataNotice } from "../../ui/stale-data-notice";
 import { StatusPill } from "../../ui/status";
 
 export function DeploysPage() {
   const runtime = useRuntimeQuery();
   const deploys = useDeploysQuery(runtime.data?.projectId ?? null);
+  const deploysUnavailable =
+    (runtime.isError && !runtime.data) || (deploys.isError && !deploys.data);
+  const failure = runtime.isError && !runtime.data ? runtime.error : deploys.error;
+  const staleFailure =
+    deploysUnavailable || !deploys.data ? null : (runtime.error ?? deploys.error);
+  const retryFailedQueries = () => {
+    if (runtime.isError) void runtime.refetch();
+    if (runtime.isError && !runtime.data) return;
+    if (deploys.isError) void deploys.refetch();
+  };
 
   return (
     <Page>
@@ -20,25 +32,33 @@ export function DeploysPage() {
         description="Inbound deploy events annotate panels for the affected service."
         title="Deploy events"
       />
-      {!runtime.isError && !deploys.isError && (runtime.isPending || deploys.isPending) ? (
+      {!deploysUnavailable && !deploys.data && (runtime.isPending || deploys.isPending) ? (
         <ContentState kind="loading" title="Loading deploy events" />
       ) : null}
-      {runtime.isError || deploys.isError ? (
+      {deploysUnavailable ? (
         <ContentState
           actions={
-            <RetryButton
-              onRetry={() => {
-                void runtime.refetch();
-                void deploys.refetch();
-              }}
+            <ConsoleFailureActions
+              error={failure}
+              notFound={{ href: "/connect", label: "Open connection setup" }}
+              onRetry={retryFailedQueries}
+              returnPath="/deploys"
             />
           }
           kind="error"
           title="Deploy events are unavailable"
         >
-          {errorMessage(runtime.error ?? deploys.error)}
+          {errorMessage(failure)}
         </ContentState>
       ) : null}
+      <StaleDataNotice
+        copy="Showing the last loaded deploy events."
+        error={staleFailure}
+        notFound={{ href: "/connect", label: "Open connection setup" }}
+        onRetry={retryFailedQueries}
+        retrying={runtime.isFetching || deploys.isFetching}
+        returnPath="/deploys"
+      />
       {deploys.data?.events.length === 0 ? (
         <ContentState
           actions={

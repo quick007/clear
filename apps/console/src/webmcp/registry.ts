@@ -1,6 +1,13 @@
+import { Duration, Effect, Schedule } from "effect";
 import type { ToolSessionSnapshot, ToolSessionSource } from "../api/session-source";
 import type { GroundtruthToolOperations } from "./operations";
 import { makeAlwaysTools } from "./always-tools";
+import {
+  isWebMcpRegistrationFailure,
+  normalizeRegistrationFailure,
+  reportRegistrationFailure,
+  type ToolRegistrationScope,
+} from "./failures";
 import { makeIncidentTools } from "./incident-tools";
 import { makeSandboxTools } from "./sandbox-tools";
 import type { PreparedTool } from "./tool-contract";
@@ -12,21 +19,56 @@ export interface ModelContextTarget {
   ) => Promise<void>;
 }
 
-const registerScope = async (
+const registerScope = (
   modelContext: ModelContextTarget,
   tools: ReadonlyArray<PreparedTool>,
-  controller: AbortController,
+  scope: ToolRegistrationScope,
+  lifecycleSignal: AbortSignal,
 ) => {
-  try {
-    await Promise.all(
-      tools.map((tool) =>
-        modelContext.registerTool(tool.definition(), { signal: controller.signal }),
-      ),
+  const registrationRetryDelay = 200; // 200 milliseconds
+  const registrationRetryCount = 4;
+  const retrySchedule = Schedule.exponential(Duration.millis(registrationRetryDelay)).pipe(
+    Schedule.upTo({ times: registrationRetryCount }),
+  );
+
+  const attempt = Effect.suspend(() => {
+    const controller = new AbortController();
+    const abort = () => controller.abort(lifecycleSignal.reason);
+    lifecycleSignal.addEventListener("abort", abort, { once: true });
+    if (lifecycleSignal.aborted) abort();
+
+    return Effect.tryPromise({
+      try: () =>
+        Promise.all(
+          tools.map((tool) =>
+            modelContext.registerTool(tool.definition(controller.signal), {
+              signal: controller.signal,
+            }),
+          ),
+        ),
+      catch: (cause) => normalizeRegistrationFailure(scope, cause),
+    }).pipe(
+      Effect.as(controller),
+      Effect.onError(() => Effect.sync(() => controller.abort())),
+      Effect.ensuring(Effect.sync(() => lifecycleSignal.removeEventListener("abort", abort))),
     );
-  } catch (error) {
-    controller.abort();
-    throw error;
-  }
+  });
+
+  return attempt.pipe(
+    Effect.tapError((failure) =>
+      lifecycleSignal.aborted ? Effect.succeed(undefined) : reportRegistrationFailure(failure),
+    ),
+    Effect.retry({
+      schedule: retrySchedule,
+      while: () => !lifecycleSignal.aborted,
+    }),
+  );
+};
+
+const observeRegistrationFailure = (scope: ToolRegistrationScope, cause: unknown) => {
+  const failure = normalizeRegistrationFailure(scope, cause);
+  Effect.runSync(reportRegistrationFailure(failure));
+  return failure;
 };
 
 export class GroundtruthToolRegistry {
@@ -34,6 +76,7 @@ export class GroundtruthToolRegistry {
   readonly #sessions: ToolSessionSource;
   readonly #operations: GroundtruthToolOperations;
   #sessionController: AbortController | null = null;
+  #lifecycleController: AbortController | null = null;
   #sandboxController: AbortController | null = null;
   #incidentController: AbortController | null = null;
   #incidentId: string | null = null;
@@ -57,19 +100,34 @@ export class GroundtruthToolRegistry {
     const generation = this.#generation + 1;
     this.#generation = generation;
     this.#started = true;
-    const sessionController = new AbortController();
-    this.#sessionController = sessionController;
+    const lifecycleController = new AbortController();
+    this.#lifecycleController = lifecycleController;
     try {
-      await registerScope(this.#modelContext, makeAlwaysTools(this.#operations), sessionController);
-      if (!this.#isActive(generation)) return;
+      const sessionController = await Effect.runPromise(
+        registerScope(
+          this.#modelContext,
+          makeAlwaysTools(this.#operations),
+          "session",
+          lifecycleController.signal,
+        ),
+      );
+      if (!this.#isActive(generation)) {
+        sessionController.abort();
+        return;
+      }
+      this.#sessionController = sessionController;
       this.#unsubscribe = this.#sessions.subscribe((snapshot) => {
         this.#enqueue(snapshot, generation);
       });
       this.#reconciliation = this.#reconcile(this.#sessions.getSnapshot(), generation);
       await this.#reconciliation;
     } catch (error) {
-      if (this.#generation === generation) this.#deactivate();
-      throw error;
+      if (this.#generation !== generation) return;
+      const failure = isWebMcpRegistrationFailure(error)
+        ? error
+        : observeRegistrationFailure("session", error);
+      this.#deactivate();
+      throw failure;
     }
   }
 
@@ -83,6 +141,8 @@ export class GroundtruthToolRegistry {
     this.#started = false;
     this.#unsubscribe?.();
     this.#unsubscribe = null;
+    this.#lifecycleController?.abort();
+    this.#lifecycleController = null;
     this.#sessionController?.abort();
     this.#sessionController = null;
     this.#sandboxController?.abort();
@@ -99,18 +159,40 @@ export class GroundtruthToolRegistry {
   #enqueue(snapshot: ToolSessionSnapshot, generation: number) {
     const reconcile = () => this.#reconcile(snapshot, generation);
     this.#reconciliation = this.#reconciliation.then(reconcile, reconcile).catch((error) => {
-      if (this.#isActive(generation)) {
-        console.warn("Clear site tool scope could not update", error);
+      if (this.#isActive(generation) && !isWebMcpRegistrationFailure(error)) {
+        observeRegistrationFailure("reconciliation", error);
       }
     });
   }
 
+  #snapshotIsCurrent(snapshot: ToolSessionSnapshot) {
+    const current = this.#sessions.getSnapshot();
+    return (
+      current.projectId === snapshot.projectId &&
+      current.mode === snapshot.mode &&
+      current.incident?.id === snapshot.incident?.id
+    );
+  }
+
   async #reconcile(snapshot: ToolSessionSnapshot, generation: number) {
-    if (!this.#isActive(generation)) return;
+    const lifecycleController = this.#lifecycleController;
+    if (
+      !this.#isActive(generation) ||
+      lifecycleController === null ||
+      !this.#snapshotIsCurrent(snapshot)
+    ) {
+      return;
+    }
     if (snapshot.mode === "sandbox" && this.#sandboxController === null) {
-      const controller = new AbortController();
-      await registerScope(this.#modelContext, makeSandboxTools(this.#operations), controller);
-      if (!this.#isActive(generation)) {
+      const controller = await Effect.runPromise(
+        registerScope(
+          this.#modelContext,
+          makeSandboxTools(this.#operations),
+          "sandbox",
+          lifecycleController.signal,
+        ),
+      );
+      if (!this.#isActive(generation) || !this.#snapshotIsCurrent(snapshot)) {
         controller.abort();
         return;
       }
@@ -128,9 +210,15 @@ export class GroundtruthToolRegistry {
     this.#incidentId = null;
 
     if (nextIncidentId !== null) {
-      const controller = new AbortController();
-      await registerScope(this.#modelContext, makeIncidentTools(this.#operations), controller);
-      if (!this.#isActive(generation)) {
+      const controller = await Effect.runPromise(
+        registerScope(
+          this.#modelContext,
+          makeIncidentTools(this.#operations),
+          "incident",
+          lifecycleController.signal,
+        ),
+      );
+      if (!this.#isActive(generation) || !this.#snapshotIsCurrent(snapshot)) {
         controller.abort();
         return;
       }

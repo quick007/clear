@@ -12,6 +12,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 import { router } from "./router";
+import { shouldRetryConsoleFailure } from "./errors";
 
 if (import.meta.env.DEV) {
   void import("virtual:stylex:runtime");
@@ -20,7 +21,8 @@ if (import.meta.env.DEV) {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: shouldRetryConsoleFailure,
+      retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 2_000), // 2 seconds maximum
       staleTime: 15_000,
     },
   },

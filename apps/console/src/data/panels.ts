@@ -16,6 +16,7 @@ import {
   type TelemetryAttributes,
 } from "@groundtruth/telemetry";
 import { useQueries } from "@tanstack/react-query";
+import { Data } from "effect";
 
 import { colorValues } from "../theme/color-values";
 import { queryKeys } from "./query-keys";
@@ -57,9 +58,26 @@ export type PanelQueryPlan = {
   readonly tone: keyof typeof panelPalette;
 };
 
-export class UnsupportedPanelQuery extends Error {
-  readonly name = "UnsupportedPanelQuery";
-}
+export class UnsupportedPanelQuery extends Data.TaggedError("UnsupportedPanelQuery")<{
+  readonly diagnosis: string;
+  readonly queryRef: QueryRef;
+}> {}
+
+export const panelQueryDiagnosis = (issue: UnsupportedPanelQuery) =>
+  `Panel query ${issue.queryRef} needs an update: ${issue.diagnosis}.`;
+
+export type MissingPanelQuery = Pick<PanelQueryPlan, "label" | "queryRef">;
+
+export const findMissingPanelQueries = (
+  plans: ReadonlyArray<PanelQueryPlan>,
+  snapshots: ReadonlyArray<{ readonly data: unknown; readonly error: unknown }>,
+) =>
+  plans.flatMap((plan, index): ReadonlyArray<MissingPanelQuery> => {
+    const snapshot = snapshots[index];
+    return snapshot?.error !== null && snapshot?.error !== undefined && snapshot.data === undefined
+      ? [{ label: plan.label, queryRef: plan.queryRef }]
+      : [];
+  });
 
 export function usePanelSeries(panel: PanelView) {
   const panelQueries = panel.spec._tag === "stat" ? [panel.spec.query] : panel.spec.queries;
@@ -84,12 +102,31 @@ export function usePanelSeries(panel: PanelView) {
   });
 
   const pending = queries.some((query) => query.isPending);
-  const error = planning.error ?? queries.find((query) => query.error)?.error;
+  const failedQueries = queries.filter((query) => query.isError);
+  const queryError =
+    failedQueries.find((query) => query.data === undefined)?.error ??
+    failedQueries[0]?.error ??
+    null;
+  const missingQueries = findMissingPanelQueries(planning.plans, queries);
   const results = queries.flatMap((query, queryIndex) =>
     query.data ? materializePanelSeries(query.data, planning.plans[queryIndex]!) : [],
   );
   const hints = queries.flatMap((query) => (query.data?.hint ? [query.data.hint] : []));
-  return { error, hints, pending, results };
+  const refetch = () =>
+    Promise.all(
+      (failedQueries.length > 0 ? failedQueries : queries).map((query) => query.refetch()),
+    ).then(() => undefined);
+  return {
+    error: queryError,
+    hints,
+    issue: planning.error,
+    missingQueries,
+    pending,
+    queryCount: planning.plans.length,
+    refetch,
+    retrying: failedQueries.some((query) => query.isFetching),
+    results,
+  };
 }
 
 export const buildPanelPlans = (queries: ReadonlyArray<ChartQuery | PanelMetricQuery>) => {
@@ -98,7 +135,7 @@ export const buildPanelPlans = (queries: ReadonlyArray<ChartQuery | PanelMetricQ
     const unsupported = unsupportedQueryReason(query);
     if (unsupported !== null) {
       return {
-        error: new UnsupportedPanelQuery(`${query.refId}: ${unsupported}`),
+        error: new UnsupportedPanelQuery({ diagnosis: unsupported, queryRef: query.refId }),
         plans: [] as ReadonlyArray<PanelQueryPlan>,
       };
     }

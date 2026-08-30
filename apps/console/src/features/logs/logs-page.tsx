@@ -7,14 +7,39 @@ import { useState } from "react";
 import { attributesText, errorMessage, formatUnixNanoTime, logBodyText } from "../../data/format";
 import { useLogsQuery, useRuntimeQuery } from "../../data/queries";
 import { colors, radii, space } from "../../theme/tokens.stylex";
-import { Icon } from "../../ui/icon";
 import { Button } from "../../ui/button";
-import { ContentState, Page, PageHeader, RetryButton, SearchField, Toolbar } from "../../ui/page";
+import { ConsoleFailureActions } from "../../ui/console-failure-actions";
+import { Icon } from "../../ui/icon";
+import { ContentState, Page, PageHeader, SearchField, Toolbar } from "../../ui/page";
+import { StaleDataNotice } from "../../ui/stale-data-notice";
 
-export function LogsPage({ service, window }: { service?: string; window: TelemetryWindow }) {
+export function LogsPage({
+  contextFailure,
+  contextRetrying = false,
+  onRetryContext,
+  service,
+  window,
+}: {
+  contextFailure?: unknown;
+  contextRetrying?: boolean;
+  onRetryContext?: () => void;
+  service?: string;
+  window: TelemetryWindow;
+}) {
   const [search, setSearch] = useState("");
   const runtime = useRuntimeQuery();
   const logs = useLogsQuery(runtime.data?.projectId ?? null, search.trim(), window, service);
+  const logsUnavailable = (runtime.isError && !runtime.data) || (logs.isError && !logs.data);
+  const failure = runtime.isError && !runtime.data ? runtime.error : logs.error;
+  const returnPath = `/explore?signal=logs&window=${window}${service ? `&service=${encodeURIComponent(service)}` : ""}`;
+  const staleFailure =
+    logsUnavailable || !logs.data ? null : (runtime.error ?? logs.error ?? contextFailure);
+  const retryFailedQueries = () => {
+    if (runtime.isError) void runtime.refetch();
+    if (runtime.isError && !runtime.data) return;
+    if (logs.isError) void logs.refetch();
+    if (contextFailure !== null && contextFailure !== undefined) onRetryContext?.();
+  };
 
   return (
     <Page>
@@ -31,25 +56,38 @@ export function LogsPage({ service, window }: { service?: string; window: Teleme
         />
       </Toolbar>
 
-      {!runtime.isError && !logs.isError && (runtime.isPending || logs.isPending) ? (
+      {!logsUnavailable && !logs.data && (runtime.isPending || logs.isPending) ? (
         <ContentState kind="loading" title="Loading logs" />
       ) : null}
-      {runtime.isError || logs.isError ? (
+      {logsUnavailable ? (
         <ContentState
           actions={
-            <RetryButton
-              onRetry={() => {
-                void runtime.refetch();
-                void logs.refetch();
+            <ConsoleFailureActions
+              error={failure}
+              invalidRequest={{
+                href: "/explore?signal=logs&window=1h",
+                label: "Clear filters",
               }}
+              notFound={{ href: "/connect", label: "Open connection setup" }}
+              onRetry={retryFailedQueries}
+              returnPath={returnPath}
             />
           }
           kind="error"
           title="Logs are unavailable"
         >
-          {errorMessage(runtime.error ?? logs.error)}
+          {errorMessage(failure)}
         </ContentState>
       ) : null}
+      <StaleDataNotice
+        copy="Some log data or service context may be out of date."
+        error={staleFailure}
+        invalidRequest={{ href: "/explore?signal=logs&window=1h", label: "Clear filters" }}
+        notFound={{ href: "/connect", label: "Open connection setup" }}
+        onRetry={retryFailedQueries}
+        retrying={runtime.isFetching || logs.isFetching || contextRetrying}
+        returnPath={returnPath}
+      />
       {logs.data && logs.data.records.length === 0 ? (
         <ContentState
           actions={

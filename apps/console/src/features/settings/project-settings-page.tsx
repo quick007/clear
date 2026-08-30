@@ -1,7 +1,7 @@
 import { Delete01Icon, Key01Icon } from "@hugeicons/core-free-icons";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { errorMessage, formatRelativeTime } from "../../data/format";
 import {
@@ -11,12 +11,16 @@ import {
   useRevokeIngestKey,
   useRuntimeQuery,
 } from "../../data/queries";
+import { mutationOutcomeIsUnknown } from "../../errors";
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
 import { ConfirmDialog } from "../../ui/confirm-dialog";
+import { ConsoleFailureActions } from "../../ui/console-failure-actions";
 import { CopyButton } from "../../ui/copy-button";
 import { Icon } from "../../ui/icon";
-import { ContentState, Page, PageHeader, RetryButton } from "../../ui/page";
+import { MutationFailureNotice } from "../../ui/mutation-failure-notice";
+import { ContentState, Page, PageHeader } from "../../ui/page";
+import { StaleDataNotice } from "../../ui/stale-data-notice";
 import { StatusPill } from "../../ui/status";
 
 export function ProjectSettingsPage() {
@@ -27,16 +31,27 @@ export function ProjectSettingsPage() {
   const createKey = useCreateIngestKey(projectId!);
   const revokeKey = useRevokeIngestKey(projectId!);
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
+  const [unrecoverableKeyId, setUnrecoverableKeyId] = useState<string | null>(null);
+  const knownKeyIds = useRef<ReadonlySet<string>>(new Set());
   const [keyToRevoke, setKeyToRevoke] = useState<{
     id: typeof revokeKey.variables;
     name: string;
   } | null>(null);
   const pending =
-    !runtime.isError &&
-    !overview.isError &&
-    !keys.isError &&
-    (runtime.isPending || overview.isPending || keys.isPending);
-  const failure = runtime.error ?? overview.error ?? keys.error;
+    (runtime.isPending && !runtime.data) ||
+    (overview.isPending && !overview.data) ||
+    (keys.isPending && !keys.data);
+  const failure = runtime.data ? (overview.error ?? keys.error) : runtime.error;
+  const settingsUnavailable = !runtime.data || !projectId || !overview.data || !keys.data;
+  const staleFailure = settingsUnavailable ? null : (runtime.error ?? overview.error ?? keys.error);
+  const retryFailedQueries = () => {
+    if (runtime.isError) void runtime.refetch();
+    if (runtime.isError && !runtime.data) return;
+    if (overview.isError) void overview.refetch();
+    if (keys.isError) void keys.refetch();
+  };
+  const createKeyOutcomeUnknown = createKey.isError && mutationOutcomeIsUnknown(createKey.error);
+  const revokeKeyOutcomeUnknown = revokeKey.isError && mutationOutcomeIsUnknown(revokeKey.error);
 
   if (pending) {
     return (
@@ -45,17 +60,16 @@ export function ProjectSettingsPage() {
       </Page>
     );
   }
-  if (failure || !runtime.data || !projectId || !overview.data || !keys.data) {
+  if (settingsUnavailable) {
     return (
       <Page>
         <ContentState
           actions={
-            <RetryButton
-              onRetry={() => {
-                void runtime.refetch();
-                void overview.refetch();
-                void keys.refetch();
-              }}
+            <ConsoleFailureActions
+              error={failure}
+              notFound={{ href: "/connect", label: "Open connection setup" }}
+              onRetry={retryFailedQueries}
+              returnPath="/settings/project"
             />
           }
           kind="error"
@@ -82,6 +96,15 @@ export function ProjectSettingsPage() {
         title="Settings"
       />
 
+      <StaleDataNotice
+        copy="Some project settings may be out of date."
+        error={staleFailure}
+        notFound={{ href: "/connect", label: "Open connection setup" }}
+        onRetry={retryFailedQueries}
+        retrying={runtime.isFetching || overview.isFetching || keys.isFetching}
+        returnPath="/settings/project"
+      />
+
       <section {...stylex.props(styles.section)}>
         <header {...stylex.props(styles.sectionHeader)}>
           <span {...stylex.props(styles.sectionIcon)}>
@@ -95,12 +118,14 @@ export function ProjectSettingsPage() {
           </div>
           {!sandbox ? (
             <Button
-              disabled={createKey.isPending || activeKeyCount >= 3}
-              onClick={() =>
+              disabled={createKey.isPending || createKeyOutcomeUnknown || activeKeyCount >= 3}
+              onClick={() => {
+                knownKeyIds.current = new Set(keys.data.items.map((key) => String(key.id)));
+                setUnrecoverableKeyId(null);
                 createKey.mutate(`exporter-${activeKeyCount + 1}`, {
                   onSuccess: (result) => setCreatedSecret(result.key),
-                })
-              }
+                });
+              }}
               tone="secondary"
             >
               {createKey.isPending ? "Creating key" : "Create key"}
@@ -139,7 +164,10 @@ export function ProjectSettingsPage() {
                     <Button
                       compact
                       disabled={revokeKey.isPending && revokeKey.variables === key.id}
-                      onClick={() => setKeyToRevoke({ id: key.id, name: key.name })}
+                      onClick={() => {
+                        revokeKey.reset();
+                        setKeyToRevoke({ id: key.id, name: key.name });
+                      }}
                       tone="danger"
                     >
                       <Icon icon={Delete01Icon} size={14} />
@@ -161,26 +189,83 @@ export function ProjectSettingsPage() {
             <CopyButton label="Copy ingest key" value={createdSecret} />
           </div>
         ) : null}
-        {createKey.isError || revokeKey.isError ? (
-          <p role="alert" {...stylex.props(styles.error)}>
-            {errorMessage(createKey.error ?? revokeKey.error)}
-          </p>
+        {createKey.isError ? (
+          <span {...stylex.props(styles.errorWrap)}>
+            <MutationFailureNotice
+              checkLabel="Check current keys"
+              checking={keys.isFetching}
+              error={createKey.error}
+              message={
+                unrecoverableKeyId
+                  ? "The key was created, but its secret could not be recovered. Revoke the new key before creating a replacement."
+                  : undefined
+              }
+              onCheckState={
+                unrecoverableKeyId
+                  ? undefined
+                  : () => {
+                      void keys.refetch().then((result) => {
+                        if (!result.isSuccess) return;
+                        const createdKey = result.data.items.find(
+                          (key) => !knownKeyIds.current.has(String(key.id)),
+                        );
+                        if (createdKey) {
+                          setUnrecoverableKeyId(String(createdKey.id));
+                          return;
+                        }
+                        createKey.reset();
+                      });
+                    }
+              }
+            />
+          </span>
         ) : null}
       </section>
 
       <ConfirmDialog
+        confirmDisabled={revokeKeyOutcomeUnknown}
         confirmLabel="Revoke ingest key"
         description={
           keyToRevoke
             ? `Exporters using ${keyToRevoke.name} will stop sending telemetry immediately. This cannot be undone.`
             : "This ingest key will stop working immediately."
         }
+        dismissDisabled={revokeKeyOutcomeUnknown}
+        error={
+          revokeKey.isError ? (
+            <MutationFailureNotice
+              checkLabel="Check current keys"
+              checking={keys.isFetching}
+              compact
+              error={revokeKey.error}
+              onCheckState={() => {
+                void keys.refetch().then((result) => {
+                  if (!result.isSuccess) return;
+                  revokeKey.reset();
+                  const current = result.data.items.find((key) => key.id === keyToRevoke?.id);
+                  if (!current || current.status !== "active") setKeyToRevoke(null);
+                });
+              }}
+            />
+          ) : undefined
+        }
         onConfirm={() => {
           if (!keyToRevoke?.id) return;
-          revokeKey.mutate(keyToRevoke.id, { onSuccess: () => setKeyToRevoke(null) });
+          revokeKey.mutate(keyToRevoke.id, {
+            onSuccess: () => {
+              if (String(keyToRevoke.id) === unrecoverableKeyId) {
+                createKey.reset();
+                setUnrecoverableKeyId(null);
+              }
+              setKeyToRevoke(null);
+            },
+          });
         }}
         onOpenChange={(open) => {
-          if (!open && !revokeKey.isPending) setKeyToRevoke(null);
+          if (!open && !revokeKey.isPending) {
+            revokeKey.reset();
+            setKeyToRevoke(null);
+          }
         }}
         open={keyToRevoke !== null}
         pending={revokeKey.isPending}
@@ -269,5 +354,5 @@ const styles = stylex.create({
   secretCopy: { display: "grid", gap: 4, minWidth: 0 },
   secretTitle: { color: colors.green, fontSize: 11, fontWeight: 500 },
   secretValue: { fontSize: 11, overflow: "hidden", textOverflow: "ellipsis" },
-  error: { color: colors.red, fontSize: 11, margin: space.x4 },
+  errorWrap: { display: "block", margin: space.x4 },
 });

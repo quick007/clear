@@ -1,11 +1,10 @@
 import { StartInvestigationRequest } from "@groundtruth/api-contract";
-import type { Alert, ManualAlert } from "@groundtruth/domain";
-import { Delete01Icon, MoreVerticalCircle02Icon } from "@hugeicons/core-free-icons";
+import type { Alert } from "@groundtruth/domain";
 import * as stylex from "@stylexjs/stylex";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { errorMessage, formatRelativeTime } from "../../data/format";
+import { errorMessage } from "../../data/format";
 import {
   useAlertsQuery,
   useDeleteAlertRule,
@@ -14,21 +13,16 @@ import {
   useRuntimeQuery,
   useStartInvestigation,
 } from "../../data/queries";
+import { mutationOutcomeIsUnknown } from "../../errors";
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
 import { ConfirmDialog } from "../../ui/confirm-dialog";
-import { Icon } from "../../ui/icon";
-import { MenuItem, MenuPopup, MenuRoot, MenuTrigger } from "../../ui/menu";
-import { ContentState, Page, PageHeader, RetryButton } from "../../ui/page";
-import { StatusPill } from "../../ui/status";
+import { ConsoleFailureActions } from "../../ui/console-failure-actions";
+import { MutationFailureNotice } from "../../ui/mutation-failure-notice";
+import { ContentState, Page, PageHeader } from "../../ui/page";
+import { StaleDataNotice } from "../../ui/stale-data-notice";
+import { AlertSection, ManualAlertRow, ThresholdAlertRow } from "./alert-list";
 import { ManualAlertDialog } from "./manual-alert-dialog";
-
-const comparisonCopy = {
-  above: ">",
-  "at-or-above": "≥",
-  below: "<",
-  "at-or-below": "≤",
-} as const;
 
 export function AlertsPage() {
   const runtime = useRuntimeQuery();
@@ -40,15 +34,42 @@ export function AlertsPage() {
   const startInvestigation = useStartInvestigation(projectId!);
   const navigate = useNavigate();
   const [alertToDelete, setAlertToDelete] = useState<Alert | null>(null);
+  const runtimeUnavailable = runtime.isError && !runtime.data;
+  const alertsUnavailable = alerts.isError && !alerts.data;
+  const manualAlertsUnavailable = manualAlerts.isError && !manualAlerts.data;
+  const unavailable = runtimeUnavailable || alertsUnavailable || manualAlertsUnavailable;
   const loading =
-    !runtime.isError &&
-    !alerts.isError &&
-    !manualAlerts.isError &&
-    (runtime.isPending || alerts.isPending || manualAlerts.isPending);
-  const error = runtime.error ?? alerts.error ?? manualAlerts.error;
+    !unavailable &&
+    ((runtime.isPending && !runtime.data) ||
+      (alerts.isPending && !alerts.data) ||
+      (manualAlerts.isPending && !manualAlerts.data));
+  const error = runtimeUnavailable
+    ? runtime.error
+    : alertsUnavailable
+      ? alerts.error
+      : manualAlerts.error;
+  const hasUsableAlerts = alerts.data !== undefined && manualAlerts.data !== undefined;
+  const staleError =
+    unavailable || !hasUsableAlerts
+      ? null
+      : (runtime.error ?? alerts.error ?? manualAlerts.error ?? overview.error);
   const openIncident = overview.data?.openIncident ?? null;
+  const incidentContextAvailable = overview.data !== undefined;
+  const startOutcomeUnknown =
+    startInvestigation.isError && mutationOutcomeIsUnknown(startInvestigation.error);
+  const deleteOutcomeUnknown = deleteAlert.isError && mutationOutcomeIsUnknown(deleteAlert.error);
+  const investigationBlocked = startInvestigation.isPending || startOutcomeUnknown;
 
-  const investigate = (alertId: Alert["id"]) =>
+  const retryFailedQueries = () => {
+    if (runtime.isError) void runtime.refetch();
+    if (runtimeUnavailable) return;
+    if (alerts.isError) void alerts.refetch();
+    if (manualAlerts.isError) void manualAlerts.refetch();
+    if (overview.isError) void overview.refetch();
+  };
+
+  const investigate = (alertId: Alert["id"]) => {
+    if (investigationBlocked) return;
     startInvestigation.mutate(
       { alertId, payload: StartInvestigationRequest.make({}) },
       {
@@ -59,6 +80,7 @@ export function AlertsPage() {
           }),
       },
     );
+  };
 
   return (
     <Page>
@@ -76,15 +98,14 @@ export function AlertsPage() {
       />
 
       {loading ? <ContentState kind="loading" title="Loading alerts" /> : null}
-      {error ? (
+      {unavailable ? (
         <ContentState
           actions={
-            <RetryButton
-              onRetry={() => {
-                void runtime.refetch();
-                void alerts.refetch();
-                void manualAlerts.refetch();
-              }}
+            <ConsoleFailureActions
+              error={error}
+              notFound={{ href: "/connect", label: "Open connection setup" }}
+              onRetry={retryFailedQueries}
+              returnPath="/alerts"
             />
           }
           kind="error"
@@ -94,7 +115,25 @@ export function AlertsPage() {
         </ContentState>
       ) : null}
 
-      {!loading && !error && alerts.data?.length === 0 && manualAlerts.data?.items.length === 0 ? (
+      <StaleDataNotice
+        copy={
+          incidentContextAvailable
+            ? "Some alert data or investigation context may be out of date."
+            : "Investigation context is unavailable. Alert data remains visible."
+        }
+        error={staleError}
+        notFound={{ href: "/connect", label: "Open connection setup" }}
+        onRetry={retryFailedQueries}
+        retrying={
+          runtime.isFetching || alerts.isFetching || manualAlerts.isFetching || overview.isFetching
+        }
+        returnPath="/alerts"
+      />
+
+      {!loading &&
+      !unavailable &&
+      alerts.data?.length === 0 &&
+      manualAlerts.data?.items.length === 0 ? (
         <ContentState title="Nothing needs attention">
           Create an alert for something you noticed, or ask your agent to watch a telemetry
           threshold.
@@ -128,6 +167,8 @@ export function AlertsPage() {
           {manualAlerts.data.items.map((alert) => (
             <ManualAlertRow
               alert={alert}
+              blocked={investigationBlocked}
+              canInvestigate={incidentContextAvailable}
               key={alert.id}
               onInvestigate={() => investigate(alert.id)}
               openIncidentId={openIncident?.id ?? null}
@@ -147,8 +188,13 @@ export function AlertsPage() {
           {alerts.data.map((alert) => (
             <ThresholdAlertRow
               alert={alert}
+              blocked={investigationBlocked}
+              canInvestigate={incidentContextAvailable}
               key={alert.id}
-              onDelete={() => setAlertToDelete(alert)}
+              onDelete={() => {
+                if (!deleteOutcomeUnknown) deleteAlert.reset();
+                setAlertToDelete(alert);
+              }}
               onInvestigate={() => investigate(alert.id)}
               openIncidentId={openIncident?.id ?? null}
               pending={
@@ -159,10 +205,24 @@ export function AlertsPage() {
         </AlertSection>
       ) : null}
 
-      {startInvestigation.isError || deleteAlert.isError ? (
-        <p aria-live="polite" {...stylex.props(styles.error)}>
-          {errorMessage(startInvestigation.error ?? deleteAlert.error)}
-        </p>
+      {startInvestigation.isError ? (
+        <MutationFailureNotice
+          checkLabel="Check current investigation"
+          checking={overview.isFetching}
+          error={startInvestigation.error}
+          onCheckState={() => {
+            void overview.refetch().then((result) => {
+              if (!result.isSuccess) return;
+              startInvestigation.reset();
+              if (result.data.openIncident) {
+                void navigate({
+                  params: { incidentId: result.data.openIncident.id },
+                  to: "/incidents/$incidentId",
+                });
+              }
+            });
+          }}
+        />
       ) : null}
 
       <ConfirmDialog
@@ -172,12 +232,35 @@ export function AlertsPage() {
             ? "This project will stop evaluating the selected rule."
             : `Clear will stop evaluating “${alertToDelete.name}”. Existing incident history and telemetry stay unchanged.`
         }
+        confirmDisabled={deleteOutcomeUnknown}
+        dismissDisabled={deleteOutcomeUnknown}
+        error={
+          deleteAlert.isError ? (
+            <MutationFailureNotice
+              compact
+              checkLabel="Check alert rules"
+              checking={alerts.isFetching}
+              error={deleteAlert.error}
+              onCheckState={() => {
+                void alerts.refetch().then((result) => {
+                  if (!result.isSuccess || alertToDelete === null) return;
+                  const stillExists = result.data.some((alert) => alert.id === alertToDelete.id);
+                  deleteAlert.reset();
+                  if (!stillExists) setAlertToDelete(null);
+                });
+              }}
+            />
+          ) : undefined
+        }
         onConfirm={() => {
           if (alertToDelete === null) return;
           deleteAlert.mutate(alertToDelete.id, { onSuccess: () => setAlertToDelete(null) });
         }}
         onOpenChange={(open) => {
-          if (!open && !deleteAlert.isPending) setAlertToDelete(null);
+          if (!open && !deleteAlert.isPending && !deleteOutcomeUnknown) {
+            deleteAlert.reset();
+            setAlertToDelete(null);
+          }
         }}
         open={alertToDelete !== null}
         pending={deleteAlert.isPending}
@@ -188,167 +271,7 @@ export function AlertsPage() {
   );
 }
 
-function AlertSection({
-  children,
-  description,
-  title,
-}: {
-  children: React.ReactNode;
-  description: string;
-  title: string;
-}) {
-  return (
-    <section {...stylex.props(styles.section)}>
-      <header {...stylex.props(styles.sectionHeader)}>
-        <h2 {...stylex.props(styles.sectionTitle)}>{title}</h2>
-        <p {...stylex.props(styles.sectionDescription)}>{description}</p>
-      </header>
-      <div {...stylex.props(styles.list)}>{children}</div>
-    </section>
-  );
-}
-
-function ManualAlertRow({
-  alert,
-  onInvestigate,
-  openIncidentId,
-  pending,
-}: {
-  alert: ManualAlert;
-  onInvestigate: () => void;
-  openIncidentId: string | null;
-  pending: boolean;
-}) {
-  return (
-    <article {...stylex.props(styles.row)}>
-      <div {...stylex.props(styles.identity)}>
-        <StatusPill tone={severityTone(alert.severity)}>{alert.severity}</StatusPill>
-        <div>
-          <h3 {...stylex.props(styles.name)}>{alert.title}</h3>
-          <span {...stylex.props(styles.summary)}>{alert.context ?? "No additional context"}</span>
-        </div>
-      </div>
-      <div {...stylex.props(styles.meta)}>
-        <Detail label="Service" value={alert.serviceName ?? "All services"} />
-        <Detail label="Created" value={formatRelativeTime(alert.createdAt)} />
-      </div>
-      <InvestigationAction
-        onInvestigate={onInvestigate}
-        openIncidentId={openIncidentId}
-        pending={pending}
-      />
-    </article>
-  );
-}
-
-function ThresholdAlertRow({
-  alert,
-  onDelete,
-  onInvestigate,
-  openIncidentId,
-  pending,
-}: {
-  alert: Alert;
-  onDelete: () => void;
-  onInvestigate: () => void;
-  openIncidentId: string | null;
-  pending: boolean;
-}) {
-  return (
-    <article {...stylex.props(styles.row)}>
-      <div {...stylex.props(styles.identity)}>
-        <StatusPill
-          tone={
-            alert.status === "firing"
-              ? "critical"
-              : alert.status === "healthy"
-                ? "healthy"
-                : "neutral"
-          }
-        >
-          {alert.status}
-        </StatusPill>
-        <div>
-          <h3 {...stylex.props(styles.name)}>{alert.name}</h3>
-          <code {...stylex.props(styles.summary)}>{alert.metricName}</code>
-        </div>
-      </div>
-      <div {...stylex.props(styles.meta)}>
-        <Detail label="Service" value={alert.serviceName ?? "All services"} />
-        <Detail
-          label="Condition"
-          value={`${alert.aggregation} ${comparisonCopy[alert.comparison]} ${alert.threshold} · ${Math.round(alert.windowSeconds / 60)} min`}
-        />
-      </div>
-      <div {...stylex.props(styles.rowActions)}>
-        {alert.status === "firing" ? (
-          <InvestigationAction
-            onInvestigate={onInvestigate}
-            openIncidentId={openIncidentId}
-            pending={pending}
-          />
-        ) : null}
-        <MenuRoot>
-          <MenuTrigger aria-label={`Actions for ${alert.name}`} size="icon">
-            <Icon icon={MoreVerticalCircle02Icon} size={18} />
-          </MenuTrigger>
-          <MenuPopup align="end">
-            <MenuItem onClick={onDelete} tone="danger">
-              <span {...stylex.props(styles.menuAction)}>
-                <Icon icon={Delete01Icon} size={15} /> Delete rule
-              </span>
-            </MenuItem>
-          </MenuPopup>
-        </MenuRoot>
-      </div>
-    </article>
-  );
-}
-
-function InvestigationAction({
-  onInvestigate,
-  openIncidentId,
-  pending,
-}: {
-  onInvestigate: () => void;
-  openIncidentId: string | null;
-  pending: boolean;
-}) {
-  return openIncidentId ? null : (
-    <Button disabled={pending} onClick={onInvestigate} tone="secondary">
-      {pending ? "Starting" : "Start investigation"}
-    </Button>
-  );
-}
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <span {...stylex.props(styles.detail)}>
-      <span>{label}</span>
-      <code {...stylex.props(styles.detailValue)}>{value}</code>
-    </span>
-  );
-}
-
-const severityTone = (severity: ManualAlert["severity"]) =>
-  severity === "critical" ? "critical" : severity === "warning" ? "attention" : "info";
-
 const styles = stylex.create({
-  section: { display: "grid", gap: space.x3, marginBottom: space.x8 },
-  sectionHeader: {
-    display: "grid",
-    gap: 3,
-  },
-  sectionTitle: { fontSize: 14, fontWeight: 500, marginBlock: 0 },
-  sectionDescription: { color: colors.textSubtle, fontSize: 11, marginBlock: 0 },
-  list: {
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderRadius: radii.md,
-    borderStyle: "solid",
-    borderWidth: 1,
-    overflow: "hidden",
-  },
   activeInvestigation: {
     alignItems: { default: "center", "@media (max-width: 620px)": "stretch" },
     backgroundColor: colors.amberWash,
@@ -370,54 +293,4 @@ const styles = stylex.create({
     fontSize: 10,
     marginTop: 4,
   },
-  row: {
-    alignItems: "center",
-    borderBottomColor: colors.line,
-    borderBottomStyle: "solid",
-    borderBottomWidth: { default: 1, ":last-child": 0 },
-    display: "grid",
-    gap: space.x5,
-    gridTemplateColumns: {
-      default: "minmax(260px, 1fr) minmax(300px, 1fr) auto",
-      "@media (max-width: 840px)": "1fr",
-    },
-    padding: space.x4,
-  },
-  identity: { alignItems: "center", display: "flex", gap: space.x3, minWidth: 0 },
-  name: { fontSize: 13, fontWeight: 500, marginBlock: 0 },
-  summary: {
-    color: colors.textSubtle,
-    display: "block",
-    fontSize: 10,
-    marginTop: 3,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-  meta: {
-    display: "grid",
-    gap: space.x4,
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  },
-  detail: {
-    color: colors.textSubtle,
-    display: "grid",
-    fontSize: 10,
-    gap: 4,
-    minWidth: 0,
-  },
-  detailValue: {
-    color: colors.textMuted,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-  rowActions: {
-    alignItems: "center",
-    display: "flex",
-    gap: space.x2,
-    justifyContent: "flex-end",
-  },
-  menuAction: { alignItems: "center", display: "flex", gap: space.x2 },
-  error: { color: colors.red, fontSize: 12, marginTop: space.x4 },
 });

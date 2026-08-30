@@ -9,13 +9,14 @@ import {
 import { Alert02Icon, Cancel01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { Dialog } from "@base-ui/react/dialog";
 import * as stylex from "@stylexjs/stylex";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
-import { errorMessage } from "../../data/format";
-import { useCreateManualAlert } from "../../data/queries";
+import { useCreateManualAlert, useManualAlertsQuery } from "../../data/queries";
+import { mutationOutcomeIsUnknown } from "../../errors";
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
 import { Icon } from "../../ui/icon";
+import { MutationFailureNotice } from "../../ui/mutation-failure-notice";
 import { SelectControl } from "../../ui/select";
 
 const severityOptions = [
@@ -38,10 +39,20 @@ export function ManualAlertDialog({
   const [severity, setSeverity] = useState<AlertSeverity>("warning");
   const [attempted, setAttempted] = useState(false);
   const createAlert = useCreateManualAlert(projectId);
+  const alerts = useManualAlertsQuery(projectId);
+  const knownAlertIds = useRef<ReadonlySet<string>>(new Set());
+  const attemptedAlert = useRef({
+    context: "",
+    service: null as string | null,
+    severity,
+    title: "",
+  });
   const titleIssue = title.trim().length === 0 ? "Describe what needs attention." : null;
+  const outcomeUnknown = createAlert.isError && mutationOutcomeIsUnknown(createAlert.error);
 
   const onOpenChange = (nextOpen: boolean) => {
-    if (nextOpen) {
+    if (!nextOpen && (createAlert.isPending || outcomeUnknown)) return;
+    if (nextOpen && !outcomeUnknown) {
       setTitle("");
       setContext("");
       setService(null);
@@ -55,8 +66,15 @@ export function ManualAlertDialog({
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setAttempted(true);
-    if (titleIssue) return;
+    if (titleIssue || outcomeUnknown) return;
     const trimmedContext = context.trim();
+    knownAlertIds.current = new Set(alerts.data?.items.map((alert) => alert.id) ?? []);
+    attemptedAlert.current = {
+      context: trimmedContext,
+      service,
+      severity,
+      title: title.trim(),
+    };
     createAlert.mutate(
       CreateManualAlertRequest.make({
         context: trimmedContext ? NonEmptyText.make(trimmedContext) : undefined,
@@ -69,7 +87,11 @@ export function ManualAlertDialog({
   };
 
   return (
-    <Dialog.Root onOpenChange={onOpenChange} open={open}>
+    <Dialog.Root
+      disablePointerDismissal={createAlert.isPending || outcomeUnknown}
+      onOpenChange={onOpenChange}
+      open={open}
+    >
       <Dialog.Trigger
         render={
           <Button tone="primary">
@@ -92,7 +114,11 @@ export function ManualAlertDialog({
                   Capture something that needs investigation now.
                 </Dialog.Description>
               </div>
-              <Dialog.Close aria-label="Close alert form" {...stylex.props(styles.close)}>
+              <Dialog.Close
+                aria-label="Close alert form"
+                disabled={createAlert.isPending || outcomeUnknown}
+                {...stylex.props(styles.close)}
+              >
                 <Icon icon={Cancel01Icon} size={18} />
               </Dialog.Close>
             </header>
@@ -166,18 +192,41 @@ export function ManualAlertDialog({
               </label>
 
               {createAlert.isError ? (
-                <p role="alert" {...stylex.props(styles.error)}>
-                  {errorMessage(createAlert.error)}
-                </p>
+                <MutationFailureNotice
+                  checkLabel="Check current alerts"
+                  checking={alerts.isFetching}
+                  error={createAlert.error}
+                  onCheckState={() => {
+                    void alerts.refetch().then((result) => {
+                      if (!result.isSuccess) return;
+                      const attempted = attemptedAlert.current;
+                      const matches = result.data.items.filter(
+                        (alert) =>
+                          !knownAlertIds.current.has(alert.id) &&
+                          alert.title === attempted.title &&
+                          alert.context === (attempted.context || null) &&
+                          alert.serviceName === attempted.service &&
+                          alert.severity === attempted.severity,
+                      );
+                      if (matches.length > 1) return;
+                      createAlert.reset();
+                      if (matches.length === 1) setOpen(false);
+                    });
+                  }}
+                />
               ) : null}
             </div>
 
             <footer {...stylex.props(styles.footer)}>
               <Dialog.Close
-                disabled={createAlert.isPending}
+                disabled={createAlert.isPending || outcomeUnknown}
                 render={<Button tone="ghost">Cancel</Button>}
               />
-              <Button disabled={createAlert.isPending} tone="primary" type="submit">
+              <Button
+                disabled={createAlert.isPending || outcomeUnknown}
+                tone="primary"
+                type="submit"
+              >
                 {createAlert.isPending ? "Creating alert" : "Create alert"}
               </Button>
             </footer>

@@ -7,10 +7,13 @@ import type {
 } from "@groundtruth/panel-dsl";
 import type { MetricCatalogEntry } from "@groundtruth/telemetry";
 import * as stylex from "@stylexjs/stylex";
+import type { ReactNode } from "react";
 
 import { epochMilliseconds, errorMessage, formatEpochShortTime } from "../../data/format";
-import { type PanelSeries, usePanelSeries } from "../../data/panels";
+import { panelQueryDiagnosis, type PanelSeries, usePanelSeries } from "../../data/panels";
 import { colors, space } from "../../theme/tokens.stylex";
+import { ConsoleFailureActions } from "../../ui/console-failure-actions";
+import { CopyButton } from "../../ui/copy-button";
 import { ContentState } from "../../ui/page";
 import { MetricChart } from "../overview/metric-chart";
 import { activeThreshold, formatPanelValue, reducePanelValues } from "./panel-format";
@@ -28,6 +31,7 @@ export function LivePanel({
   panel: PanelView;
 }) {
   const data = usePanelSeries(panel);
+  const complete = data.missingQueries.length === 0;
   const unitResolution = resolvePanelUnits(panel, catalog);
   const values = data.results.flatMap((item) => item.points.map((point) => point.value));
   const latest = data.results[0]?.points
@@ -39,9 +43,13 @@ export function LivePanel({
       : data.results.length === 1
         ? latest
         : undefined;
-  const footer = data.error
-    ? errorMessage(data.error)
-    : (unitResolution.error ?? data.hints[0] ?? panel.annotations.at(-1)?.label);
+  const footer = data.issue
+    ? "This panel needs an updated query"
+    : !complete
+      ? `Missing ${missingQueryLabels(data.missingQueries)}`
+      : data.error
+        ? errorMessage(data.error)
+        : (unitResolution.error ?? data.hints[0] ?? panel.annotations.at(-1)?.label);
 
   return (
     <PanelCard
@@ -49,7 +57,7 @@ export function LivePanel({
       footer={footer}
       fullWidth={fullWidth}
       legend={
-        panel.spec._tag === "metric-chart"
+        complete && panel.spec._tag === "metric-chart"
           ? buildChartLegend(panel.spec, data.results, unitResolution.units)
           : []
       }
@@ -58,7 +66,7 @@ export function LivePanel({
       }
       title={panel.spec.title}
       value={
-        panel.spec._tag === "metric-chart" && panelValue !== undefined
+        complete && panel.spec._tag === "metric-chart" && panelValue !== undefined
           ? formatPanelValue(
               panelValue,
               panel.spec.axes.find((axis) => axis.id === data.results[0]?.axis)?.unit ?? {
@@ -94,10 +102,42 @@ function PanelContent({
   units: Readonly<Partial<Record<"left" | "right", string>>>;
 }) {
   if (data.pending) return <ContentState kind="loading" title="Loading panel data" />;
-  if (data.error) {
+  if (data.issue) {
     return (
-      <ContentState kind="error" title="Panel data is unavailable">
-        {errorMessage(data.error)}
+      <ContentState
+        actions={
+          <CopyButton
+            label="Copy diagnosis for your agent"
+            value={panelQueryDiagnosis(data.issue)}
+          />
+        }
+        kind="error"
+        title="This panel needs an updated query"
+      >
+        Clear cannot run one part of this panel yet. Ask your agent to update the query.
+      </ContentState>
+    );
+  }
+  if (data.missingQueries.length > 0) {
+    return (
+      <ContentState
+        actions={
+          <ConsoleFailureActions
+            disabled={data.retrying}
+            error={data.error}
+            notFound={{
+              href: "/explore?signal=metrics&window=1h",
+              label: "Open metrics explorer",
+            }}
+            onRetry={() => void data.refetch()}
+            returnPath="/board"
+          />
+        }
+        kind="error"
+        title={data.queryCount === 1 ? "Panel data is unavailable" : "Panel data is incomplete"}
+      >
+        Clear could not load {missingQueryLabels(data.missingQueries)}. This panel is hidden until
+        every query is available.
       </ContentState>
     );
   }
@@ -110,11 +150,19 @@ function PanelContent({
   }
   if (panel.spec._tag === "stat") {
     if (data.results.length === 0) return <ContentState title="No data in this window" />;
-    return <StatPanel catalog={catalog} series={data.results} spec={panel.spec} />;
+    return (
+      <PanelDataFrame data={data}>
+        <StatPanel catalog={catalog} series={data.results} spec={panel.spec} />
+      </PanelDataFrame>
+    );
   }
   if (panel.spec._tag === "table") {
     if (data.results.length === 0) return <ContentState title="No data in this window" />;
-    return <TablePanel series={data.results} spec={panel.spec} />;
+    return (
+      <PanelDataFrame data={data}>
+        <TablePanel series={data.results} spec={panel.spec} />
+      </PanelDataFrame>
+    );
   }
   const spec = panel.spec;
   if (spec.visualization === "heatmap") {
@@ -146,19 +194,54 @@ function PanelContent({
     })),
   ];
   return (
-    <MetricChart
-      accessibleName={spec.title}
-      annotations={annotations}
-      axes={spec.axes}
-      resolvedUnits={units}
-      series={data.results}
-      stacking={spec.stacking}
-      summary={chartSummary(spec.title, data.results, spec.axes, units)}
-      thresholds={spec.thresholds}
-      visualization={spec.visualization}
-    />
+    <PanelDataFrame data={data}>
+      <MetricChart
+        accessibleName={spec.title}
+        annotations={annotations}
+        axes={spec.axes}
+        resolvedUnits={units}
+        series={data.results}
+        stacking={spec.stacking}
+        summary={chartSummary(spec.title, data.results, spec.axes, units)}
+        thresholds={spec.thresholds}
+        visualization={spec.visualization}
+      />
+    </PanelDataFrame>
   );
 }
+
+function PanelDataFrame({
+  children,
+  data,
+}: {
+  children: ReactNode;
+  data: ReturnType<typeof usePanelSeries>;
+}) {
+  return (
+    <div {...stylex.props(styles.panelDataFrame)}>
+      {data.error ? (
+        <div role="status" {...stylex.props(styles.staleNotice)}>
+          <span>Showing the last complete data.</span>
+          <ConsoleFailureActions
+            compact
+            disabled={data.retrying}
+            error={data.error}
+            notFound={{
+              href: "/explore?signal=metrics&window=1h",
+              label: "Open metrics explorer",
+            }}
+            onRetry={() => void data.refetch()}
+            returnPath="/board"
+          />
+        </div>
+      ) : null}
+      {children}
+    </div>
+  );
+}
+
+const missingQueryLabels = (missingQueries: ReturnType<typeof usePanelSeries>["missingQueries"]) =>
+  missingQueries.map(({ label, queryRef }) => `${label} (${queryRef})`).join(", ");
 
 function StatPanel({
   catalog,
@@ -331,6 +414,26 @@ const cellColorStyles = stylex.create({
 });
 
 const styles = stylex.create({
+  panelDataFrame: { height: "100%", position: "relative" },
+  staleNotice: {
+    alignItems: "center",
+    backdropFilter: "blur(8px)",
+    backgroundColor: "rgba(18, 21, 21, 0.9)",
+    borderColor: colors.lineStrong,
+    borderRadius: 6,
+    borderStyle: "solid",
+    borderWidth: 1,
+    color: colors.textMuted,
+    display: "flex",
+    fontSize: 10,
+    gap: space.x2,
+    paddingBlock: 4,
+    paddingInline: 8,
+    position: "absolute",
+    right: 0,
+    top: 0,
+    zIndex: 2,
+  },
   statPanel: {
     alignItems: "center",
     display: "grid",

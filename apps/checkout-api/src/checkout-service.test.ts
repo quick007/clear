@@ -1,10 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer, Metric, Option, Redacted } from "effect";
+import { Deferred, Effect, Fiber, Layer, Metric, Option, Redacted } from "effect";
 import { HttpClient, HttpClientResponse } from "effect/unstable/http";
 import { CheckoutService } from "./checkout-service.js";
 import { CheckoutConfig } from "./config.js";
 import { PaymentAuthorizationResponse } from "./contracts.js";
-import { PaymentUnavailable } from "./errors.js";
+import { CheckoutConflict, PaymentUnavailable } from "./errors.js";
 import { checkoutDuration, serverRequests, upstreamDuration, upstreamRequests } from "./metrics.js";
 import { PaymentsClient } from "./payments-client.js";
 import { metricUserId } from "./telemetry-cardinality.js";
@@ -178,5 +178,193 @@ describe("CheckoutService request metrics", () => {
       expect(attempts.map(({ requests }) => requests.count)).toEqual([1, 1, 1]);
       expect(attempts.map(({ duration }) => duration.count)).toEqual([1, 1, 1]);
     }).pipe(Effect.provide(CheckoutLive), Effect.provideService(Metric.MetricRegistry, new Map()));
+  });
+});
+
+describe("CheckoutService idempotency", () => {
+  it.effect("coalesces concurrent requests and replays their successful response", () => {
+    let authorizations = 0;
+
+    return Effect.gen(function* () {
+      const authorizationStarted = yield* Deferred.make<void>();
+      const releaseAuthorization = yield* Deferred.make<void>();
+      const payments = PaymentsClient.of({
+        authorize: () =>
+          Effect.gen(function* () {
+            authorizations += 1;
+            yield* Deferred.succeed(authorizationStarted, undefined);
+            yield* Deferred.await(releaseAuthorization);
+            return PaymentAuthorizationResponse.make({
+              approved: true,
+              authorizationId: "auth_once",
+            });
+          }),
+      });
+
+      return yield* Effect.gen(function* () {
+        const checkout = yield* CheckoutService;
+        const first = yield* Effect.forkChild(checkout.checkout(request));
+        yield* Deferred.await(authorizationStarted);
+        const duplicate = yield* Effect.forkChild(checkout.checkout(request));
+        yield* Effect.yieldNow;
+        const conflict = yield* Effect.flip(
+          checkout.checkout({ ...request, amountCents: request.amountCents + 1 }),
+        );
+        expect(authorizations).toBe(1);
+        expect(conflict).toBeInstanceOf(CheckoutConflict);
+
+        yield* Deferred.succeed(releaseAuthorization, undefined);
+        const [firstResponse, duplicateResponse] = yield* Effect.all([
+          Fiber.join(first),
+          Fiber.join(duplicate),
+        ]);
+        const replayed = yield* checkout.checkout(request);
+
+        expect(firstResponse).toEqual(duplicateResponse);
+        expect(replayed).toEqual(firstResponse);
+        expect(authorizations).toBe(1);
+      }).pipe(
+        Effect.provide(
+          CheckoutService.layer.pipe(Layer.provide(Layer.succeed(PaymentsClient, payments))),
+        ),
+        Effect.provideService(Metric.MetricRegistry, new Map()),
+      );
+    });
+  });
+
+  it.effect("does not cache failures and permits a later recovery", () => {
+    let available = false;
+    let authorizations = 0;
+    const payments = PaymentsClient.of({
+      authorize: (input) => {
+        authorizations += 1;
+        return available
+          ? Effect.succeed(
+              PaymentAuthorizationResponse.make({
+                approved: true,
+                authorizationId: "auth_recovered",
+              }),
+            )
+          : Effect.fail(
+              new PaymentUnavailable({
+                attempt: input.attempt,
+                reason: "test outage",
+              }),
+            );
+      },
+    });
+
+    return Effect.gen(function* () {
+      const checkout = yield* CheckoutService;
+      const failed = yield* Effect.exit(checkout.checkout(request));
+      available = true;
+      const recovered = yield* checkout.checkout(request);
+
+      expect(failed._tag).toBe("Failure");
+      expect(recovered.authorizationId).toBe("auth_recovered");
+      expect(authorizations).toBe(5);
+    }).pipe(
+      Effect.provide(
+        CheckoutService.layer.pipe(Layer.provide(Layer.succeed(PaymentsClient, payments))),
+      ),
+      Effect.provideService(Metric.MetricRegistry, new Map()),
+    );
+  });
+
+  it.effect("scopes an idempotency key to its user", () => {
+    let authorizations = 0;
+    const payments = PaymentsClient.of({
+      authorize: (input) => {
+        authorizations += 1;
+        return Effect.succeed(
+          PaymentAuthorizationResponse.make({
+            approved: true,
+            authorizationId: `auth_${input.userId}`,
+          }),
+        );
+      },
+    });
+
+    return Effect.gen(function* () {
+      const checkout = yield* CheckoutService;
+      const first = yield* checkout.checkout(request);
+      const second = yield* checkout.checkout({ ...request, userId: "user_456" });
+
+      expect(first.authorizationId).toBe("auth_user_123");
+      expect(second.authorizationId).toBe("auth_user_456");
+      expect(authorizations).toBe(2);
+    }).pipe(
+      Effect.provide(
+        CheckoutService.layer.pipe(Layer.provide(Layer.succeed(PaymentsClient, payments))),
+      ),
+      Effect.provideService(Metric.MetricRegistry, new Map()),
+    );
+  });
+
+  it.effect("rejects changed payment semantics for the same request id", () => {
+    let authorizations = 0;
+    const payments = PaymentsClient.of({
+      authorize: (input) => {
+        authorizations += 1;
+        return Effect.succeed(
+          PaymentAuthorizationResponse.make({
+            approved: true,
+            authorizationId: `auth_${input.amountCents}`,
+          }),
+        );
+      },
+    });
+
+    return Effect.gen(function* () {
+      const checkout = yield* CheckoutService;
+      const first = yield* checkout.checkout(request);
+      const changedAmount = yield* Effect.flip(
+        checkout.checkout({ ...request, amountCents: 12_500 }),
+      );
+      const changedItems = yield* Effect.flip(checkout.checkout({ ...request, itemCount: 2 }));
+
+      expect(first.authorizationId).toBe("auth_16058");
+      expect(changedAmount).toBeInstanceOf(CheckoutConflict);
+      expect(changedItems).toBeInstanceOf(CheckoutConflict);
+      expect(authorizations).toBe(1);
+    }).pipe(
+      Effect.provide(
+        CheckoutService.layer.pipe(Layer.provide(Layer.succeed(PaymentsClient, payments))),
+      ),
+      Effect.provideService(Metric.MetricRegistry, new Map()),
+    );
+  });
+
+  it.effect("bounds successful replay entries", () => {
+    let authorizations = 0;
+    const payments = PaymentsClient.of({
+      authorize: (input) => {
+        authorizations += 1;
+        return Effect.succeed(
+          PaymentAuthorizationResponse.make({
+            approved: true,
+            authorizationId: `auth_${input.requestId}`,
+          }),
+        );
+      },
+    });
+
+    return Effect.gen(function* () {
+      const checkout = yield* CheckoutService;
+      yield* checkout.checkout(request);
+      yield* Effect.forEach(
+        Array.from({ length: 256 }, (_, index) => index),
+        (index) => checkout.checkout({ ...request, requestId: `req_cache_${index}` }),
+        { discard: true },
+      );
+      yield* checkout.checkout(request);
+
+      expect(authorizations).toBe(258);
+    }).pipe(
+      Effect.provide(
+        CheckoutService.layer.pipe(Layer.provide(Layer.succeed(PaymentsClient, payments))),
+      ),
+      Effect.provideService(Metric.MetricRegistry, new Map()),
+    );
   });
 });

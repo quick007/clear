@@ -5,11 +5,15 @@ import { useState } from "react";
 import { getConsoleConfig } from "../../config";
 import { errorMessage, formatRelativeTime } from "../../data/format";
 import { useCreateIngestKey, useOverviewQuery, useRuntimeQuery } from "../../data/queries";
+import { mutationOutcomeIsUnknown } from "../../errors";
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
+import { ConsoleFailureActions } from "../../ui/console-failure-actions";
 import { CopyButton } from "../../ui/copy-button";
 import { Icon } from "../../ui/icon";
-import { ContentState, Page, PageHeader, RetryButton } from "../../ui/page";
+import { MutationFailureNotice } from "../../ui/mutation-failure-notice";
+import { ContentState, Page, PageHeader } from "../../ui/page";
+import { StaleDataNotice } from "../../ui/stale-data-notice";
 import { StatusDot } from "../../ui/status";
 
 export function ConnectPage() {
@@ -19,30 +23,41 @@ export function ConnectPage() {
   const overview = useOverviewQuery(projectId);
   const createKey = useCreateIngestKey(projectId!);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const connectionLoading =
+    (runtime.isPending && !runtime.data) || (overview.isPending && !overview.data);
+  const connectionUnavailable = !runtime.data || !projectId || !overview.data;
+  const failure = runtime.isError && !runtime.data ? runtime.error : overview.error;
+  const staleFailure = connectionUnavailable ? null : (runtime.error ?? overview.error);
+  const retryFailedQueries = () => {
+    if (runtime.isError) void runtime.refetch();
+    if (runtime.isError && !runtime.data) return;
+    if (overview.isError) void overview.refetch();
+  };
+  const createKeyOutcomeUnknown = createKey.isError && mutationOutcomeIsUnknown(createKey.error);
 
-  if (!runtime.isError && !overview.isError && (runtime.isPending || overview.isPending)) {
+  if (connectionLoading) {
     return (
       <Page>
         <ContentState kind="loading" title="Preparing your connection" />
       </Page>
     );
   }
-  if (runtime.isError || overview.isError || !runtime.data || !projectId || !overview.data) {
+  if (connectionUnavailable) {
     return (
       <Page>
         <ContentState
           actions={
-            <RetryButton
-              onRetry={() => {
-                void runtime.refetch();
-                void overview.refetch();
-              }}
+            <ConsoleFailureActions
+              error={failure}
+              notFound={{ href: "/", label: "Return home" }}
+              onRetry={retryFailedQueries}
+              returnPath="/connect"
             />
           }
           kind="error"
           title="Connection setup is unavailable"
         >
-          {errorMessage(runtime.error ?? overview.error)}
+          {errorMessage(failure)}
         </ContentState>
       </Page>
     );
@@ -57,6 +72,14 @@ export function ConnectPage() {
         description="Point any OpenTelemetry SDK or Collector at Clear. No proprietary agent is required."
         title="Connect OpenTelemetry"
       />
+      <StaleDataNotice
+        copy="Showing the last loaded connection status."
+        error={staleFailure}
+        notFound={{ href: "/", label: "Return home" }}
+        onRetry={retryFailedQueries}
+        retrying={runtime.isFetching || overview.isFetching}
+        returnPath="/connect"
+      />
       <div {...stylex.props(styles.layout)}>
         <section {...stylex.props(styles.steps)}>
           <ConnectStep icon={Key01Icon} number="1" title="Create an ingest key">
@@ -67,7 +90,7 @@ export function ConnectPage() {
                   and the secret is shown only once.
                 </p>
                 <Button
-                  disabled={createKey.isPending}
+                  disabled={createKey.isPending || createKeyOutcomeUnknown}
                   onClick={() =>
                     createKey.mutate("primary-exporter", {
                       onSuccess: (result) => setCreatedKey(result.key),
@@ -96,9 +119,16 @@ export function ConnectPage() {
               </div>
             ) : null}
             {createKey.isError ? (
-              <p role="alert" {...stylex.props(styles.error)}>
-                {errorMessage(createKey.error)}
-              </p>
+              <MutationFailureNotice
+                checkLabel="Check current keys"
+                error={createKey.error}
+                message={
+                  createKeyOutcomeUnknown
+                    ? "The key may have been created, but its secret cannot be recovered. Check current keys and revoke the new key before creating a replacement."
+                    : undefined
+                }
+                onCheckState={() => window.location.assign("/settings/project")}
+              />
             ) : null}
           </ConnectStep>
 
@@ -337,5 +367,4 @@ const styles = stylex.create({
   helpTitle: { fontSize: 14, fontWeight: 500, marginBlock: 0 },
   helpCopy: { color: colors.textMuted, fontSize: 12, lineHeight: 1.6, marginBlock: space.x3 },
   helpLink: { color: colors.amber, fontSize: 11, textDecoration: "none" },
-  error: { color: colors.red, fontSize: 11, marginBlock: 0 },
 });

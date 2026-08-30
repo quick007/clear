@@ -1,5 +1,11 @@
 export { JsonValue } from "./json-value";
 import type { JsonValue } from "./json-value";
+import {
+  presentToolExecutionFailure,
+  toolFailureHasUnknownWriteOutcome,
+  type ToolExecutionFailure,
+  type ToolFailureContext,
+} from "./failures";
 import { toBoundedJsonValue } from "./result-bounds";
 
 export const toJsonValue = (value: unknown): JsonValue => toBoundedJsonValue(value).value;
@@ -29,31 +35,18 @@ export const toolSuccess = (
   }).value;
 };
 
-const errorMessage = (error: unknown) => {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "object" && error !== null && "message" in error) {
-    const message = Reflect.get(error, "message");
-    if (typeof message === "string") return message;
-  }
-  return "Clear could not complete this request";
-};
-
-const errorCode = (error: unknown) => {
-  if (typeof error === "object" && error !== null && "_tag" in error) {
-    const tag = Reflect.get(error, "_tag");
-    if (typeof tag === "string") return tag;
-  }
-  if (error instanceof Error && error.name !== "Error") return error.name;
-  return "REQUEST_FAILED";
-};
-
-export const toolFailure = (error: unknown, hint: string) =>
-  toJsonValue({
+export const toolFailure = (
+  failure: ToolExecutionFailure,
+  hint: string,
+  context: ToolFailureContext,
+) => {
+  const presentation = presentToolExecutionFailure(failure, context);
+  const recoveryHint = toolFailureHasUnknownWriteOutcome(failure, context)
+    ? `The change may already be present. Read the current state before deciding whether to retry. ${hint}`
+    : hint;
+  return toJsonValue({
     ok: false,
-    error: {
-      code: errorCode(error),
-      message: errorMessage(error).slice(0, 600),
-      retryable: errorCode(error) === "ServiceUnavailable" || errorCode(error) === "REQUEST_FAILED",
-    },
-    hint,
+    error: presentation,
+    hint: recoveryHint,
   });
+};

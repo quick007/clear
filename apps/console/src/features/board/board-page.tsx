@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { errorMessage } from "../../data/format";
 import {
@@ -10,10 +10,14 @@ import {
   useRuntimeQuery,
   useTriggerSandboxIncident,
 } from "../../data/queries";
+import { mutationOutcomeIsUnknown } from "../../errors";
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
+import { ConsoleFailureActions } from "../../ui/console-failure-actions";
 import { CopyButton } from "../../ui/copy-button";
-import { ContentState, RetryButton } from "../../ui/page";
+import { MutationFailureNotice } from "../../ui/mutation-failure-notice";
+import { ContentState } from "../../ui/page";
+import { boardContextMessage, type BoardDependencyState } from "./board-context";
 import { LivePanel } from "./panel-renderer";
 
 const investigationPrompt = "Investigate the active alerts and show me why.";
@@ -28,11 +32,19 @@ export function BoardPage() {
   const catalog = useMetricCatalogQuery(projectId);
   const overview = useOverviewQuery(projectId);
   const triggerIncident = useTriggerSandboxIncident(projectId!);
+  const boardUnavailable = (runtime.isError && !runtime.data) || (board.isError && !board.data);
+  const boardFailure = runtime.isError && !runtime.data ? runtime.error : board.error;
+  const catalogState = dependencyState(catalog.isError, catalog.data !== undefined);
+  const overviewState = dependencyState(overview.isError, overview.data !== undefined);
+  const dependencyFailure = catalogState !== "available" || overviewState !== "available";
+  const triggerOutcomeUnknown =
+    triggerIncident.isError && mutationOutcomeIsUnknown(triggerIncident.error);
   useEffect(() => {
     if (
       !search.start ||
       startedFromHome.current ||
       runtime.data?.mode !== "sandbox" ||
+      overview.data === undefined ||
       overview.data?.openIncident ||
       projectId === null
     ) {
@@ -66,8 +78,27 @@ export function BoardPage() {
 
       {runtime.data?.mode === "sandbox" && overview.data && !overview.data.openIncident ? (
         <SandboxStart
-          error={triggerIncident.isError ? errorMessage(triggerIncident.error) : null}
-          onStart={() => triggerIncident.mutate()}
+          blocked={triggerOutcomeUnknown}
+          error={
+            triggerIncident.isError ? (
+              <MutationFailureNotice
+                checkLabel="Check incident state"
+                checking={overview.isFetching || board.isFetching}
+                error={triggerIncident.error}
+                onCheckState={() => {
+                  void Promise.all([overview.refetch(), board.refetch()]).then(
+                    ([overviewResult, boardResult]) => {
+                      if (!overviewResult.isSuccess || !boardResult.isSuccess) return;
+                      triggerIncident.reset();
+                    },
+                  );
+                }}
+              />
+            ) : null
+          }
+          onStart={() => {
+            if (!triggerOutcomeUnknown) triggerIncident.mutate();
+          }}
           pending={triggerIncident.isPending}
         />
       ) : null}
@@ -85,24 +116,38 @@ export function BoardPage() {
         </aside>
       ) : null}
 
-      {!runtime.isError && !board.isError && (runtime.isPending || board.isPending) ? (
+      {!boardUnavailable && !board.data && (runtime.isPending || board.isPending) ? (
         <ContentState kind="loading" title="Loading the board" />
       ) : null}
-      {runtime.isError || board.isError ? (
+      {boardUnavailable ? (
         <ContentState
           actions={
-            <RetryButton
-              onRetry={() => {
-                void runtime.refetch();
-                void board.refetch();
-              }}
+            <ConsoleFailureActions
+              error={boardFailure}
+              notFound={{ href: "/", label: "Return home" }}
+              onRetry={() =>
+                void (runtime.isError && !runtime.data ? runtime.refetch() : board.refetch())
+              }
+              returnPath="/board"
             />
           }
           kind="error"
           title="The board is unavailable"
         >
-          {errorMessage(runtime.error ?? board.error)}
+          {errorMessage(runtime.isError && !runtime.data ? runtime.error : board.error)}
         </ContentState>
+      ) : null}
+      {board.data && dependencyFailure ? (
+        <BoardContextNotice
+          catalog={catalogState}
+          error={catalog.error ?? overview.error}
+          onRetry={() => {
+            if (catalog.isError) void catalog.refetch();
+            if (overview.isError) void overview.refetch();
+          }}
+          overview={overviewState}
+          retrying={catalog.isFetching || overview.isFetching}
+        />
       ) : null}
       {board.data?.panels.length === 0 ? (
         <ContentState
@@ -133,12 +178,46 @@ export function BoardPage() {
   );
 }
 
+function BoardContextNotice({
+  catalog,
+  error,
+  onRetry,
+  overview,
+  retrying,
+}: {
+  catalog: BoardDependencyState;
+  error: unknown;
+  onRetry: () => void;
+  overview: BoardDependencyState;
+  retrying: boolean;
+}) {
+  return (
+    <aside aria-live="polite" role="status" {...stylex.props(styles.contextNotice)}>
+      <span {...stylex.props(styles.contextNoticeCopy)}>
+        {boardContextMessage({ catalog, overview })}
+      </span>
+      <ConsoleFailureActions
+        compact
+        disabled={retrying}
+        error={error}
+        onRetry={onRetry}
+        returnPath="/board"
+      />
+    </aside>
+  );
+}
+
+const dependencyState = (failed: boolean, loaded: boolean): BoardDependencyState =>
+  failed ? (loaded ? "stale" : "missing") : "available";
+
 function SandboxStart({
+  blocked,
   error,
   onStart,
   pending,
 }: {
-  error: string | null;
+  blocked: boolean;
+  error: ReactNode;
   onStart: () => void;
   pending: boolean;
 }) {
@@ -153,15 +232,11 @@ function SandboxStart({
             Introduce a controlled retry storm, then ask your agent to investigate what changed.
           </p>
         </div>
-        <Button disabled={pending} onClick={onStart} tone="primary">
+        <Button disabled={pending || blocked} onClick={onStart} tone="primary">
           {pending ? "Starting incident" : "Start incident"}
         </Button>
       </div>
-      {error ? (
-        <p role="alert" {...stylex.props(styles.sandboxError)}>
-          {error}
-        </p>
-      ) : null}
+      {error}
     </section>
   );
 }
@@ -216,6 +291,23 @@ const styles = stylex.create({
     gap: { default: space.x3, "@media (max-width: 620px)": 2 },
   },
   agentPromptTitle: { color: colors.text, fontWeight: 500, whiteSpace: "nowrap" },
+  contextNotice: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.md,
+    borderStyle: "solid",
+    borderWidth: 1,
+    color: colors.textMuted,
+    display: "flex",
+    fontSize: 12,
+    gap: space.x3,
+    justifyContent: "space-between",
+    marginBottom: space.x4,
+    paddingBlock: space.x2,
+    paddingInline: space.x3,
+  },
+  contextNoticeCopy: { lineHeight: 1.45 },
   sandboxStart: {
     backgroundColor: colors.surface,
     borderColor: colors.line,

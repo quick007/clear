@@ -1,6 +1,7 @@
 import type { TelemetryAttributes, TelemetryValue } from "@groundtruth/telemetry";
 import { TelemetryBytes, TelemetryInteger } from "@groundtruth/telemetry";
 import { DateTime } from "effect";
+import { presentConsoleFailure } from "../errors";
 
 export const epochMilliseconds = (value: DateTime.Utc) => DateTime.toEpochMillis(value);
 
@@ -73,10 +74,4 @@ export const formatUnixNanoTime = (value: bigint) =>
     fractionalSecondDigits: 3,
   }).format(unixNanoToDate(value));
 
-export const errorMessage = (error: unknown) => {
-  if (!(error instanceof Error)) return "Clear could not load this data";
-  if (/transport error|failed to fetch|fetch failed/iu.test(error.message)) {
-    return "Clear could not reach the API. Check the connection and try again.";
-  }
-  return error.message;
-};
+export const errorMessage = (error: unknown) => presentConsoleFailure(error).message;

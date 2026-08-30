@@ -3,6 +3,7 @@ import { AlertId, ProjectId } from "@groundtruth/domain";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { Schema } from "effect";
 import { makeBrowserApiClient } from "./client";
+import { ConsoleUnavailable } from "../errors";
 
 const projectId = Schema.decodeUnknownSync(ProjectId)("01890f6e-7c00-7000-8000-000000000001");
 
@@ -113,5 +114,23 @@ describe("browser API client", () => {
 
     api.access.setSandboxSessionId(null);
     expect(sessionStorage.getItem("groundtruth.sandboxSessionId")).toBeNull();
+  });
+
+  it("normalizes browser transport failures before leaving Effect", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    const api = await makeBrowserApiClient({
+      baseUrl: "https://api.groundtruth.test",
+      sessionStorage: makeSessionStorage(),
+    });
+
+    await expect(
+      api.run(api.client.overview.listServices({ params: { projectId } })),
+    ).rejects.toBeInstanceOf(ConsoleUnavailable);
+    expect(consoleError).toHaveBeenCalledWith(
+      "[Clear] API request failed",
+      expect.objectContaining({ cause: expect.anything() }),
+    );
+    consoleError.mockRestore();
   });
 });

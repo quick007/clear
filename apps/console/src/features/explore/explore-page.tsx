@@ -2,7 +2,7 @@ import type { Axis } from "@groundtruth/panel-dsl";
 import type { TelemetryWindow } from "@groundtruth/telemetry";
 import { Search02Icon } from "@hugeicons/core-free-icons";
 import * as stylex from "@stylexjs/stylex";
-import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 
 import { errorMessage, formatRelativeTime } from "../../data/format";
@@ -13,114 +13,70 @@ import {
   useRuntimeQuery,
 } from "../../data/queries";
 import { colors, radii, space } from "../../theme/tokens.stylex";
+import { ConsoleFailureActions } from "../../ui/console-failure-actions";
 import { Icon } from "../../ui/icon";
-import { ContentState, Page, PageHeader, RetryButton, SearchField } from "../../ui/page";
-import { SelectControl, type SelectOption } from "../../ui/select";
+import { ContentState, Page, PageHeader, SearchField } from "../../ui/page";
+import { StaleDataNotice } from "../../ui/stale-data-notice";
 import { MetricChart } from "../overview/metric-chart";
 import { LogsPage } from "../logs/logs-page";
 import { TracesPage } from "../traces/traces-page";
 import { aggregationFor, formatStat, toPanelSeries, windowLabels } from "./explore-format";
-
-export type ExploreSignal = "logs" | "metrics" | "traces";
-
-const tabs = [
-  { label: "Metrics", signal: "metrics" },
-  { label: "Logs", signal: "logs" },
-  { label: "Traces", signal: "traces" },
-] as const;
-
-const windowOptions = [
-  { label: "Last 15 minutes", value: "15m" },
-  { label: "Last hour", value: "1h" },
-  { label: "Last 6 hours", value: "6h" },
-  { label: "Last 24 hours", value: "24h" },
-  { label: "Last 7 days", value: "7d" },
-] satisfies ReadonlyArray<SelectOption<TelemetryWindow>>;
+import { overviewContextFailure } from "./explore-context";
+import { ExploreNavigation } from "./explore-navigation";
 
 export function ExplorePage() {
   const search = useSearch({ from: "/explore" });
-  const navigate = useNavigate({ from: "/explore" });
   const runtime = useRuntimeQuery();
   const overview = useOverviewQuery(runtime.data?.projectId ?? null);
   const services = overview.data?.services ?? [];
-  const serviceOptions = [
-    { label: "All services", value: "*" },
-    ...services.map((service) => ({ label: service.name, value: String(service.name) })),
-  ];
+  const contextFailure = overviewContextFailure(overview);
 
   return (
     <>
-      <div {...stylex.props(styles.navigationWrap)}>
-        <nav aria-label="Telemetry signals" {...stylex.props(styles.signalNav)}>
-          {tabs.map((tab) => (
-            <Link
-              aria-current={search.signal === tab.signal ? "page" : undefined}
-              key={tab.signal}
-              search={{ ...search, signal: tab.signal }}
-              to="/explore"
-              {...stylex.props(
-                styles.signalLink,
-                search.signal === tab.signal && styles.signalLinkActive,
-              )}
-            >
-              {tab.label}
-            </Link>
-          ))}
-        </nav>
-        <div {...stylex.props(styles.contextControls)}>
-          {services.length > 1 ? (
-            <span {...stylex.props(styles.serviceControl)}>
-              <SelectControl
-                ariaLabel="Filter by service"
-                onChange={(service) =>
-                  void navigate({
-                    search: (current) => ({
-                      ...current,
-                      service: service === "*" ? undefined : service,
-                    }),
-                  })
-                }
-                options={serviceOptions}
-                placeholder="All services"
-                value={search.service ?? "*"}
-              />
-            </span>
-          ) : null}
-          <span {...stylex.props(styles.windowControl)}>
-            <SelectControl
-              ariaLabel="Select time range"
-              onChange={(window) =>
-                void navigate({ search: (current) => ({ ...current, window }) })
-              }
-              options={windowOptions}
-              placeholder="Last hour"
-              value={search.window}
-            />
-          </span>
-        </div>
-      </div>
+      <ExploreNavigation services={services} />
       {search.signal === "metrics" ? (
         <MetricsExplorer
+          contextFailure={contextFailure}
+          contextRetrying={overview.isFetching}
+          onRetryContext={() => void overview.refetch()}
           selectedMetric={search.metric}
           service={search.service}
           window={search.window}
         />
       ) : null}
       {search.signal === "logs" ? (
-        <LogsPage service={search.service} window={search.window} />
+        <LogsPage
+          contextFailure={contextFailure}
+          contextRetrying={overview.isFetching}
+          onRetryContext={() => void overview.refetch()}
+          service={search.service}
+          window={search.window}
+        />
       ) : null}
       {search.signal === "traces" ? (
-        <TracesPage service={search.service} window={search.window} />
+        <TracesPage
+          contextFailure={contextFailure}
+          contextRetrying={overview.isFetching}
+          onRetryContext={() => void overview.refetch()}
+          service={search.service}
+          window={search.window}
+        />
       ) : null}
     </>
   );
 }
 
 function MetricsExplorer({
+  contextFailure,
+  contextRetrying = false,
+  onRetryContext,
   selectedMetric,
   service,
   window,
 }: {
+  contextFailure?: unknown;
+  contextRetrying?: boolean;
+  onRetryContext?: () => void;
   selectedMetric?: string;
   service?: string;
   window: TelemetryWindow;
@@ -154,6 +110,22 @@ function MetricsExplorer({
   );
   const series = metricResult.data ? toPanelSeries(metricResult.data.series) : [];
   const axis: Axis = { id: "left", unit: { _tag: "auto" } };
+  const catalogUnavailable =
+    (runtime.isError && !runtime.data) || (catalog.isError && !catalog.data);
+  const metricUnavailable = metricResult.isError && !metricResult.data;
+  const catalogFailure = runtime.isError && !runtime.data ? runtime.error : catalog.error;
+  const returnPath = `/explore?signal=metrics&window=${window}${selectedMetric ? `&metric=${encodeURIComponent(selectedMetric)}` : ""}${service ? `&service=${encodeURIComponent(service)}` : ""}`;
+  const staleFailure =
+    catalogUnavailable || metricUnavailable || !catalog.data
+      ? null
+      : (runtime.error ?? catalog.error ?? metricResult.error ?? contextFailure);
+  const retryFailedQueries = () => {
+    if (runtime.isError) void runtime.refetch();
+    if (runtime.isError && !runtime.data) return;
+    if (catalog.isError) void catalog.refetch();
+    if (metricResult.isError) void metricResult.refetch();
+    if (contextFailure !== null && contextFailure !== undefined) onRetryContext?.();
+  };
 
   return (
     <Page>
@@ -161,25 +133,46 @@ function MetricsExplorer({
         description="Inspect every metric your services emit without changing the board."
         title="Metrics"
       />
-      {!runtime.isError && !catalog.isError && (runtime.isPending || catalog.isPending) ? (
+      {!catalogUnavailable && !catalog.data && (runtime.isPending || catalog.isPending) ? (
         <ContentState kind="loading" title="Discovering metrics" />
       ) : null}
-      {runtime.isError || catalog.isError ? (
+      {catalogUnavailable ? (
         <ContentState
           actions={
-            <RetryButton
-              onRetry={() => {
-                void runtime.refetch();
-                void catalog.refetch();
+            <ConsoleFailureActions
+              error={catalogFailure}
+              invalidRequest={{
+                href: "/explore?signal=metrics&window=1h",
+                label: "Reset explorer",
               }}
+              notFound={{ href: "/connect", label: "Open connection setup" }}
+              onRetry={retryFailedQueries}
+              returnPath={returnPath}
             />
           }
           kind="error"
           title="Metrics are unavailable"
         >
-          {errorMessage(runtime.error ?? catalog.error)}
+          {errorMessage(catalogFailure)}
         </ContentState>
       ) : null}
+      <StaleDataNotice
+        copy="Some metric data or service context may be out of date."
+        error={staleFailure}
+        invalidRequest={{
+          href: "/explore?signal=metrics&window=1h",
+          label: "Reset explorer",
+        }}
+        notFound={{
+          href: "/explore?signal=metrics&window=1h",
+          label: "Choose another metric",
+        }}
+        onRetry={retryFailedQueries}
+        retrying={
+          runtime.isFetching || catalog.isFetching || metricResult.isFetching || contextRetrying
+        }
+        returnPath={returnPath}
+      />
       {catalog.data?.length === 0 ? (
         <ContentState title="No metrics yet">
           Send OTLP metrics to this project and they will appear here automatically.
@@ -249,11 +242,25 @@ function MetricsExplorer({
                 <Stat label="Series" value={String(metricResult.data?.series.length ?? 0)} />
               </div>
               <div {...stylex.props(styles.chartFrame)}>
-                {metricResult.isPending ? (
+                {metricResult.isPending && !metricResult.data ? (
                   <ContentState kind="loading" title="Loading metric" />
-                ) : metricResult.isError ? (
+                ) : metricUnavailable ? (
                   <ContentState
-                    actions={<RetryButton onRetry={() => void metricResult.refetch()} />}
+                    actions={
+                      <ConsoleFailureActions
+                        error={metricResult.error}
+                        invalidRequest={{
+                          href: "/explore?signal=metrics&window=1h",
+                          label: "Reset explorer",
+                        }}
+                        notFound={{
+                          href: "/explore?signal=metrics&window=1h",
+                          label: "Choose another metric",
+                        }}
+                        onRetry={retryFailedQueries}
+                        returnPath={returnPath}
+                      />
+                    }
                     kind="error"
                     title="This metric is unavailable"
                   >
@@ -298,50 +305,6 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 const styles = stylex.create({
-  navigationWrap: {
-    alignItems: "center",
-    borderBottomColor: colors.line,
-    borderBottomStyle: "solid",
-    borderBottomWidth: 1,
-    display: "flex",
-    flexWrap: "wrap",
-    gap: space.x3,
-    justifyContent: "space-between",
-    marginInline: "auto",
-    maxWidth: 1400,
-    paddingInline: { default: space.x6, "@media (max-width: 620px)": space.x5 },
-    paddingTop: space.x4,
-  },
-  signalNav: { alignItems: "center", display: "flex", gap: space.x1 },
-  signalLink: {
-    borderBottomColor: "transparent",
-    borderBottomStyle: "solid",
-    borderBottomWidth: 2,
-    color: { default: colors.textSubtle, ":hover": colors.text },
-    fontSize: 12,
-    fontWeight: 500,
-    paddingBlock: 11,
-    paddingInline: space.x3,
-    textDecoration: "none",
-  },
-  signalLinkActive: { borderBottomColor: colors.amber, color: colors.text },
-  contextControls: {
-    alignItems: "center",
-    display: "flex",
-    gap: space.x2,
-    justifyContent: { default: "end", "@media (max-width: 620px)": "start" },
-    width: { default: "auto", "@media (max-width: 620px)": "100%" },
-  },
-  serviceControl: {
-    display: "block",
-    flex: { default: "0 0 auto", "@media (max-width: 620px)": "1 1 auto" },
-    width: { default: 180, "@media (max-width: 620px)": "auto" },
-  },
-  windowControl: {
-    display: "block",
-    flex: { default: "0 0 auto", "@media (max-width: 620px)": "1 1 auto" },
-    width: { default: 156, "@media (max-width: 620px)": "auto" },
-  },
   metricsLayout: {
     display: "grid",
     gap: space.x5,

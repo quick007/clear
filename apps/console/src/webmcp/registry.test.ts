@@ -71,15 +71,16 @@ const fakeSessions = (initial: ToolSessionSnapshot) => {
 const fakeModelContext = (
   config: {
     readonly failOnce?: string;
+    readonly failCount?: number;
     readonly waitFor?: (name: string, signal: AbortSignal | undefined) => Promise<void>;
   } = {},
 ) => {
   const tools = new Map<string, WebMCP.ModelContextTool>();
-  let failed = false;
+  let failuresRemaining = config.failOnce === undefined ? 0 : (config.failCount ?? 1);
   const target: ModelContextTarget = {
     registerTool: async (tool, registrationOptions) => {
-      if (tool.name === config.failOnce && !failed) {
-        failed = true;
+      if (tool.name === config.failOnce && failuresRemaining > 0) {
+        failuresRemaining -= 1;
         throw new Error(`failed ${tool.name}`);
       }
       await config.waitFor?.(tool.name, registrationOptions?.signal);
@@ -187,7 +188,8 @@ describe("GroundtruthToolRegistry", () => {
     ).not.toHaveProperty("step");
   });
 
-  it("rolls back partial registration and can retry the same registry", async () => {
+  it("rolls back partial registration and retries startup automatically", async () => {
+    vi.useFakeTimers();
     const sessions = fakeSessions({ projectId, mode: "hosted", incident: null });
     const modelContext = fakeModelContext({ failOnce: "get_console_overview" });
     const registry = new GroundtruthToolRegistry({
@@ -195,16 +197,47 @@ describe("GroundtruthToolRegistry", () => {
       sessions: sessions.source,
       operations: fakeOperations(),
     });
+    const report = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-    await expect(registry.start()).rejects.toThrow("failed get_console_overview");
-    expect(modelContext.tools.size).toBe(0);
-
-    await registry.start();
+    const started = registry.start();
+    await vi.runAllTimersAsync();
+    await started;
     expect(modelContext.tools.has("get_console_overview")).toBe(true);
+    expect(report).toHaveBeenCalledWith(
+      "[Clear] session site tool registration failed",
+      expect.objectContaining({ cause: expect.any(Error) }),
+    );
     registry.stop();
+    report.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it("retries a failed dynamic scope during initial reconciliation", async () => {
+    vi.useFakeTimers();
+    const sessions = fakeSessions({ projectId, mode: "sandbox", incident: null });
+    const modelContext = fakeModelContext({ failOnce: "start_sandbox_incident" });
+    const registry = new GroundtruthToolRegistry({
+      modelContext: modelContext.target,
+      sessions: sessions.source,
+      operations: fakeOperations(),
+    });
+    const report = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const started = registry.start();
+    await vi.runAllTimersAsync();
+    await started;
+    expect(modelContext.tools.has("start_sandbox_incident")).toBe(true);
+    expect(report).toHaveBeenCalledWith(
+      "[Clear] sandbox site tool registration failed",
+      expect.objectContaining({ cause: expect.any(Error) }),
+    );
+    registry.stop();
+    report.mockRestore();
+    vi.useRealTimers();
   });
 
   it("recovers from a failed dynamic scope update", async () => {
+    vi.useFakeTimers();
     const sessions = fakeSessions({ projectId, mode: "hosted", incident: null });
     const modelContext = fakeModelContext({ failOnce: "add_timeline_note" });
     const registry = new GroundtruthToolRegistry({
@@ -212,16 +245,51 @@ describe("GroundtruthToolRegistry", () => {
       sessions: sessions.source,
       operations: fakeOperations(),
     });
-    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const report = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     await registry.start();
     await sessions.set({ projectId, mode: "hosted", incident: openIncident });
     expect(modelContext.tools.has("add_timeline_note")).toBe(false);
+    expect(report).toHaveBeenCalledWith(
+      "[Clear] incident site tool registration failed",
+      expect.objectContaining({ cause: expect.any(Error) }),
+    );
 
-    await sessions.set({ projectId, mode: "hosted", incident: openIncident });
+    await vi.runAllTimersAsync();
+    await flushTasks();
     expect(modelContext.tools.has("add_timeline_note")).toBe(true);
-    warning.mockRestore();
+    report.mockRestore();
     registry.stop();
+    vi.useRealTimers();
+  });
+
+  it("stops retrying and rejects after persistent registration failures", async () => {
+    vi.useFakeTimers();
+    const sessions = fakeSessions({ projectId, mode: "hosted", incident: null });
+    const modelContext = fakeModelContext({
+      failOnce: "get_console_overview",
+      failCount: 10,
+    });
+    const registry = new GroundtruthToolRegistry({
+      modelContext: modelContext.target,
+      sessions: sessions.source,
+      operations: fakeOperations(),
+    });
+    const report = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const outcome = registry.start().then(
+      () => ({ _tag: "Started" as const }),
+      (error: unknown) => ({ _tag: "Failed" as const, error }),
+    );
+    await vi.runAllTimersAsync();
+    await expect(outcome).resolves.toMatchObject({
+      _tag: "Failed",
+      error: { _tag: "WebMcpRegistrationFailure", scope: "session" },
+    });
+    expect(modelContext.tools.size).toBe(0);
+    expect(report).toHaveBeenCalledTimes(5);
+    report.mockRestore();
+    vi.useRealTimers();
   });
 
   it("restarts cleanly and prevents pending reconciliation from reviving stopped tools", async () => {

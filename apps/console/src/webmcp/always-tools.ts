@@ -132,7 +132,7 @@ export const makeAlwaysTools = (operations: GroundtruthToolOperations) =>
       readOnly: false,
       returnsUntrustedContent: true,
       invoke: operations.openIncident,
-      afterSuccess: () => operations.refreshSession(),
+      afterSuccess: (_, signal) => operations.refreshSession(signal),
       format: compactIncident,
       resultOptions: (incident) => ({ truncated: incidentWasCompacted(incident) }),
       successHint:

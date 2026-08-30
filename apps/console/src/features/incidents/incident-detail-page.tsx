@@ -13,10 +13,14 @@ import {
   formatShortTime,
 } from "../../data/format";
 import { useCloseIncident, useIncidentQuery, useRuntimeQuery } from "../../data/queries";
+import { mutationOutcomeIsUnknown } from "../../errors";
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
+import { ConsoleFailureActions } from "../../ui/console-failure-actions";
 import { Icon } from "../../ui/icon";
-import { ContentState, Page, RetryButton } from "../../ui/page";
+import { MutationFailureNotice } from "../../ui/mutation-failure-notice";
+import { ContentState, Page } from "../../ui/page";
+import { StaleDataNotice } from "../../ui/stale-data-notice";
 import { StatusPill } from "../../ui/status";
 import { HypothesisList } from "../../app/situation-strip";
 
@@ -25,30 +29,40 @@ export function IncidentDetailPage() {
   const runtime = useRuntimeQuery();
   const projectId = runtime.data?.projectId ?? null;
   const incident = useIncidentQuery(projectId, incidentId);
+  const incidentLoading =
+    (runtime.isPending && !runtime.data) || (incident.isPending && !incident.data);
+  const incidentUnavailable = !runtime.data || !projectId || !incident.data;
+  const failure = runtime.isError && !runtime.data ? runtime.error : incident.error;
+  const staleFailure = incidentUnavailable ? null : (runtime.error ?? incident.error);
+  const retryFailedQueries = () => {
+    if (runtime.isError) void runtime.refetch();
+    if (runtime.isError && !runtime.data) return;
+    if (incident.isError) void incident.refetch();
+  };
 
-  if (!runtime.isError && !incident.isError && (runtime.isPending || incident.isPending)) {
+  if (incidentLoading) {
     return (
       <Page>
         <ContentState kind="loading" title="Loading investigation" />
       </Page>
     );
   }
-  if (runtime.isError || incident.isError || !incident.data || !projectId) {
+  if (incidentUnavailable) {
     return (
       <Page>
         <ContentState
           actions={
-            <RetryButton
-              onRetry={() => {
-                void runtime.refetch();
-                void incident.refetch();
-              }}
+            <ConsoleFailureActions
+              error={failure}
+              notFound={{ href: "/incidents", label: "Back to incidents" }}
+              onRetry={retryFailedQueries}
+              returnPath={`/incidents/${encodeURIComponent(incidentId)}`}
             />
           }
           kind="error"
           title="The investigation is unavailable"
         >
-          {errorMessage(runtime.error ?? incident.error)}
+          {errorMessage(failure)}
         </ContentState>
       </Page>
     );
@@ -65,6 +79,14 @@ export function IncidentDetailPage() {
       <Link to="/incidents" {...stylex.props(styles.back)}>
         <Icon icon={ArrowLeft02Icon} size={15} /> Incidents
       </Link>
+      <StaleDataNotice
+        copy="Showing the last loaded investigation."
+        error={staleFailure}
+        notFound={{ href: "/incidents", label: "Back to incidents" }}
+        onRetry={retryFailedQueries}
+        retrying={runtime.isFetching || incident.isFetching}
+        returnPath={`/incidents/${encodeURIComponent(incidentId)}`}
+      />
       <header {...stylex.props(styles.header)}>
         <div {...stylex.props(styles.heading)}>
           <StatusPill tone={isOpen ? "critical" : "healthy"}>{detail.incident.status}</StatusPill>
@@ -128,12 +150,14 @@ function CloseIncidentDialog({
   const [summary, setSummary] = useState("");
   const [attempted, setAttempted] = useState(false);
   const closeIncident = useCloseIncident(projectId);
+  const incident = useIncidentQuery(projectId, incidentId);
   const invalid = summary.trim().length === 0;
+  const outcomeUnknown = closeIncident.isError && mutationOutcomeIsUnknown(closeIncident.error);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setAttempted(true);
-    if (invalid) return;
+    if (invalid || outcomeUnknown) return;
     closeIncident.mutate(
       {
         incidentId,
@@ -145,8 +169,10 @@ function CloseIncidentDialog({
 
   return (
     <Dialog.Root
+      disablePointerDismissal={closeIncident.isPending || outcomeUnknown}
       onOpenChange={(nextOpen) => {
-        if (nextOpen) {
+        if (!nextOpen && (closeIncident.isPending || outcomeUnknown)) return;
+        if (nextOpen && !outcomeUnknown) {
           setSummary("");
           setAttempted(false);
           closeIncident.reset();
@@ -169,7 +195,11 @@ function CloseIncidentDialog({
                   Leave a concise resolution for the next person who reads this timeline.
                 </Dialog.Description>
               </div>
-              <Dialog.Close aria-label="Close dialog" {...stylex.props(styles.close)}>
+              <Dialog.Close
+                aria-label="Close dialog"
+                disabled={closeIncident.isPending || outcomeUnknown}
+                {...stylex.props(styles.close)}
+              >
                 <Icon icon={Cancel01Icon} size={18} />
               </Dialog.Close>
             </header>
@@ -191,12 +221,30 @@ function CloseIncidentDialog({
                 <p {...stylex.props(styles.formError)}>Add a resolution before closing.</p>
               ) : null}
               {closeIncident.isError ? (
-                <p {...stylex.props(styles.formError)}>{errorMessage(closeIncident.error)}</p>
+                <MutationFailureNotice
+                  checkLabel="Check incident state"
+                  checking={incident.isFetching}
+                  error={closeIncident.error}
+                  onCheckState={() => {
+                    void incident.refetch().then((result) => {
+                      if (!result.isSuccess) return;
+                      closeIncident.reset();
+                      if (result.data.incident.status === "closed") setOpen(false);
+                    });
+                  }}
+                />
               ) : null}
             </div>
             <footer {...stylex.props(styles.dialogFooter)}>
-              <Dialog.Close render={<Button tone="ghost">Cancel</Button>} />
-              <Button disabled={closeIncident.isPending} tone="primary" type="submit">
+              <Dialog.Close
+                disabled={closeIncident.isPending || outcomeUnknown}
+                render={<Button tone="ghost">Cancel</Button>}
+              />
+              <Button
+                disabled={closeIncident.isPending || outcomeUnknown}
+                tone="primary"
+                type="submit"
+              >
                 {closeIncident.isPending ? "Closing incident" : "Close incident"}
               </Button>
             </footer>

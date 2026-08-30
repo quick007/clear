@@ -16,22 +16,22 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { useLogoutMutation } from "../data/queries";
+import { mutationOutcomeIsUnknown } from "../errors";
 import { colors, radii, space } from "../theme/tokens.stylex";
 import { ClearMark } from "../ui/clear-mark";
 import { Icon } from "../ui/icon";
+import { MutationFailureNotice } from "../ui/mutation-failure-notice";
 import { accountInitials, serviceSummary } from "./sidebar-format";
 import { SidebarNavLink } from "./sidebar-nav-link";
 import { navigationStyles } from "./sidebar-navigation.styles";
 
-export function WorkspaceSidebar({
-  overview,
-  overviewState,
-  session,
-}: {
-  overview?: ConsoleOverview;
-  overviewState: "error" | "loading" | "ready";
-  session?: SessionView;
-}) {
+interface WorkspaceNavigationProps {
+  readonly overview?: ConsoleOverview;
+  readonly overviewState: "error" | "loading" | "ready";
+  readonly session?: SessionView;
+}
+
+export function WorkspaceSidebar({ overview, overviewState, session }: WorkspaceNavigationProps) {
   return (
     <aside {...stylex.props(styles.desktopSidebar)}>
       <SidebarContent overview={overview} overviewState={overviewState} session={session} />
@@ -43,11 +43,7 @@ export function MobileWorkspaceHeader({
   overview,
   overviewState,
   session,
-}: {
-  overview?: ConsoleOverview;
-  overviewState: "error" | "loading" | "ready";
-  session?: SessionView;
-}) {
+}: WorkspaceNavigationProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -91,13 +87,9 @@ function SidebarContent({
   overview,
   overviewState,
   session,
-}: {
-  onNavigate?: () => void;
-  overview?: ConsoleOverview;
-  overviewState: "error" | "loading" | "ready";
-  session?: SessionView;
-}) {
+}: WorkspaceNavigationProps & { readonly onNavigate?: () => void }) {
   const logout = useLogoutMutation();
+  const logoutOutcomeUnknown = logout.isError && mutationOutcomeIsUnknown(logout.error);
   const account = session?.account;
   const accountName = account?.displayName ?? account?.email ?? "Account";
   const initials = accountInitials(accountName);
@@ -192,21 +184,34 @@ function SidebarContent({
 
       <div {...stylex.props(styles.bottom)}>
         {account ? (
-          <div {...stylex.props(styles.account)}>
-            <span {...stylex.props(styles.avatar)}>{initials}</span>
-            <span {...stylex.props(styles.accountCopy)}>
-              <strong {...stylex.props(styles.accountName)}>{accountName}</strong>
-              <span {...stylex.props(styles.accountDetail)}>{account.email}</span>
-            </span>
-            <button
-              aria-label="Sign out"
-              disabled={logout.isPending}
-              onClick={() => logout.mutate()}
-              type="button"
-              {...stylex.props(styles.logout)}
-            >
-              <Icon icon={Logout01Icon} size={17} />
-            </button>
+          <div>
+            <div {...stylex.props(styles.account)}>
+              <span {...stylex.props(styles.avatar)}>{initials}</span>
+              <span {...stylex.props(styles.accountCopy)}>
+                <strong {...stylex.props(styles.accountName)}>{accountName}</strong>
+                <span {...stylex.props(styles.accountDetail)}>{account.email}</span>
+              </span>
+              <button
+                aria-label="Sign out"
+                disabled={logout.isPending || logoutOutcomeUnknown}
+                onClick={() => {
+                  logout.reset();
+                  logout.mutate();
+                }}
+                type="button"
+                {...stylex.props(styles.logout)}
+              >
+                <Icon icon={Logout01Icon} size={17} />
+              </button>
+            </div>
+            {logout.isError ? (
+              <MutationFailureNotice
+                checkLabel="Check session"
+                compact
+                error={logout.error}
+                onCheckState={() => window.location.reload()}
+              />
+            ) : null}
           </div>
         ) : (
           <a
@@ -396,6 +401,13 @@ const styles = stylex.create({
     height: 32,
     justifyContent: "center",
     width: 32,
+  },
+  logoutError: {
+    color: colors.red,
+    fontSize: 10,
+    lineHeight: 1.4,
+    marginBlock: space.x2,
+    paddingInline: space.x2,
   },
   mobileHeader: {
     alignItems: "center",

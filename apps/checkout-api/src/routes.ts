@@ -8,7 +8,7 @@ import {
 import { CheckoutService } from "./checkout-service.js";
 import { CheckoutConfig } from "./config.js";
 import { CheckoutRequest, CheckoutResponse } from "./contracts.js";
-import { PaymentUnavailable } from "./errors.js";
+import { CheckoutConflict, PaymentUnavailable } from "./errors.js";
 import { RequestGuards } from "./security.js";
 
 const health = HttpServerResponse.jsonUnsafe({
@@ -35,10 +35,18 @@ const checkoutRoute = Effect.gen(function* () {
             },
             { status: 503 },
           )
-        : HttpServerResponse.jsonUnsafe(
-            { code: "invalid_request", message: "The checkout request is invalid" },
-            { status: 400 },
-          ),
+        : error instanceof CheckoutConflict
+          ? HttpServerResponse.jsonUnsafe(
+              {
+                code: "invalid_request",
+                message: "This checkout request was already used for a different order",
+              },
+              { status: 409 },
+            )
+          : HttpServerResponse.jsonUnsafe(
+              { code: "invalid_request", message: "The checkout request is invalid" },
+              { status: 400 },
+            ),
     ),
   ),
   Effect.catchCause((cause) =>

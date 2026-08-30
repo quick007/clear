@@ -40,7 +40,7 @@ export const makeIncidentTools = (operations: GroundtruthToolOperations) =>
       readOnly: false,
       returnsUntrustedContent: true,
       invoke: operations.closeIncident,
-      afterSuccess: () => operations.refreshSession(),
+      afterSuccess: (_, signal) => operations.refreshSession(signal),
       format: compactIncident,
       resultOptions: (incident) => ({ truncated: incidentWasCompacted(incident) }),
       successHint: "The incident-scoped tools are now unavailable until another incident opens.",
