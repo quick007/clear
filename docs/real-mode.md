@@ -4,11 +4,11 @@ Real mode connects an existing OpenTelemetry-instrumented system to a durable Cl
 
 ## Hosted status
 
-The anonymous incident experience is live at [clear-observability.seufert.chatgpt.site](https://clear-observability.seufert.chatgpt.site/).
+The Clear console and anonymous incident experience are live at [clear.seufert.sh](https://clear.seufert.sh/).
 
-The current API and OTLP/HTTP fallback is `https://clear-runtime.onrender.com`. Its interactive API reference is at [`/docs`](https://clear-runtime.onrender.com/docs), and the OpenAPI document is at [`/openapi.json`](https://clear-runtime.onrender.com/openapi.json).
+The API is live at `https://api.clear.seufert.sh`, and OTLP/HTTP ingest is live at `https://otlp.clear.seufert.sh`. The interactive API reference is at [`api.clear.seufert.sh/docs`](https://api.clear.seufert.sh/docs), and the OpenAPI document is at [`api.clear.seufert.sh/openapi.json`](https://api.clear.seufert.sh/openapi.json).
 
-Durable project login is not live on the fallback hostnames. The ChatGPT Sites identity handoff and API session cookie require the planned sibling domains `clear.seufert.sh` and `api.clear.seufert.sh`. Until those DNS records and certificates are active, use the anonymous demo. The steps below describe the durable-project flow that becomes available after that cutover.
+Sign in with ChatGPT to create a durable project and ingest key, then use the steps below to connect your telemetry.
 
 ## Boundary
 
@@ -17,8 +17,6 @@ Clear needs a telemetry ingest key, not execution credentials.
 Give Clear an ingest key through your OpenTelemetry exporter. Do not give it source-control tokens, cloud credentials, SSH keys, deployment keys, or access to your agent. Your own agent keeps using the repository and infrastructure access you already configured.
 
 ## 1. Create an ingest key
-
-After durable login is enabled:
 
 1. Open `https://clear.seufert.sh` and sign in with ChatGPT.
 2. Open **Settings**, then **Ingest keys**.
@@ -35,7 +33,7 @@ Set the standard OpenTelemetry variables on your service or upstream Collector:
 
 ```sh
 export CLEAR_INGEST_KEY=<your-ingest-key>
-export OTEL_EXPORTER_OTLP_ENDPOINT=https://clear-runtime.onrender.com
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.clear.seufert.sh
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 export OTEL_EXPORTER_OTLP_HEADERS="x-clear-ingest-key=${CLEAR_INGEST_KEY}"
 export OTEL_SERVICE_NAME=<stable-service-name>
@@ -65,7 +63,7 @@ Send an authenticated event after a successful deploy:
 
 ```sh
 curl --fail-with-body \
-  -X POST https://clear-runtime.onrender.com/v1/events/deploy \
+  -X POST https://api.clear.seufert.sh/v1/events/deploy \
   -H 'content-type: application/json' \
   -H "x-clear-ingest-key: ${CLEAR_INGEST_KEY}" \
   --data '{

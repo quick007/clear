@@ -354,7 +354,7 @@ The public Sites page also does not document the exact server-handler framework 
 - Call `https://api.clear.seufert.sh` with `credentials: "include"` and exact credentialed CORS for `https://clear.seufert.sh`.
 - Verify cookie behavior in the actual ChatGPT browser. Sharing `seufert.sh` makes the two HTTPS origins same-site, but they remain cross-origin and still require CORS.
 
-Custom domains and Sign in with ChatGPT are availability-gated beta features. Keep the generated `*.chatgpt.site` URL as a fallback until `clear.seufert.sh` is verified from a signed-out browser and a fresh ChatGPT browser profile.
+Custom domains and Sign in with ChatGPT are availability-gated beta features. The canonical console and API now use sibling `seufert.sh` domains. Keep the generated `*.chatgpt.site` and `*.onrender.com` hostnames enabled as secondary operational fallbacks.
 
 ## Test plan
 

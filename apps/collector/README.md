@@ -155,7 +155,7 @@ The queue is intentionally in memory. Collector authentication context is not sa
 
 ## Hosted configuration
 
-The hosted configuration binds OTLP/HTTP behind the stateful Render service's Nginx ingress. The current public endpoint is `https://clear-runtime.onrender.com`; `https://otlp.clear.seufert.sh` is reserved for the later custom-domain cutover. The health listener remains private.
+The hosted configuration binds OTLP/HTTP behind the stateful Render service's Nginx ingress. The canonical public endpoint is `https://otlp.clear.seufert.sh`. The Render hostname remains enabled as an operational fallback, and the health listener remains private.
 
 `config/local.yaml` exposes gRPC and HTTP for contributor development. Hosted gRPC is deferred for the hackathon release.
 

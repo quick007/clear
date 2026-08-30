@@ -4,22 +4,22 @@ The hosted hackathon topology is deliberately small. ChatGPT Sites publishes the
 
 ## Topology
 
-| Component           | Local address           | Current hosted fallback                            | Runtime                 |
-| ------------------- | ----------------------- | -------------------------------------------------- | ----------------------- |
-| Console             | `http://localhost:5173` | `https://clear-observability.seufert.chatgpt.site` | ChatGPT Sites           |
-| Checkout storefront | `http://localhost:5174` | `https://clear-checkout.seufert.chatgpt.site`      | ChatGPT Sites           |
-| Effect API          | `http://localhost:3000` | `https://clear-runtime.onrender.com`               | stateful Render service |
-| OTLP/HTTP           | `http://localhost:4318` | `https://clear-runtime.onrender.com`               | stateful Render service |
-| OTLP/gRPC           | `localhost:4317`        | not hosted                                         | local development only  |
-| Checkout API        | `http://localhost:4101` | `https://clear-checkout-api.onrender.com`          | separate Render service |
-| Payments stub       | `http://localhost:4102` | `clear-runtime` authenticated internal route       | stateful Render service |
-| Load controller     | `http://localhost:4103` | `clear-runtime` authenticated internal route       | stateful Render service |
-| PostgreSQL          | `localhost:5432`        | internal listener on persistent disk               | stateful Render service |
-| ClickHouse HTTP     | `http://localhost:8123` | internal listener on persistent disk               | stateful Render service |
+| Component           | Local address           | Hosted address                                | Runtime                 |
+| ------------------- | ----------------------- | --------------------------------------------- | ----------------------- |
+| Console             | `http://localhost:5173` | `https://clear.seufert.sh`                    | ChatGPT Sites           |
+| Checkout storefront | `http://localhost:5174` | `https://clear-checkout.seufert.chatgpt.site` | ChatGPT Sites           |
+| Effect API          | `http://localhost:3000` | `https://api.clear.seufert.sh`                | stateful Render service |
+| OTLP/HTTP           | `http://localhost:4318` | `https://otlp.clear.seufert.sh`               | stateful Render service |
+| OTLP/gRPC           | `localhost:4317`        | not hosted                                    | local development only  |
+| Checkout API        | `http://localhost:4101` | `https://clear-checkout-api.onrender.com`     | separate Render service |
+| Payments stub       | `http://localhost:4102` | `clear-runtime` authenticated internal route  | stateful Render service |
+| Load controller     | `http://localhost:4103` | `clear-runtime` authenticated internal route  | stateful Render service |
+| PostgreSQL          | `localhost:5432`        | internal listener on persistent disk          | stateful Render service |
+| ClickHouse HTTP     | `http://localhost:8123` | internal listener on persistent disk          | stateful Render service |
 
-The fallback console supports the anonymous sandbox. Durable project login is not live there because the Sites identity handoff and API session cookie require sibling custom domains. The planned production hostnames are `clear.seufert.sh`, `checkout.clear.seufert.sh`, `api.clear.seufert.sh`, `otlp.clear.seufert.sh`, and `checkout-api.clear.seufert.sh`. They remain pending until DNS records and certificates are active.
+The console, Effect API, and OTLP/HTTP receiver use active sibling domains under `seufert.sh`. This keeps the login handoff same-site while the API continues to enforce exact credentialed CORS. Provider hostnames remain enabled as operational fallbacks. The example checkout still uses its provider hostnames.
 
-The runtime exposes an interactive API reference at `https://clear-runtime.onrender.com/docs` and its OpenAPI document at `https://clear-runtime.onrender.com/openapi.json`.
+The runtime exposes an interactive API reference at `https://api.clear.seufert.sh/docs` and its OpenAPI document at `https://api.clear.seufert.sh/openapi.json`.
 
 The stateful Render service uses the `1c-2g` plan and one 10 GB disk. Nginx receives Render's public port and routes requests to the API or Collector. PostgreSQL, ClickHouse, the payments stub, and the scenario controller are not exposed as standalone public services.
 

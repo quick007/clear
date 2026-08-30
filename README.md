@@ -13,13 +13,13 @@ Clear stops at observability. It never checks out your repository, stores deploy
 
 ## Try it
 
-| Surface          | URL                                                                                          |
-| ---------------- | -------------------------------------------------------------------------------------------- |
-| Live sandbox     | [clear-observability.seufert.chatgpt.site](https://clear-observability.seufert.chatgpt.site) |
-| Example checkout | [clear-checkout.seufert.chatgpt.site](https://clear-checkout.seufert.chatgpt.site)           |
-| Runtime health   | [clear-runtime.onrender.com/health](https://clear-runtime.onrender.com/health)               |
-| API reference    | [clear-runtime.onrender.com/docs](https://clear-runtime.onrender.com/docs)                   |
-| Source           | [github.com/quick007/clear](https://github.com/quick007/clear)                               |
+| Surface          | URL                                                                                |
+| ---------------- | ---------------------------------------------------------------------------------- |
+| Live app         | [clear.seufert.sh](https://clear.seufert.sh)                                       |
+| Example checkout | [clear-checkout.seufert.chatgpt.site](https://clear-checkout.seufert.chatgpt.site) |
+| Runtime health   | [api.clear.seufert.sh/health](https://api.clear.seufert.sh/health)                 |
+| API reference    | [api.clear.seufert.sh/docs](https://api.clear.seufert.sh/docs)                     |
+| Source           | [github.com/quick007/clear](https://github.com/quick007/clear)                     |
 
 The anonymous sandbox and real OTLP runtime are live. Sign in with ChatGPT when you want to create a project and point your own exporter at Clear. The submission video is recorded against the real checkout stack.
 
@@ -92,7 +92,7 @@ Clear accepts the three stable signals at their standard paths:
 - `POST /v1/logs`
 - `POST /v1/traces`
 
-The hosted runtime exposes OTLP/HTTP protobuf and JSON at `https://clear-runtime.onrender.com`. Public OTLP/gRPC is intentionally out of scope for the hackathon deployment, but it remains available in the local contributor stack.
+The hosted runtime exposes OTLP/HTTP protobuf and JSON at `https://otlp.clear.seufert.sh`. Public OTLP/gRPC is intentionally out of scope for the hackathon deployment, but it remains available in the local contributor stack.
 
 See the [OpenTelemetry quickstart](docs/otel-quickstart.md) for application and upstream Collector setup.
 
@@ -201,7 +201,7 @@ media/devpost/      Reproducible Devpost source captures and outputs
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
-- [OpenAPI](https://clear-runtime.onrender.com/openapi.json)
+- [OpenAPI](https://api.clear.seufert.sh/openapi.json)
 
 ## License
 

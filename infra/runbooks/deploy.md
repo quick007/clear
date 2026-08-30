@@ -29,12 +29,12 @@ Database readiness retries are bounded. Invalid configuration, authentication fa
 ## Domains and Sites
 
 1. Publish the console and checkout storefront as separate Sites projects.
-2. Configure the console build and worker with the current `clear-runtime.onrender.com` origin and the shared handoff secret.
+2. Configure the console build and worker with the canonical `api.clear.seufert.sh` origin and the shared handoff secret.
 3. Configure the checkout build with the current `clear-checkout-api.onrender.com` origin.
 4. Set the matching public origins in Render's environment before deploying.
-5. Keep all fallback hostnames enabled and verify them before any optional custom-domain cutover.
+5. Keep all provider fallback hostnames enabled and verify them before changing custom-domain routing.
 
-Custom domains are not declared in the Blueprint. Attach them manually only after the owning DNS zone is available, then copy the exact targets Render and Sites provide and follow `infra/domains.md`. Durable login remains disabled on the fallback cross-site hostnames.
+Custom domains are not declared in the Blueprint. The active console, API, and OTLP/HTTP domains were attached manually through Sites, Render, and the owning DNS zone. Follow `infra/domains.md` when changing them or attaching the planned checkout domains. Durable login depends on the active sibling console and API domains.
 
 ## Example services
 
@@ -48,7 +48,7 @@ The checkout service's build filter contains only `apps/checkout-api` and requir
 
 Before routing judges to a release:
 
-- `https://clear-runtime.onrender.com/health` reports both databases ready.
+- `https://api.clear.seufert.sh/health` reports both databases ready.
 - `https://clear-checkout-api.onrender.com/readyz` passes.
 - The Collector accepts OTLP/HTTP protobuf and JSON on `/v1/metrics`, `/v1/logs`, and `/v1/traces`.
 - Invalid and conflicting ingest credentials are rejected.

@@ -8,7 +8,7 @@ Clear accepts metrics, logs, and traces through standard OTLP. Use the official 
 2. A project ingest key.
 3. A stable `service.name` for each service.
 
-The current hosted OTLP/HTTP base endpoint is `https://clear-runtime.onrender.com`. The planned `https://otlp.clear.seufert.sh` hostname is not live yet.
+The hosted OTLP/HTTP base endpoint is `https://otlp.clear.seufert.sh`.
 
 For local development:
 
@@ -20,14 +20,14 @@ export OTEL_EXPORTER_OTLP_HEADERS="x-clear-ingest-key=${CLEAR_INGEST_KEY}"
 export OTEL_SERVICE_NAME=my-service
 ```
 
-For the hosted service, replace the endpoint with `https://clear-runtime.onrender.com` and use the ingest key copied from your durable Clear project. Durable project login is waiting on the custom-domain cutover, so new hosted keys cannot be created through the fallback console yet. Do not use the checked-in local key outside isolated development.
+For the hosted service, replace the endpoint with `https://otlp.clear.seufert.sh` and use the ingest key copied from your durable Clear project at [clear.seufert.sh](https://clear.seufert.sh). Do not use the checked-in local key outside isolated development.
 
 ## Supported transports
 
 | Transport          | Local base endpoint     | Hosted base endpoint                      |
 | ------------------ | ----------------------- | ----------------------------------------- |
-| OTLP/HTTP protobuf | `http://localhost:4318` | `https://clear-runtime.onrender.com`      |
-| OTLP/HTTP JSON     | `http://localhost:4318` | `https://clear-runtime.onrender.com`      |
+| OTLP/HTTP protobuf | `http://localhost:4318` | `https://otlp.clear.seufert.sh`           |
+| OTLP/HTTP JSON     | `http://localhost:4318` | `https://otlp.clear.seufert.sh`           |
 | OTLP/gRPC          | `localhost:4317`        | not available in the hackathon deployment |
 
 OTLP/HTTP uses the standard signal paths:
@@ -78,7 +78,7 @@ An existing OpenTelemetry Collector can forward all signals to Clear over OTLP/H
 ```yaml
 exporters:
   otlphttp/clear:
-    endpoint: https://clear-runtime.onrender.com
+    endpoint: https://otlp.clear.seufert.sh
     headers:
       x-clear-ingest-key: ${env:CLEAR_INGEST_KEY}
 
@@ -138,8 +138,8 @@ These are safety limits, not sizing promises. Review them together with API, Cli
 
 ## API reference
 
-- Interactive reference: [clear-runtime.onrender.com/docs](https://clear-runtime.onrender.com/docs)
-- OpenAPI document: [clear-runtime.onrender.com/openapi.json](https://clear-runtime.onrender.com/openapi.json)
+- Interactive reference: [api.clear.seufert.sh/docs](https://api.clear.seufert.sh/docs)
+- OpenAPI document: [api.clear.seufert.sh/openapi.json](https://api.clear.seufert.sh/openapi.json)
 
 The API reference covers project operations and the deploy-event webhook. OTLP payload schemas follow the OpenTelemetry protocol rather than the Clear OpenAPI document.
 

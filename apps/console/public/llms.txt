@@ -28,17 +28,18 @@ Agent guidance:
 
 Documentation:
 - Repository: https://github.com/quick007/clear
-- Live anonymous demo: https://clear-observability.seufert.chatgpt.site/
-- Current API and OTLP/HTTP base: https://clear-runtime.onrender.com
-- Interactive API reference: https://clear-runtime.onrender.com/docs
-- OpenAPI document: https://clear-runtime.onrender.com/openapi.json
+- Live console and anonymous demo: https://clear.seufert.sh/
+- API base: https://api.clear.seufert.sh
+- OTLP/HTTP base: https://otlp.clear.seufert.sh
+- Interactive API reference: https://api.clear.seufert.sh/docs
+- OpenAPI document: https://api.clear.seufert.sh/openapi.json
 - Architecture: https://github.com/quick007/clear/blob/main/docs/architecture.md
 - OpenTelemetry quickstart: https://github.com/quick007/clear/blob/main/docs/otel-quickstart.md
 - Connect a project: https://github.com/quick007/clear/blob/main/docs/real-mode.md
 
 Session modes:
 - Without an authenticated browser session, the console opens an isolated two-hour sandbox.
-- Durable project login requires the planned sibling custom domains and is not live on the fallback Sites and Render hostnames yet.
+- Sign in with ChatGPT on the live console to create a durable project and ingest keys.
 - Read the active console's Connect page for its exact OTLP endpoint and authentication header. Do not assume localhost or a particular hosted domain.
 
 Telemetry integration:
