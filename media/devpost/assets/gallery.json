@@ -104,7 +104,7 @@
   },
   {
     "id": "devpost-hero",
-    "description": "Clear and a clean Codex task over the real homepage material, composed only from live captures.",
+    "description": "A single glass Clear dashboard over the real homepage material.",
     "output": "clear-devpost-hero.png",
     "canvas": {
       "width": 1800,
@@ -120,9 +120,9 @@
       {
         "source": "homepageMaterial",
         "x": 0,
-        "y": 350,
+        "y": 0,
         "width": 1800,
-        "height": 850,
+        "height": 1200,
         "fit": "cover",
         "position": "centre",
         "crop": {
@@ -132,95 +132,54 @@
           "height": 1440
         },
         "style": {
+          "fadeTop": 360,
           "modulate": {
-            "brightness": 0.76,
-            "saturation": 0.8
-          }
-        }
-      },
-      {
-        "source": "codexAgent",
-        "x": 82,
-        "y": 498,
-        "width": 760,
-        "height": 428,
-        "fit": "cover",
-        "position": "north",
-        "style": {
-          "borderRadius": 24,
-          "border": {
-            "width": 2,
-            "color": "#ffffff",
-            "opacity": 0.42
-          },
-          "shadow": {
-            "x": 0,
-            "y": 22,
-            "blur": 34,
-            "spread": 2,
-            "color": "#020505",
-            "opacity": 0.34
+            "brightness": 0.7,
+            "saturation": 0.86
           }
         }
       },
       {
         "source": "boardAgent",
-        "x": 596,
-        "y": 304,
-        "width": 1120,
-        "height": 630,
+        "x": 80,
+        "y": 220,
+        "width": 1640,
+        "height": 923,
         "fit": "cover",
         "position": "north",
+        "crop": {
+          "left": 480,
+          "top": 80,
+          "width": 2080,
+          "height": 1170
+        },
         "style": {
-          "borderRadius": 24,
+          "opacity": 0.84,
+          "borderRadius": 32,
           "border": {
             "width": 2,
             "color": "#ffffff",
-            "opacity": 0.42
+            "opacity": 0.34
           },
           "shadow": {
             "x": 0,
-            "y": 24,
-            "blur": 40,
+            "y": 30,
+            "blur": 52,
             "spread": 2,
             "color": "#020505",
-            "opacity": 0.34
+            "opacity": 0.4
           }
         }
       }
     ],
     "editorial": {
       "theme": "dark",
-      "brand": {
-        "x": 84,
-        "y": 58,
-        "label": "Clear"
-      },
       "headline": {
-        "x": 340,
-        "y": 38,
-        "lines": ["Your agent knows the code. Clear brings the evidence."],
-        "size": 46,
-        "subtitle": "Real OpenTelemetry signals and WebMCP tools, shared in one investigation."
-      },
-      "callouts": [
-        {
-          "x": 106,
-          "y": 976,
-          "width": 362,
-          "title": "Your agent",
-          "detail": "Investigates, then fixes its attached repo",
-          "tone": "neutral"
-        },
-        {
-          "x": 1326,
-          "y": 976,
-          "width": 350,
-          "title": "Clear",
-          "detail": "Keeps the evidence shared and visible",
-          "tone": "signal"
-        }
-      ]
+        "x": 360,
+        "y": 40,
+        "lines": ["Agent Driven Observability"],
+        "size": 88
+      }
     }
   }
 ]

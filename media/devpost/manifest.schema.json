@@ -127,6 +127,7 @@
       "additionalProperties": false,
       "properties": {
         "opacity": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "fadeTop": { "type": "integer", "minimum": 1 },
         "borderRadius": { "type": "integer", "minimum": 0 },
         "border": {
           "type": "object",

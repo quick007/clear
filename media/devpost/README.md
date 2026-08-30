@@ -26,7 +26,7 @@ Do not include keys, tokens, local paths, unrelated browser tabs, or unfinished 
 | File                                      | Size         | Purpose                            |
 | ----------------------------------------- | ------------ | ---------------------------------- |
 | `outputs/clear-devpost-thumbnail.jpg`     | 1800 by 1200 | Project card and gallery thumbnail |
-| `outputs/clear-devpost-hero.png`          | 1800 by 1200 | Clear and Codex hero composition   |
+| `outputs/clear-devpost-hero.png`          | 1800 by 1200 | Clear dashboard hero               |
 | `outputs/clear-board-reveal.png`          | 1920 by 1080 | Retry-storm evidence               |
 | `outputs/clear-agent-collaboration.png`   | 1920 by 1080 | Shared human-agent investigation   |
 | `outputs/clear-trace-log-correlation.png` | 1920 by 1080 | Correlated trace and log evidence  |
@@ -52,9 +52,10 @@ The renderer fails with the exact missing source and its capture instructions. I
 
 ## Composition rules
 
-- Keep UI captures fully opaque and at their natural aspect ratio.
+- Keep evidence captures fully opaque and at their natural aspect ratio. The hero dashboard may use restrained transparency for its glass treatment.
 - Tone down only the homepage shader material used behind the captures.
-- Use no more than one headline and three evidence callouts per image.
+- Keep the hero to one headline and one dashboard. Do not add a separate logo, agent capture, subtitle, or callout.
+- Use no more than one headline and three evidence callouts on evidence images.
 - Keep labels factual. The screenshot is the source of truth.
 - Point at the exact chart line, trace span, log row, or deploy marker being described.
 - Prefer a focused crop over shrinking an entire interface until it is unreadable.

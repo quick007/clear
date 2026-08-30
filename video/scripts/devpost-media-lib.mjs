@@ -66,6 +66,9 @@ const validateStyle = (style, label, failures) => {
   if (style.opacity !== undefined && !isNumberInRange(style.opacity, Number.EPSILON, 1)) {
     failures.push(`${label}.style.opacity must be greater than 0 and at most 1`);
   }
+  if (style.fadeTop !== undefined && !isPositiveInteger(style.fadeTop)) {
+    failures.push(`${label}.style.fadeTop must be a positive integer`);
+  }
   if (style.borderRadius !== undefined && !isNonNegativeInteger(style.borderRadius)) {
     failures.push(`${label}.style.borderRadius must be a non-negative integer`);
   }
@@ -135,6 +138,9 @@ const validateLayer = (layer, asset, index, sourceIds, failures) => {
   }
   if (!fits.has(layer.fit)) failures.push(`${label}.fit is not supported`);
   if (!positions.has(layer.position)) failures.push(`${label}.position is not supported`);
+  if (layer.style?.fadeTop !== undefined && layer.style.fadeTop > layer.height) {
+    failures.push(`${label}.style.fadeTop must not exceed the layer height`);
+  }
   if (layer.crop !== undefined) {
     if (!isRecord(layer.crop)) {
       failures.push(`${label}.crop must be an object`);
@@ -354,6 +360,11 @@ const roundedMask = (width, height, radius, opacity) =>
     `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="${width}" height="${height}" rx="${radius}" fill="#fff" fill-opacity="${opacity}"/></svg>`,
   );
 
+const topFadeMask = (width, height, fadeTop) =>
+  Buffer.from(
+    `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="fade" x1="0" y1="0" x2="0" y2="${fadeTop}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity="1"/></linearGradient></defs><rect width="${width}" height="${height}" fill="url(#fade)"/></svg>`,
+  );
+
 const shadowSvg = (canvas, layer) => {
   const shadow = layer.style.shadow;
   const spread = shadow.spread;
@@ -394,6 +405,17 @@ const renderLayer = async (layer, sourcePath) => {
     buffer = await sharp(buffer)
       .composite([
         { input: roundedMask(layer.width, layer.height, radius, opacity), blend: "dest-in" },
+      ])
+      .png()
+      .toBuffer();
+  }
+  if (layer.style?.fadeTop) {
+    buffer = await sharp(buffer)
+      .composite([
+        {
+          input: topFadeMask(layer.width, layer.height, layer.style.fadeTop),
+          blend: "dest-in",
+        },
       ])
       .png()
       .toBuffer();
