@@ -3,7 +3,7 @@ import { IncidentId, NonEmptyText } from "@groundtruth/domain";
 import { ArrowLeft02Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { Dialog } from "@base-ui/react/dialog";
 import * as stylex from "@stylexjs/stylex";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 
 import {
@@ -26,6 +26,7 @@ import { HypothesisList } from "../../app/situation-strip";
 
 export function IncidentDetailPage() {
   const { incidentId } = useParams({ from: "/incidents/$incidentId" });
+  const navigate = useNavigate({ from: "/incidents/$incidentId" });
   const runtime = useRuntimeQuery();
   const projectId = runtime.data?.projectId ?? null;
   const incident = useIncidentQuery(projectId, incidentId);
@@ -99,7 +100,11 @@ export function IncidentDetailPage() {
           </div>
         </div>
         {isOpen ? (
-          <CloseIncidentDialog incidentId={detail.incident.id} projectId={projectId} />
+          <CloseIncidentDialog
+            incidentId={detail.incident.id}
+            onClosed={() => void navigate({ search: { guide: undefined }, to: "/board" })}
+            projectId={projectId}
+          />
         ) : null}
       </header>
 
@@ -141,9 +146,11 @@ export function IncidentDetailPage() {
 
 function CloseIncidentDialog({
   incidentId,
+  onClosed,
   projectId,
 }: {
   incidentId: ReturnType<typeof IncidentId.make>;
+  onClosed: () => void;
   projectId: Parameters<typeof useCloseIncident>[0];
 }) {
   const [open, setOpen] = useState(false);
@@ -163,7 +170,7 @@ function CloseIncidentDialog({
         incidentId,
         payload: CloseIncidentRequest.make({ summary: NonEmptyText.make(summary.trim()) }),
       },
-      { onSuccess: () => setOpen(false) },
+      { onSuccess: onClosed },
     );
   };
 
@@ -229,7 +236,7 @@ function CloseIncidentDialog({
                     void incident.refetch().then((result) => {
                       if (!result.isSuccess) return;
                       closeIncident.reset();
-                      if (result.data.incident.status === "closed") setOpen(false);
+                      if (result.data.incident.status === "closed") onClosed();
                     });
                   }}
                 />
