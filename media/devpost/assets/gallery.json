@@ -104,12 +104,12 @@
   },
   {
     "id": "devpost-hero",
-    "description": "A single glass Clear dashboard over the real homepage material.",
+    "description": "A shared Codex and Clear investigation workspace over the real homepage material.",
     "output": "clear-devpost-hero.png",
     "canvas": {
       "width": 1800,
       "height": 1200,
-      "background": "#070909"
+      "background": "#050707"
     },
     "format": {
       "type": "png",
@@ -120,9 +120,9 @@
       {
         "source": "homepageMaterial",
         "x": 0,
-        "y": 0,
+        "y": 180,
         "width": 1800,
-        "height": 1200,
+        "height": 1020,
         "fit": "cover",
         "position": "centre",
         "crop": {
@@ -132,42 +132,37 @@
           "height": 1440
         },
         "style": {
-          "fadeTop": 360,
+          "fadeTop": 420,
           "modulate": {
-            "brightness": 0.7,
-            "saturation": 0.86
+            "brightness": 0.9,
+            "saturation": 1
           }
         }
       },
       {
-        "source": "boardAgent",
-        "x": 80,
-        "y": 220,
-        "width": 1640,
-        "height": 923,
+        "source": "heroWorkspace",
+        "x": 64,
+        "y": 350,
+        "width": 1672,
+        "height": 940,
         "fit": "cover",
         "position": "north",
-        "crop": {
-          "left": 480,
-          "top": 80,
-          "width": 2080,
-          "height": 1170
-        },
+        "clipToCanvas": true,
         "style": {
-          "opacity": 0.84,
-          "borderRadius": 32,
+          "opacity": 0.92,
+          "borderRadius": 28,
           "border": {
             "width": 2,
             "color": "#ffffff",
-            "opacity": 0.34
+            "opacity": 0.28
           },
           "shadow": {
             "x": 0,
-            "y": 30,
-            "blur": 52,
+            "y": 24,
+            "blur": 48,
             "spread": 2,
             "color": "#020505",
-            "opacity": 0.4
+            "opacity": 0.35
           }
         }
       }
@@ -176,7 +171,7 @@
       "theme": "dark",
       "headline": {
         "x": 360,
-        "y": 40,
+        "y": 50,
         "lines": ["Agent Driven Observability"],
         "size": 88
       }

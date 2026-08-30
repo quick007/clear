@@ -8,6 +8,7 @@
   "scripts": {
     "build": "vp run -r build",
     "dev": "vp run console#dev",
+    "media:prepare:hero": "vp exec node video/scripts/prepare-hero-workspace.mjs",
     "media:render": "vp exec node video/scripts/render-devpost-assets.mjs",
     "media:validate": "vp exec node video/scripts/validate-devpost-assets.mjs",
     "media:validate:manifest": "vp exec node video/scripts/validate-devpost-assets.mjs --manifest-only",

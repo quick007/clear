@@ -21,6 +21,7 @@ const expectedSources = [
   "boardReveal",
   "codexAgent",
   "boardAgent",
+  "heroWorkspace",
   "traceDetail",
   "logDetail",
   "recoveryBoard",
@@ -131,7 +132,13 @@ const validateLayer = (layer, asset, index, sourceIds, failures) => {
   if (![layer.width, layer.height].every(isPositiveInteger)) {
     failures.push(`${label} width and height must be positive integers`);
   }
-  if (layer.x + layer.width > asset.canvas.width || layer.y + layer.height > asset.canvas.height) {
+  if (layer.clipToCanvas !== undefined && typeof layer.clipToCanvas !== "boolean") {
+    failures.push(`${label}.clipToCanvas must be a boolean`);
+  }
+  if (
+    layer.clipToCanvas !== true &&
+    (layer.x + layer.width > asset.canvas.width || layer.y + layer.height > asset.canvas.height)
+  ) {
     failures.push(
       `${label} extends beyond the ${asset.canvas.width}x${asset.canvas.height} canvas`,
     );

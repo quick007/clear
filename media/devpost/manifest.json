@@ -64,6 +64,42 @@
         "state": "Use the same incident state shown in the Codex source capture."
       }
     },
+    "boardAgentTop": {
+      "file": "board-agent-top.png",
+      "description": "Clean top-of-board Clear capture after the retry amplification diagnosis.",
+      "capture": {
+        "route": "/board?guide=true",
+        "viewport": {
+          "width": 2471,
+          "height": 1434
+        },
+        "state": "Fresh sandbox at scroll top with the rejected surge hypothesis, confirmed retry hypothesis, and no stale-session notices."
+      }
+    },
+    "codexWorkspaceReference": {
+      "file": "codex-workspace-reference.png",
+      "description": "User-provided Codex investigation reference used only for its clean left task pane.",
+      "capture": {
+        "route": "Codex desktop task",
+        "viewport": {
+          "width": 2902,
+          "height": 2002
+        },
+        "state": "Focused Clear checkout investigation with the root-cause summary visible."
+      }
+    },
+    "heroWorkspace": {
+      "file": "hero-workspace.png",
+      "description": "Deterministic split workspace combining the clean Codex task and diagnosed Clear board.",
+      "capture": {
+        "route": "Derived from the Codex and Clear source captures",
+        "viewport": {
+          "width": 2560,
+          "height": 1440
+        },
+        "state": "Codex occupies the left 30 percent and Clear occupies the right 70 percent with no browser chrome or stale-session notices."
+      }
+    },
     "traceDetail": {
       "file": "trace-detail.png",
       "description": "A real trace detail view from the manufactured checkout incident.",

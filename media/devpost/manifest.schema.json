@@ -118,6 +118,7 @@
         "height": { "$ref": "#/$defs/positiveInteger" },
         "fit": { "enum": ["cover", "contain"] },
         "position": { "enum": ["centre", "north", "south", "east", "west"] },
+        "clipToCanvas": { "type": "boolean" },
         "crop": { "$ref": "#/$defs/crop" },
         "style": { "$ref": "#/$defs/style" }
       }
