@@ -1,0 +1,484 @@
+[
+  {
+    "id": "board-reveal",
+    "description": "The decisive requests, users, and retries evidence on the Clear board.",
+    "output": "clear-board-reveal.png",
+    "canvas": {
+      "width": 1920,
+      "height": 1080,
+      "background": "#070909"
+    },
+    "format": {
+      "type": "png",
+      "compressionLevel": 9
+    },
+    "maxBytes": 10000000,
+    "layers": [
+      {
+        "source": "homepage",
+        "x": 0,
+        "y": 310,
+        "width": 1920,
+        "height": 770,
+        "fit": "cover",
+        "position": "centre",
+        "crop": {
+          "left": 0,
+          "top": 520,
+          "width": 2560,
+          "height": 920
+        },
+        "style": {
+          "modulate": {
+            "brightness": 0.72,
+            "saturation": 0.76
+          }
+        }
+      },
+      {
+        "source": "boardReveal",
+        "x": 96,
+        "y": 108,
+        "width": 1728,
+        "height": 972,
+        "fit": "cover",
+        "position": "north",
+        "style": {
+          "borderRadius": 26,
+          "border": {
+            "width": 2,
+            "color": "#ffffff",
+            "opacity": 0.3
+          },
+          "shadow": {
+            "x": 0,
+            "y": 20,
+            "blur": 32,
+            "spread": 2,
+            "color": "#020505",
+            "opacity": 0.3
+          }
+        }
+      }
+    ],
+    "editorial": {
+      "theme": "dark",
+      "brand": {
+        "x": 56,
+        "y": 36,
+        "label": "Clear"
+      },
+      "headline": {
+        "x": 306,
+        "y": 12,
+        "lines": ["The traffic tripled. The users did not."],
+        "size": 36,
+        "subtitle": "The evidence points past the surge and into retry amplification."
+      },
+      "callouts": [
+        {
+          "x": 86,
+          "y": 900,
+          "width": 270,
+          "title": "Requests surge",
+          "detail": "Load keeps climbing",
+          "tone": "warning",
+          "anchor": {
+            "x": 588,
+            "y": 506
+          }
+        },
+        {
+          "x": 820,
+          "y": 900,
+          "width": 264,
+          "title": "Users stay flat",
+          "detail": "Demand never changed",
+          "tone": "signal",
+          "anchor": {
+            "x": 958,
+            "y": 498
+          }
+        },
+        {
+          "x": 1532,
+          "y": 900,
+          "width": 300,
+          "title": "Retries dominate",
+          "detail": "Amplification confirmed",
+          "tone": "danger",
+          "anchor": {
+            "x": 1330,
+            "y": 506
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "agent-collaboration",
+    "description": "A real Codex task beside the corresponding Clear board, over the real homepage material.",
+    "output": "clear-agent-collaboration.png",
+    "canvas": {
+      "width": 1920,
+      "height": 1080,
+      "background": "#070909"
+    },
+    "format": {
+      "type": "png",
+      "compressionLevel": 9
+    },
+    "maxBytes": 10000000,
+    "layers": [
+      {
+        "source": "homepage",
+        "x": 0,
+        "y": 310,
+        "width": 1920,
+        "height": 770,
+        "fit": "cover",
+        "position": "centre",
+        "crop": {
+          "left": 0,
+          "top": 520,
+          "width": 2560,
+          "height": 920
+        },
+        "style": {
+          "modulate": {
+            "brightness": 0.72,
+            "saturation": 0.76
+          }
+        }
+      },
+      {
+        "source": "codexAgent",
+        "x": 64,
+        "y": 300,
+        "width": 800,
+        "height": 450,
+        "fit": "cover",
+        "position": "north",
+        "style": {
+          "borderRadius": 26,
+          "border": {
+            "width": 2,
+            "color": "#ffffff",
+            "opacity": 0.3
+          },
+          "shadow": {
+            "x": 0,
+            "y": 18,
+            "blur": 30,
+            "spread": 2,
+            "color": "#020505",
+            "opacity": 0.3
+          }
+        }
+      },
+      {
+        "source": "boardAgent",
+        "x": 720,
+        "y": 320,
+        "width": 1136,
+        "height": 639,
+        "fit": "cover",
+        "position": "north",
+        "style": {
+          "borderRadius": 26,
+          "border": {
+            "width": 2,
+            "color": "#ffffff",
+            "opacity": 0.3
+          },
+          "shadow": {
+            "x": 0,
+            "y": 18,
+            "blur": 30,
+            "spread": 2,
+            "color": "#020505",
+            "opacity": 0.3
+          }
+        }
+      }
+    ],
+    "editorial": {
+      "theme": "dark",
+      "brand": {
+        "x": 56,
+        "y": 44,
+        "label": "Clear"
+      },
+      "headline": {
+        "x": 306,
+        "y": 26,
+        "lines": ["One investigation, shared between you and your agent."],
+        "size": 38,
+        "subtitle": "The agent brings repository access. Clear keeps the telemetry in view."
+      },
+      "callouts": [
+        {
+          "x": 84,
+          "y": 784,
+          "width": 300,
+          "title": "Codex",
+          "detail": "Checkout repository attached",
+          "tone": "neutral"
+        },
+        {
+          "x": 1510,
+          "y": 900,
+          "width": 300,
+          "title": "Clear",
+          "detail": "Live incident evidence",
+          "tone": "signal"
+        }
+      ]
+    }
+  },
+  {
+    "id": "trace-log-correlation",
+    "description": "Trace and log evidence from the same real incident time window.",
+    "output": "clear-trace-log-correlation.png",
+    "canvas": {
+      "width": 1920,
+      "height": 1080,
+      "background": "#070909"
+    },
+    "format": {
+      "type": "png",
+      "compressionLevel": 9
+    },
+    "maxBytes": 10000000,
+    "layers": [
+      {
+        "source": "homepage",
+        "x": 0,
+        "y": 310,
+        "width": 1920,
+        "height": 770,
+        "fit": "cover",
+        "position": "centre",
+        "crop": {
+          "left": 0,
+          "top": 520,
+          "width": 2560,
+          "height": 920
+        },
+        "style": {
+          "modulate": {
+            "brightness": 0.72,
+            "saturation": 0.76
+          }
+        }
+      },
+      {
+        "source": "traceDetail",
+        "x": 500,
+        "y": 64,
+        "width": 1356,
+        "height": 438,
+        "fit": "cover",
+        "position": "north",
+        "crop": {
+          "left": 360,
+          "top": 280,
+          "width": 2160,
+          "height": 700
+        },
+        "style": {
+          "borderRadius": 26,
+          "border": {
+            "width": 2,
+            "color": "#ffffff",
+            "opacity": 0.3
+          },
+          "shadow": {
+            "x": 0,
+            "y": 18,
+            "blur": 30,
+            "spread": 2,
+            "color": "#020505",
+            "opacity": 0.3
+          }
+        }
+      },
+      {
+        "source": "logDetail",
+        "x": 500,
+        "y": 578,
+        "width": 1356,
+        "height": 438,
+        "fit": "cover",
+        "position": "north",
+        "crop": {
+          "left": 360,
+          "top": 280,
+          "width": 2160,
+          "height": 700
+        },
+        "style": {
+          "borderRadius": 26,
+          "border": {
+            "width": 2,
+            "color": "#ffffff",
+            "opacity": 0.3
+          },
+          "shadow": {
+            "x": 0,
+            "y": 18,
+            "blur": 30,
+            "spread": 2,
+            "color": "#020505",
+            "opacity": 0.3
+          }
+        }
+      }
+    ],
+    "editorial": {
+      "theme": "dark",
+      "brand": {
+        "x": 64,
+        "y": 64,
+        "label": "Clear"
+      },
+      "headline": {
+        "x": 64,
+        "y": 154,
+        "lines": ["Follow one failure", "from trace to log."],
+        "size": 48,
+        "subtitle": "Correlated OpenTelemetry evidence."
+      },
+      "callouts": [
+        {
+          "x": 64,
+          "y": 520,
+          "width": 328,
+          "title": "Retry chain",
+          "detail": "Three attempts, one request",
+          "tone": "warning",
+          "anchor": {
+            "x": 690,
+            "y": 310
+          }
+        },
+        {
+          "x": 64,
+          "y": 650,
+          "width": 328,
+          "title": "Upstream 503",
+          "detail": "Same service, same moment",
+          "tone": "danger",
+          "anchor": {
+            "x": 690,
+            "y": 798
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "deploy-recovery",
+    "description": "The real deploy marker and the checkout service recovering on the Clear board.",
+    "output": "clear-deploy-recovery.png",
+    "canvas": {
+      "width": 1920,
+      "height": 1080,
+      "background": "#070909"
+    },
+    "format": {
+      "type": "png",
+      "compressionLevel": 9
+    },
+    "maxBytes": 10000000,
+    "layers": [
+      {
+        "source": "homepage",
+        "x": 0,
+        "y": 310,
+        "width": 1920,
+        "height": 770,
+        "fit": "cover",
+        "position": "centre",
+        "crop": {
+          "left": 0,
+          "top": 520,
+          "width": 2560,
+          "height": 920
+        },
+        "style": {
+          "modulate": {
+            "brightness": 0.72,
+            "saturation": 0.76
+          }
+        }
+      },
+      {
+        "source": "recoveryBoard",
+        "x": 96,
+        "y": 108,
+        "width": 1728,
+        "height": 972,
+        "fit": "cover",
+        "position": "north",
+        "style": {
+          "borderRadius": 26,
+          "border": {
+            "width": 2,
+            "color": "#ffffff",
+            "opacity": 0.3
+          },
+          "shadow": {
+            "x": 0,
+            "y": 20,
+            "blur": 32,
+            "spread": 2,
+            "color": "#020505",
+            "opacity": 0.3
+          }
+        }
+      }
+    ],
+    "editorial": {
+      "theme": "dark",
+      "brand": {
+        "x": 56,
+        "y": 36,
+        "label": "Clear"
+      },
+      "headline": {
+        "x": 306,
+        "y": 12,
+        "lines": ["A real deploy. A visible recovery."],
+        "size": 36,
+        "subtitle": "Clear records the change and shows the telemetry returning to baseline."
+      },
+      "callouts": [
+        {
+          "x": 86,
+          "y": 900,
+          "width": 292,
+          "title": "Deploy recorded",
+          "detail": "Real commit and timestamp",
+          "tone": "signal",
+          "anchor": {
+            "x": 1008,
+            "y": 516
+          }
+        },
+        {
+          "x": 1532,
+          "y": 900,
+          "width": 300,
+          "title": "System recovers",
+          "detail": "Retries and latency fall",
+          "tone": "healthy",
+          "anchor": {
+            "x": 1350,
+            "y": 516
+          }
+        }
+      ]
+    }
+  }
+]

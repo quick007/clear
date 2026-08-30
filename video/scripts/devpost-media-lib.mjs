@@ -1,12 +1,12 @@
-import { access, mkdir, readFile, rename, stat } from "node:fs/promises";
+import { access, mkdir, rename, stat } from "node:fs/promises";
 import { dirname, extname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
+import { renderEditorial, validateEditorial } from "./devpost-editorial.mjs";
+import { readManifestTree } from "./devpost-manifest-tree.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
-
 export const defaultManifestPath = resolve(scriptDirectory, "../../media/devpost/manifest.json");
-
 const expectedAssets = new Map([
   ["homepage-thumbnail", [1800, 1200, "clear-devpost-thumbnail.jpg"]],
   ["devpost-hero", [1800, 1200, "clear-devpost-hero.png"]],
@@ -26,7 +26,7 @@ const expectedSources = [
   "recoveryBoard",
 ];
 
-const fits = new Set(["cover", "contain", "fill"]);
+const fits = new Set(["cover", "contain"]);
 const positions = new Set(["centre", "north", "south", "east", "west"]);
 const hexColor = /^#[0-9a-f]{6}$/i;
 const imageExtensions = new Set([".avif", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"]);
@@ -244,6 +244,7 @@ const validateManifest = (manifest, rawManifest) => {
         validateLayer(layer, asset, index, sourceIds, failures),
       );
     }
+    validateEditorial(asset.editorial, asset.canvas, asset.id, failures);
   }
 
   for (const [assetId, [width, height, output]] of expectedAssets) {
@@ -263,13 +264,7 @@ const validateManifest = (manifest, rawManifest) => {
 
 export const loadManifest = async (manifestPath) => {
   const absoluteManifestPath = resolve(manifestPath);
-  const rawManifest = await readFile(absoluteManifestPath, "utf8");
-  let manifest;
-  try {
-    manifest = JSON.parse(rawManifest);
-  } catch (error) {
-    throw new Error(`Cannot parse ${absoluteManifestPath}: ${error.message}`);
-  }
+  const { manifest, rawManifest } = await readManifestTree(absoluteManifestPath);
   const failures = validateManifest(manifest, rawManifest);
   if (failures.length > 0) throw new Error(`Invalid media manifest:\n${formatFailures(failures)}`);
   const rootDirectory = dirname(absoluteManifestPath);
@@ -321,6 +316,14 @@ export const inspectSources = async ({ assets, manifest, sourceDirectory }) => {
         failures.push(`${sourceId}: ${sourcePath} is not a readable image`);
       } else {
         metadata.set(sourceId, { ...imageMetadata, path: sourcePath });
+        if (
+          imageMetadata.width !== source.capture.viewport.width ||
+          imageMetadata.height !== source.capture.viewport.height
+        ) {
+          failures.push(
+            `${sourceId}: expected ${source.capture.viewport.width}x${source.capture.viewport.height}, got ${imageMetadata.width}x${imageMetadata.height}`,
+          );
+        }
       }
     } catch {
       const capture = source.capture;
@@ -408,6 +411,8 @@ export const renderAsset = async ({ asset, outputDirectory, sourceMetadata }) =>
     if (layer.style?.border)
       composites.push({ input: borderSvg(asset.canvas, layer), left: 0, top: 0 });
   }
+  const editorial = renderEditorial(asset.canvas, asset.editorial);
+  if (editorial) composites.push({ input: editorial, left: 0, top: 0 });
 
   const outputPath = resolve(outputDirectory, asset.output);
   const temporaryPath = `${outputPath}.${process.pid}.tmp`;
@@ -423,7 +428,7 @@ export const renderAsset = async ({ asset, outputDirectory, sourceMetadata }) =>
   output =
     asset.format.type === "jpeg"
       ? output.jpeg({ quality: asset.format.quality, chromaSubsampling: "4:4:4" })
-      : output.png({ compressionLevel: asset.format.compressionLevel, adaptiveFiltering: false });
+      : output.png({ compressionLevel: asset.format.compressionLevel, adaptiveFiltering: true });
   await output.toFile(temporaryPath);
   await rename(temporaryPath, outputPath);
   return outputPath;
