@@ -22,25 +22,25 @@ export function HomePage() {
             <span>Clear</span>
           </a>
 
-          <h1 {...stylex.props(styles.title)}>See clearly.</h1>
+          <h1 {...stylex.props(styles.title)}>Your agent knows the code. Give it the evidence.</h1>
           <p {...stylex.props(styles.description)}>
-            OpenTelemetry for you and the agent that knows your code.
+            Metrics, logs, traces, and deploys in one live OpenTelemetry workspace for both of you.
           </p>
 
           <div {...stylex.props(styles.actions)}>
             <Link
-              search={{ start: true }}
+              search={{ guide: true }}
               to="/board"
               {...stylex.props(buttonStyles.button, buttonToneStyles.primary, buttonStyles.large)}
             >
-              Demo incident
+              Investigate an incident
               <Icon icon={ArrowRight01Icon} size={17} />
             </Link>
             <a
               href={loginHref}
               {...stylex.props(buttonStyles.button, buttonToneStyles.secondary, buttonStyles.large)}
             >
-              Log in
+              Connect your telemetry
             </a>
           </div>
         </section>
@@ -54,7 +54,7 @@ const styles = stylex.create({
     backgroundColor: "#070909",
     color: colors.text,
     minHeight: "100svh",
-    overflow: "hidden",
+    overflowX: "hidden",
     position: "relative",
   },
   main: {
@@ -77,7 +77,7 @@ const styles = stylex.create({
     boxShadow: "0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 32px 100px rgba(0, 0, 0, 0.18)",
     display: "flex",
     flexDirection: "column",
-    maxWidth: "clamp(680px, 32vw, 820px)",
+    maxWidth: 780,
     paddingBlock: {
       default: "clamp(64px, 3.1vw, 80px)",
       "@media (max-width: 620px)": space.x10,
@@ -87,7 +87,7 @@ const styles = stylex.create({
       "@media (max-width: 620px)": space.x6,
     },
     textAlign: "center",
-    width: "100%",
+    width: "min(100%, 780px)",
   },
   brand: {
     alignItems: "center",
@@ -102,14 +102,15 @@ const styles = stylex.create({
   },
   title: {
     fontSize: {
-      default: "clamp(72px, 3.2vw, 84px)",
-      "@media (max-width: 620px)": 52,
-      "@media (max-width: 390px)": 44,
+      default: "clamp(54px, 4.4vw, 78px)",
+      "@media (max-width: 620px)": 46,
+      "@media (max-width: 390px)": 40,
     },
     fontWeight: 500,
-    letterSpacing: "-0.06em",
-    lineHeight: 0.96,
+    letterSpacing: "-0.055em",
+    lineHeight: 0.98,
     margin: 0,
+    maxWidth: 680,
     textWrap: "balance",
   },
   description: {

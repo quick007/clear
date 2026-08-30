@@ -73,16 +73,21 @@ export function HomeAtmosphere() {
           <StaticMeshGradient
             ref={shaderRef}
             colors={shaderColors}
+            fit="cover"
             grainMixer={0.28}
             grainOverlay={0.2}
             maxPixelCount={2_800_000}
             minPixelRatio={1}
             mixing={0.72}
+            offsetY={0.06}
             positions={shaderPosition}
+            scale={1.04}
             waveX={0.62}
             waveXShift={shaderWaveXShift}
             waveY={0.48}
             waveYShift={shaderWaveYShift}
+            worldHeight={9}
+            worldWidth={16}
             width="100%"
             height="100%"
             {...stylex.props(styles.shader)}
@@ -107,16 +112,14 @@ const styles = stylex.create({
   shaderFrame: {
     backgroundImage:
       "radial-gradient(circle at 52% 68%, #d8f4ed 0, #6abdbb 24%, #497a8e 45%, #121c1d 74%, #070909 100%)",
-    bottom: "-10%",
-    height: "78%",
+    aspectRatio: "16 / 9",
+    bottom: "-24%",
+    height: "auto",
     left: "50%",
     maskImage: "linear-gradient(to bottom, transparent 0%, #000 28%, #000 100%)",
     position: "absolute",
     transform: "translateX(-50%)",
-    width: {
-      default: "116%",
-      "@media (min-width: 700px)": "max(116%, calc(78svh * 3.1))",
-    },
+    width: "max(112vw, calc(112svh * 16 / 9))",
     WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, #000 28%, #000 100%)",
   },
   shader: {
@@ -133,7 +136,7 @@ const styles = stylex.create({
   },
   vignette: {
     backgroundImage:
-      "radial-gradient(ellipse at 50% 68%, transparent 24%, rgba(5, 7, 7, 0.24) 63%, rgba(5, 7, 7, 0.78) 100%)",
+      "radial-gradient(ellipse min(74vw, 1180px) min(62vh, 640px) at 50% 70%, transparent 28%, rgba(5, 7, 7, 0.24) 72%, rgba(5, 7, 7, 0.78) 100%)",
     inset: 0,
     position: "absolute",
   },
