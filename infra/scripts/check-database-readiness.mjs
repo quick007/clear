@@ -85,10 +85,8 @@ const clickhouseEndpoint = () => {
 
   const endpoint = new URL(configured);
   endpoint.searchParams.set("query", "SELECT 1");
-  endpoint.searchParams.set(
-    "database",
-    process.env.GROUNDTRUTH_CLICKHOUSE_DATABASE ?? "groundtruth",
-  );
+  // Readiness runs before migrations create the application database.
+  endpoint.searchParams.set("database", "default");
   return endpoint;
 };
 
