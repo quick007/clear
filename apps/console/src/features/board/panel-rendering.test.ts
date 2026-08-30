@@ -15,7 +15,7 @@ import {
   panelQueryDiagnosis,
   type PanelSeries,
 } from "../../data/panels";
-import { buildMetricChartOption } from "../overview/metric-chart-options";
+import { buildMetricChartModel } from "../overview/metric-chart-model";
 import { buildChartLegend } from "./panel-legend";
 import { buildPanelTableRows, tableCellValue } from "./panel-table";
 
@@ -99,28 +99,27 @@ describe("panel query and chart rendering", () => {
       }),
     ];
     expect(
-      buildMetricChartOption({
+      buildMetricChartModel({
         annotations: [{ _tag: "deploy", atMs: 1_772_176_400_000, label: "release" }],
         axes: RequestsVsUsersPanel.axes,
-        reducedMotion: true,
         series: chartSeries,
         thresholds: [{ axis: "left", value: 100, condition: "above", severity: "warning" }],
         visualization: "line",
       }),
     ).toMatchObject({
-      animationDuration: 0,
+      annotations: [{ _tag: "deploy", atMs: 1_772_176_400_000, label: "release" }],
       series: [
         {
-          lineStyle: { type: "solid" },
-          markLine: { data: [{ yAxis: 100 }, { xAxis: 1_772_176_400_000 }] },
-          yAxisIndex: 0,
+          axis: "left",
+          lineStyle: "solid",
         },
-        { lineStyle: { type: "dashed" }, yAxisIndex: 1 },
+        { axis: "right", lineStyle: "dashed" },
       ],
-      yAxis: [
-        { name: "Upstream requests", position: "left" },
-        { name: "Unique users", position: "right" },
+      axes: [
+        { id: "left", label: "Upstream requests" },
+        { id: "right", label: "Unique users" },
       ],
+      thresholds: [{ axis: "left", value: 100, severity: "warning" }],
     });
   });
 
@@ -134,48 +133,39 @@ describe("panel query and chart rendering", () => {
       ],
     });
     expect(
-      buildMetricChartOption({
+      buildMetricChartModel({
         axes: RetryAmplificationPanel.axes,
         series: [{ ...attemptSeries, fillOpacity: 0.35 }],
         stacking: "normal",
         visualization: "area",
       }),
     ).toMatchObject({
-      series: [{ areaStyle: { opacity: 0.35 }, stack: "panel-left", type: "line" }],
+      series: [{ fillOpacity: 0.35, stackId: "panel-left" }],
+      visualization: "area",
     });
     expect(
-      buildMetricChartOption({
+      buildMetricChartModel({
         axes: RetryAmplificationPanel.axes,
         series: [attemptSeries],
         visualization: "bar",
       }),
-    ).toMatchObject({ series: [{ type: "bar" }], xAxis: { boundaryGap: true } });
-    expect(
-      buildMetricChartOption({
-        axes: RetryAmplificationPanel.axes,
-        series: [attemptSeries, { ...attemptSeries, label: "attempt=3" }],
-        stacking: "percent",
-        visualization: "area",
-      }),
-    ).toMatchObject({
-      series: [
-        {
-          data: [
-            [expect.any(Number), 0.5],
-            [expect.any(Number), 0.5],
-          ],
-          stack: "panel-left",
-        },
-        {
-          data: [
-            [expect.any(Number), 0.5],
-            [expect.any(Number), 0.5],
-          ],
-          stack: "panel-left",
-        },
-      ],
-      yAxis: [{ max: 1, min: 0 }],
+    ).toMatchObject({ visualization: "bar" });
+    const percentModel = buildMetricChartModel({
+      axes: RetryAmplificationPanel.axes,
+      series: [attemptSeries, { ...attemptSeries, label: "attempt=3" }],
+      stacking: "percent",
+      visualization: "area",
     });
+    expect(percentModel).toMatchObject({
+      series: [
+        { key: "series-0", stackId: "panel-left" },
+        { key: "series-1", stackId: "panel-left" },
+      ],
+    });
+    expect(percentModel.rows).toMatchObject([
+      { atMs: expect.any(Number), "series-0": 0.5, "series-1": 0.5 },
+      { atMs: expect.any(Number), "series-0": 0.5, "series-1": 0.5 },
+    ]);
 
     const legend = buildChartLegend(
       { ...RequestsVsUsersPanel, legend: { visibility: "always", values: ["last", "max"] } },
@@ -191,6 +181,41 @@ describe("panel query and chart rendering", () => {
         ],
       },
     ]);
+  });
+
+  it("keeps misaligned timestamps as honest gaps and rejects invalid log values", () => {
+    const left = series({
+      label: "requests",
+      queryRef: RequestsVsUsersPanel.queries[0].refId,
+      values: [["2026-08-28T08:00:00Z", 12]],
+    });
+    const right = series({
+      axis: "right",
+      label: "users",
+      queryRef: RequestsVsUsersPanel.queries[1]!.refId,
+      values: [["2026-08-28T08:01:00Z", 8]],
+    });
+    const model = buildMetricChartModel({
+      axes: RequestsVsUsersPanel.axes,
+      series: [left, right],
+      visualization: "line",
+    });
+    expect(model.rows).toMatchObject([{ "series-0": 12 }, { "series-1": 8 }]);
+    expect(model.rows[0]).not.toHaveProperty("series-1");
+    expect(model.rows[1]).not.toHaveProperty("series-0");
+
+    expect(
+      buildMetricChartModel({
+        axes: [{ id: "left", scale: "log", unit: { _tag: "auto" } }],
+        series: [
+          {
+            ...left,
+            points: [new MetricSeriesPoint({ at: at("2026-08-28T08:00:00Z"), value: 0 })],
+          },
+        ],
+        visualization: "line",
+      }).invalidLogAxis,
+    ).toBe("left");
   });
 
   it("rejects query features the backend cannot preserve instead of weakening them", () => {
