@@ -119,7 +119,7 @@ services:
     name: clear-checkout-api
     runtime: docker
     region: oregon
-    plan: 0.5c-512mb
+    plan: free
     numInstances: 1
     dockerContext: .
     dockerfilePath: apps/checkout-api/Dockerfile

@@ -4,7 +4,7 @@
 
 1. Push the exact release commit to the public GitHub repository. Render cannot build local or uncommitted files.
 2. In the intended Render workspace, create a Blueprint from the `main` branch with Blueprint Path set to `infra/render.yaml`.
-3. Review the live estimate before confirming it. The Blueprint creates one paid `1c-2g` service with a 10 GB disk and one separate `0.5c-512mb` checkout API service.
+3. Review the live estimate before confirming it. The Blueprint creates one paid `1c-2g` service with a 10 GB disk and one separate free checkout API service.
 4. Generate a strong Sites handoff secret. Store the same value in the Render `GROUNDTRUTH_SITE_HANDOFF_SECRET` variable and the Sites deployment. Never put it in Git or frontend JavaScript.
 5. Confirm the stateful service has exactly one instance and that the disk is mounted at `/var/lib`.
 
