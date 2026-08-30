@@ -11,7 +11,9 @@ import { Icon } from "../../ui/icon";
 import { ContentState, Page, PageHeader, RetryButton } from "../../ui/page";
 import { StatusDot } from "../../ui/status";
 
-const endpoint = "https://otlp.clear.seufert.sh";
+const endpoint =
+  import.meta.env.VITE_CLEAR_OTLP_ENDPOINT ??
+  (import.meta.env.DEV ? "http://localhost:4318" : "https://otlp.clear.seufert.sh");
 
 export function ConnectPage() {
   const runtime = useRuntimeQuery();

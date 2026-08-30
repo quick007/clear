@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  readonly VITE_CLEAR_OTLP_ENDPOINT?: string;
   readonly VITE_GROUNDTRUTH_API_URL?: string;
 }
 

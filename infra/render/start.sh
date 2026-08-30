@@ -89,6 +89,8 @@ configure_application() {
   local encoded_postgres_password
   encoded_postgres_password="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$postgres_password")"
 
+  # Keep the internal API off Render's public port scanner. Nginx owns port 10000.
+  export GROUNDTRUTH_HOST=127.0.0.1
   export GROUNDTRUTH_PORT=3000
   export GROUNDTRUTH_PUBLIC_URL="${GROUNDTRUTH_PUBLIC_URL:-https://api.clear.seufert.sh}"
   export GROUNDTRUTH_CONSOLE_ORIGIN="${GROUNDTRUTH_CONSOLE_ORIGIN:-https://clear.seufert.sh}"
