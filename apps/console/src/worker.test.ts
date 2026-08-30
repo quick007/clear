@@ -236,6 +236,94 @@ describe("Sites authentication Worker", () => {
     expect(await response.text()).toBe("console asset");
   });
 
+  it("serves the application shell for a direct client-route navigation", async () => {
+    const assets = vi.fn(async (input: Request) =>
+      new URL(input.url).pathname === "/"
+        ? new Response("application shell", {
+            headers: { "content-type": "text/html; charset=utf-8" },
+          })
+        : new Response("missing", { status: 404 }),
+    );
+    const directRouteEnv = { ...env, ASSETS: { fetch: assets } as unknown as Fetcher };
+
+    const response = await handleRequest(
+      request("/board?guide=true", { headers: { accept: "text/html,application/xhtml+xml" } }),
+      directRouteEnv,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("application shell");
+    expect(assets).toHaveBeenCalledTimes(2);
+    expect(new URL(assets.mock.calls[1]?.[0].url ?? "https://invalid.test").pathname).toBe("/");
+  });
+
+  it("preserves missing asset responses instead of returning HTML", async () => {
+    const assets = vi.fn(async () => new Response("missing", { status: 404 }));
+    const missingAssetEnv = { ...env, ASSETS: { fetch: assets } as unknown as Fetcher };
+
+    const response = await handleRequest(
+      request("/assets/missing.js", { headers: { accept: "text/html,*/*" } }),
+      missingAssetEnv,
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).toBe("missing");
+    expect(assets).toHaveBeenCalledOnce();
+  });
+
+  it("preserves missing public-file responses instead of returning HTML", async () => {
+    const assets = vi.fn(async () => new Response("missing", { status: 404 }));
+    const missingAssetEnv = { ...env, ASSETS: { fetch: assets } as unknown as Fetcher };
+
+    const response = await handleRequest(
+      request("/favicon.svg", { headers: { accept: "text/html,*/*" } }),
+      missingAssetEnv,
+    );
+
+    expect(response.status).toBe(404);
+    expect(assets).toHaveBeenCalledOnce();
+  });
+
+  it("does not rewrite non-navigation client-route requests", async () => {
+    const assets = vi.fn(async () => new Response("missing", { status: 404 }));
+    const nonNavigationEnv = { ...env, ASSETS: { fetch: assets } as unknown as Fetcher };
+
+    const response = await handleRequest(
+      request("/board", { headers: { accept: "application/json" } }),
+      nonNavigationEnv,
+    );
+
+    expect(response.status).toBe(404);
+    expect(assets).toHaveBeenCalledOnce();
+  });
+
+  it("does not rewrite client-route mutations", async () => {
+    const assets = vi.fn(async () => new Response("missing", { status: 404 }));
+    const mutationEnv = { ...env, ASSETS: { fetch: assets } as unknown as Fetcher };
+
+    const response = await handleRequest(
+      request("/board", { method: "POST", headers: { accept: "text/html" } }),
+      mutationEnv,
+    );
+
+    expect(response.status).toBe(404);
+    expect(assets).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the exact API root out of the application shell", async () => {
+    const assets = vi.fn(async () => new Response("console asset"));
+    const apiEnv = { ...env, ASSETS: { fetch: assets } as unknown as Fetcher };
+
+    const response = await handleRequest(
+      request("/v1", { headers: { accept: "text/html" } }),
+      apiEnv,
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ code: "not_found", message: "Route not found." });
+    expect(assets).not.toHaveBeenCalled();
+  });
+
   it("serves a no-store health response", async () => {
     const response = await handleRequest(request("/health"), env);
 

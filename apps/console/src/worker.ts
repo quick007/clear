@@ -32,6 +32,23 @@ const jsonError = (code: string, message: string, status: number, headers?: Head
     },
   );
 
+const isApiPath = (pathname: string) => pathname === "/v1" || pathname.startsWith("/v1/");
+
+const looksLikeAssetPath = (pathname: string) => pathname.split("/").at(-1)?.includes(".") === true;
+
+const isDocumentRequest = (request: Request, url: URL) =>
+  (request.method === "GET" || request.method === "HEAD") &&
+  request.headers.get("accept")?.includes("text/html") === true &&
+  !looksLikeAssetPath(url.pathname);
+
+const serveApplication = async (request: Request, env: AuthEnv, url: URL) => {
+  const response = await env.ASSETS.fetch(request);
+  if (response.status !== 404 || !isDocumentRequest(request, url)) return response;
+
+  const indexRequest = new Request(new URL("/", url), request);
+  return env.ASSETS.fetch(indexRequest);
+};
+
 const redirect = (location: string, initial?: HeadersInit) =>
   new Response(null, {
     status: 303,
@@ -224,7 +241,7 @@ export const handleRequest = async (request: Request, env: AuthEnv) => {
 
   if (url.pathname === authPath) return handleAuth(request, env, url);
 
-  if (!url.pathname.startsWith("/v1/")) return env.ASSETS.fetch(request);
+  if (!isApiPath(url.pathname)) return serveApplication(request, env, url);
 
   return jsonError("not_found", "Route not found.", 404);
 };
