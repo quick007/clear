@@ -16,6 +16,18 @@
         "state": "Fresh signed-out visit. Let the shader settle before capture."
       }
     },
+    "homepageMaterial": {
+      "file": "homepage-material.png",
+      "description": "The shader-only lower edge extracted from the real homepage capture for editorial framing.",
+      "capture": {
+        "route": "/",
+        "viewport": {
+          "width": 2560,
+          "height": 1440
+        },
+        "state": "Derived from the captured homepage without recreating or repainting the shader."
+      }
+    },
     "boardReveal": {
       "file": "board-reveal.png",
       "description": "Clear board after the agent creates the requests-versus-users and retries panels.",

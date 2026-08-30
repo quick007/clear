@@ -15,7 +15,7 @@
     "maxBytes": 5000000,
     "layers": [
       {
-        "source": "homepage",
+        "source": "homepageMaterial",
         "x": 0,
         "y": 350,
         "width": 1800,
@@ -24,9 +24,9 @@
         "position": "centre",
         "crop": {
           "left": 0,
-          "top": 520,
+          "top": 0,
           "width": 2560,
-          "height": 920
+          "height": 1440
         },
         "style": {
           "modulate": {
@@ -118,7 +118,7 @@
     "maxBytes": 10000000,
     "layers": [
       {
-        "source": "homepage",
+        "source": "homepageMaterial",
         "x": 0,
         "y": 350,
         "width": 1800,
@@ -127,9 +127,9 @@
         "position": "centre",
         "crop": {
           "left": 0,
-          "top": 520,
+          "top": 0,
           "width": 2560,
-          "height": 920
+          "height": 1440
         },
         "style": {
           "modulate": {

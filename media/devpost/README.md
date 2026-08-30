@@ -6,17 +6,20 @@ This folder turns real Clear and Codex captures into the final Devpost gallery s
 
 Capture every source at 2560 by 1440 without browser chrome. Keep the same sandbox session and incident window across the board, trace, log, and recovery images.
 
-| File                         | Capture                                                     |
-| ---------------------------- | ----------------------------------------------------------- |
-| `sources/homepage.png`       | Signed-out homepage after the paper shader settles          |
-| `sources/board-reveal.png`   | Requests elevated, users flat, retries visible              |
-| `sources/codex-agent.png`    | Clean Codex task with only the checkout repository attached |
-| `sources/board-agent.png`    | Clear at the same moment as the Codex capture               |
-| `sources/trace-detail.png`   | Real retrying checkout trace with an upstream failure       |
-| `sources/log-detail.png`     | Correlated logs for the same service and time window        |
-| `sources/recovery-board.png` | Real deploy marker with latency and retries recovering      |
+| File                            | Capture                                                     |
+| ------------------------------- | ----------------------------------------------------------- |
+| `sources/homepage.png`          | Signed-out homepage after the paper shader settles          |
+| `sources/homepage-material.png` | Shader-only lower edge derived from `homepage.png`          |
+| `sources/board-reveal.png`      | Requests elevated, users flat, retries visible              |
+| `sources/codex-agent.png`       | Clean Codex task with only the checkout repository attached |
+| `sources/board-agent.png`       | Clear at the same moment as the Codex capture               |
+| `sources/trace-detail.png`      | Real retrying checkout trace with an upstream failure       |
+| `sources/log-detail.png`        | Correlated logs for the same service and time window        |
+| `sources/recovery-board.png`    | Real deploy marker with latency and retries recovering      |
 
 Do not include keys, tokens, local paths, unrelated browser tabs, or unfinished UI. Use the real deployed app and a real Codex task. If a callout disagrees with the captured value or points at the wrong evidence, adjust the manifest before rendering.
+
+`homepage-material.png` is a deterministic crop and resize of the real homepage capture. Regenerate it from `homepage.png`; do not repaint or hand-edit the shader.
 
 ## Final outputs
 
