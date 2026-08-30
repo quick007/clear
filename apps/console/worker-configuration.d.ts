@@ -3,6 +3,7 @@
 interface __BaseEnv_Env {
   ASSETS: Fetcher;
   GROUNDTRUTH_API_ORIGIN: string;
+  GROUNDTRUTH_INTERNAL_API_ORIGIN?: string;
   GROUNDTRUTH_SITE_HANDOFF_SECRET: string;
 }
 declare namespace Cloudflare {
@@ -17,6 +18,11 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 };
 declare namespace NodeJS {
   interface ProcessEnv extends StringifyValues<
-    Pick<Cloudflare.Env, "GROUNDTRUTH_API_ORIGIN" | "GROUNDTRUTH_SITE_HANDOFF_SECRET">
+    Pick<
+      Cloudflare.Env,
+      | "GROUNDTRUTH_API_ORIGIN"
+      | "GROUNDTRUTH_INTERNAL_API_ORIGIN"
+      | "GROUNDTRUTH_SITE_HANDOFF_SECRET"
+    >
   > {}
 }

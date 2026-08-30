@@ -1,3 +1,4 @@
+import { Data, Effect } from "effect";
 import { isSafeReturnPath, signInHref, signInPath } from "./auth-route";
 
 const callbackPath = "/v1/auth/chatgpt/callback";
@@ -10,8 +11,32 @@ const backendTimeoutMillis = 8 * 1000; // 8 seconds
 interface AuthEnv {
   readonly ASSETS: Fetcher;
   readonly GROUNDTRUTH_API_ORIGIN: string;
+  readonly GROUNDTRUTH_INTERNAL_API_ORIGIN?: string;
   readonly GROUNDTRUTH_SITE_HANDOFF_SECRET: string;
 }
+
+class HandoffConfigurationFailure extends Data.TaggedError("HandoffConfigurationFailure")<{
+  readonly origin: string;
+}> {}
+
+class HandoffTransportFailure extends Data.TaggedError("HandoffTransportFailure")<{
+  readonly origin: string;
+}> {}
+
+class HandoffStatusFailure extends Data.TaggedError("HandoffStatusFailure")<{
+  readonly origin: string;
+  readonly status: number;
+}> {}
+
+class HandoffResponseFailure extends Data.TaggedError("HandoffResponseFailure")<{
+  readonly origin: string;
+}> {}
+
+type HandoffFailure =
+  | HandoffConfigurationFailure
+  | HandoffTransportFailure
+  | HandoffStatusFailure
+  | HandoffResponseFailure;
 
 const securityHeaders = (initial?: HeadersInit) => {
   const headers = new Headers(initial);
@@ -122,36 +147,65 @@ const isHandoffCreated = (value: unknown): value is { readonly code: string } =>
   value.code.length >= 32 &&
   value.code.length <= 512;
 
-const createHandoff = async (
+const configuredHandoffOrigin = (env: AuthEnv) =>
+  env.GROUNDTRUTH_INTERNAL_API_ORIGIN?.trim() || env.GROUNDTRUTH_API_ORIGIN;
+
+const reportHandoffFailure = (failure: HandoffFailure) =>
+  Effect.sync(() => {
+    console.error("[Clear] authentication handoff failed", {
+      failureClass: failure._tag,
+      origin: failure.origin,
+      ...(failure._tag === "HandoffStatusFailure" ? { status: failure.status } : {}),
+    });
+  }).pipe(Effect.catchDefect(() => Effect.succeed(undefined)));
+
+const createHandoff = (
   env: AuthEnv,
   subject: string,
   email: string,
   displayName: string | undefined,
   returnPath: string,
   browserNonce: string,
-) => {
-  const endpoint = new URL(handoffPath, env.GROUNDTRUTH_API_ORIGIN);
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${env.GROUNDTRUTH_SITE_HANDOFF_SECRET}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      subject,
-      email,
-      ...(displayName === undefined ? {} : { displayName }),
-      returnPath,
-      browserNonce,
-    }),
-    redirect: "error",
-    signal: AbortSignal.timeout(backendTimeoutMillis),
-  });
+) =>
+  Effect.gen(function* () {
+    const endpoint = yield* Effect.try({
+      try: () => new URL(handoffPath, configuredHandoffOrigin(env)),
+      catch: () => new HandoffConfigurationFailure({ origin: "invalid" }),
+    });
+    const origin = endpoint.origin;
+    const response = yield* Effect.tryPromise({
+      try: () =>
+        fetch(endpoint, {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${env.GROUNDTRUTH_SITE_HANDOFF_SECRET}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            subject,
+            email,
+            ...(displayName === undefined ? {} : { displayName }),
+            returnPath,
+            browserNonce,
+          }),
+          redirect: "error",
+          signal: AbortSignal.timeout(backendTimeoutMillis),
+        }),
+      catch: () => new HandoffTransportFailure({ origin }),
+    });
 
-  if (response.status !== 201) return undefined;
-  const result: unknown = await response.json();
-  return isHandoffCreated(result) ? result : undefined;
-};
+    if (response.status !== 201) {
+      return yield* Effect.fail(new HandoffStatusFailure({ origin, status: response.status }));
+    }
+    const result = yield* Effect.tryPromise({
+      try: () => response.json() as Promise<unknown>,
+      catch: () => new HandoffResponseFailure({ origin }),
+    });
+    if (!isHandoffCreated(result)) {
+      return yield* Effect.fail(new HandoffResponseFailure({ origin }));
+    }
+    return result;
+  });
 
 const handleAuth = async (request: Request, env: AuthEnv, url: URL) => {
   if (request.method !== "GET") {
@@ -177,13 +231,15 @@ const handleAuth = async (request: Request, env: AuthEnv, url: URL) => {
         502,
       );
     }
-    const handoff = await createHandoff(
-      env,
-      subject,
-      email,
-      readDisplayName(request.headers),
-      returnPath,
-      browserNonce,
+    const handoff = await Effect.runPromise(
+      createHandoff(
+        env,
+        subject,
+        email,
+        readDisplayName(request.headers),
+        returnPath,
+        browserNonce,
+      ).pipe(Effect.catch((failure) => reportHandoffFailure(failure).pipe(Effect.as(undefined)))),
     );
     if (handoff === undefined) {
       return jsonError(

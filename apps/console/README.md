@@ -28,6 +28,12 @@ configuration. Keep actual origins and secrets in uncommitted environment files
 or the hosting provider. [`src/config.ts`](src/config.ts) validates browser
 configuration at startup.
 
+`GROUNDTRUTH_API_ORIGIN` is the public browser-facing API origin. Authentication
+callbacks and shared-domain cookies depend on it, so it must stay on the public
+Clear domain. `GROUNDTRUTH_INTERNAL_API_ORIGIN` is an optional server-to-server
+origin used only when the Sites worker creates an identity handoff. When it is
+unset, the worker falls back to `GROUNDTRUTH_API_ORIGIN`.
+
 ## Key files
 
 - [`src/main.tsx`](src/main.tsx): browser entrypoint.

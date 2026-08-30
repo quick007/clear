@@ -27,7 +27,10 @@ const jsonBody = (body: BodyInit | null | undefined) => {
 };
 
 describe("Sites authentication Worker", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
 
   it("leaves sign-in optional for anonymous visitors", async () => {
     const response = await handleRequest(request("/sign-in?returnPath=%2Fboard"), env);
@@ -57,7 +60,7 @@ describe("Sites authentication Worker", () => {
     },
   );
 
-  it("creates a server-side handoff and redirects only the opaque code", async () => {
+  it("falls back to the public origin and redirects only the opaque code", async () => {
     const handoffCode = "handoff-code-123456789012345678901234";
     let browserNonce: string | undefined;
     const backendFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -110,6 +113,29 @@ describe("Sites authentication Worker", () => {
     expect(nonceCookie).toContain("Secure");
     expect(nonceCookie).toContain("SameSite=Lax");
     expect(backendFetch).toHaveBeenCalledOnce();
+  });
+
+  it("uses the internal origin only for the server-side handoff request", async () => {
+    const handoffCode = "handoff-code-123456789012345678901234";
+    const backendFetch = vi.fn(async (input: string | URL | Request) => {
+      expect(requestUrl(input)).toBe("https://clear-runtime.internal.test/v1/auth/handoffs");
+      return Response.json({ code: handoffCode }, { status: 201 });
+    });
+    vi.stubGlobal("fetch", backendFetch);
+
+    const response = await handleRequest(
+      request("/sign-in?returnPath=%2Fconnect", { headers: authenticatedHeaders }),
+      {
+        ...env,
+        GROUNDTRUTH_INTERNAL_API_ORIGIN: "https://clear-runtime.internal.test",
+      },
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      `https://api.clear.test/v1/auth/chatgpt/callback?code=${handoffCode}`,
+    );
+    expect(response.headers.get("set-cookie")).toContain("Domain=clear.test");
   });
 
   it("omits an unverified or malformed display name", async () => {
@@ -201,6 +227,7 @@ describe("Sites authentication Worker", () => {
   });
 
   it("fails closed without exposing backend details", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -220,6 +247,41 @@ describe("Sites authentication Worker", () => {
       code: "authentication_unavailable",
       message: "Clear could not start a signed-in session.",
     });
+    expect(consoleError).toHaveBeenCalledWith("[Clear] authentication handoff failed", {
+      failureClass: "HandoffStatusFailure",
+      origin: "https://api.clear.test",
+      status: 401,
+    });
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain("Sites service credential");
+  });
+
+  it("classifies transport failures without logging request secrets or identity", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error(
+          "sites-handoff-secret chatgpt-user-1 operator@example.com private-handoff-code",
+        );
+      }),
+    );
+
+    const response = await handleRequest(request("/sign-in", { headers: authenticatedHeaders }), {
+      ...env,
+      GROUNDTRUTH_INTERNAL_API_ORIGIN: "https://clear-runtime.internal.test/private-path",
+    });
+
+    expect(response.status).toBe(502);
+    expect(consoleError).toHaveBeenCalledWith("[Clear] authentication handoff failed", {
+      failureClass: "HandoffTransportFailure",
+      origin: "https://clear-runtime.internal.test",
+    });
+    const diagnostic = JSON.stringify(consoleError.mock.calls);
+    expect(diagnostic).not.toContain("sites-handoff-secret");
+    expect(diagnostic).not.toContain("chatgpt-user-1");
+    expect(diagnostic).not.toContain("operator@example.com");
+    expect(diagnostic).not.toContain("private-handoff-code");
+    expect(diagnostic).not.toContain("private-path");
   });
 
   it("does not proxy arbitrary application routes", async () => {
