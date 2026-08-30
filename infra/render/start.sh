@@ -109,6 +109,11 @@ configure_application() {
 }
 
 start_application_services() {
+  # Bind Render's public port before any internal TCP listener. Render selects
+  # the first detected port for health checks and public traffic.
+  nginx -g 'daemon off;' &
+  service_pids+=("$!")
+
   sh infra/scripts/run-migrations.sh
 
   su-exec clear:clear node apps/backend/dist/index.mjs &
@@ -134,8 +139,6 @@ start_application_services() {
   service_pids+=("$!")
   wait_for_command "Load generator" curl --fail --silent http://127.0.0.1:4103/readyz
 
-  nginx -g 'daemon off;' &
-  service_pids+=("$!")
   wait_for_command "Clear ingress" curl --fail --silent --header 'Host: api.clear.seufert.sh' http://127.0.0.1:10000/health
 }
 
