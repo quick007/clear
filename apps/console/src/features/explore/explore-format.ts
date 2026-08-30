@@ -2,10 +2,11 @@ import { QueryRef } from "@groundtruth/panel-dsl";
 import type {
   MetricAggregation,
   MetricCatalogEntry,
+  MetricQueryResult,
   TelemetryWindow,
 } from "@groundtruth/telemetry";
 
-import { panelPalette, type PanelSeries } from "../../data/panels";
+import { metricQueryBucketDuration, panelPalette, type PanelSeries } from "../../data/panels";
 
 export const windowLabels: Record<TelemetryWindow, string> = {
   "5m": "last 5 minutes",
@@ -26,19 +27,14 @@ export const aggregationFor = (metric: MetricCatalogEntry): MetricAggregation =>
   return "avg";
 };
 
-export const toPanelSeries = (
-  input: ReadonlyArray<{
-    attributes: PanelSeries["attributes"];
-    label: string;
-    points: PanelSeries["points"];
-  }>,
-): ReadonlyArray<PanelSeries> =>
-  input.map((series, index) => {
+export const toPanelSeries = (result: MetricQueryResult): ReadonlyArray<PanelSeries> =>
+  result.series.map((series, index) => {
     const tones = ["amber", "blue", "green", "violet", "orange", "red", "cyan", "gray"] as const;
     const tone = tones[index % tones.length]!;
     return {
       attributes: series.attributes,
       axis: "left",
+      bucketDurationMs: metricQueryBucketDuration(result.query.step),
       color: panelPalette[tone],
       label: series.label,
       lineStyle: "solid",

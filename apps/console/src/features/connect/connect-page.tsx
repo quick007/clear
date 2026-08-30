@@ -112,8 +112,9 @@ export function ConnectPage() {
     );
   }
   const activeKeys = (keys.data?.items ?? []).filter((key) => key.status === "active");
+  const createdKeyNotYetListed = createdKey !== null && createKey.submittedAt > keys.dataUpdatedAt;
   const progress = deriveConnectionProgress({
-    activeKeyCount: activeKeys.length + (createdKey === null ? 0 : 1),
+    activeKeyCount: activeKeys.length + (createdKeyNotYetListed ? 1 : 0),
     signalHealth: overview.data.signalHealth,
   });
   const exporterSnippet = `export OTEL_EXPORTER_OTLP_ENDPOINT=${endpoint}\nexport OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf\nexport OTEL_EXPORTER_OTLP_HEADERS="x-clear-ingest-key=${createdKey ?? "<your-key>"}"\nexport OTEL_SERVICE_NAME=your-service`;
@@ -122,16 +123,18 @@ export function ConnectPage() {
     <Page>
       <PageHeader
         actions={
-          progress.hasObservedSignal ? (
+          progress.isConnected ? (
             <Button render={<Link search={{ guide: undefined }} to="/board" />} tone="primary">
               Open board <Icon icon={ArrowRight01Icon} size={15} />
             </Button>
           ) : undefined
         }
         description={
-          progress.hasObservedSignal
+          progress.isConnected
             ? "Your project is connected. Open the board to explore its telemetry with your agent."
-            : "Connect any OpenTelemetry SDK or Collector in three short steps."
+            : progress.connectionState === "previously-received-data"
+              ? "Clear has data from this project, but it needs an active ingest key to receive more."
+              : "Connect any OpenTelemetry SDK or Collector in three short steps."
         }
         title="Connect OpenTelemetry"
       />
@@ -145,9 +148,9 @@ export function ConnectPage() {
       />
       <ConnectionSummary
         completedCount={progress.completedCount}
-        connected={progress.hasObservedSignal}
         healthy={progress.hasHealthySignal}
         nextStep={progress.nextStep}
+        state={progress.connectionState}
       />
       <div {...stylex.props(styles.layout)}>
         <section {...stylex.props(styles.steps)}>

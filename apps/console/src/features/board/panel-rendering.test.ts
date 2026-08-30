@@ -25,17 +25,20 @@ const at = (iso: string) => DateTime.makeUnsafe(iso);
 
 const series = ({
   axis = "left",
+  bucketDurationMs = 30 * 1_000, // 30 seconds
   label,
   queryRef,
   values,
 }: {
   axis?: "left" | "right";
+  bucketDurationMs?: number;
   label: string;
   queryRef: PanelSeries["queryRef"];
   values: ReadonlyArray<readonly [string, number]>;
 }): PanelSeries => ({
   attributes: {},
   axis,
+  bucketDurationMs,
   color: axis === "left" ? "#fb923c" : "#38bdf8",
   label,
   lineStyle: axis === "left" ? "solid" : "dashed",
@@ -170,9 +173,17 @@ describe("panel query and chart rendering", () => {
         visualization: "bar",
       }),
     ).toMatchObject({ visualization: "bar" });
+    const percentPeer = series({
+      label: "attempt=3",
+      queryRef: RetryAmplificationPanel.queries[0].refId,
+      values: [
+        ["2026-08-28T08:00:00.820Z", 30],
+        ["2026-08-28T08:01:00.820Z", 60],
+      ],
+    });
     const percentModel = buildMetricChartModel({
       axes: RetryAmplificationPanel.axes,
-      series: [attemptSeries, { ...attemptSeries, label: "attempt=3" }],
+      series: [attemptSeries, percentPeer],
       stacking: "percent",
       visualization: "area",
     });
@@ -183,8 +194,8 @@ describe("panel query and chart rendering", () => {
       ],
     });
     expect(percentModel.rows).toMatchObject([
-      { atMs: expect.any(Number), "series-0": 0.5, "series-1": 0.5 },
-      { atMs: expect.any(Number), "series-0": 0.5, "series-1": 0.5 },
+      { atMs: expect.any(Number), "series-0": 0.25, "series-1": 0.75 },
+      { atMs: expect.any(Number), "series-0": 0.25, "series-1": 0.75 },
     ]);
 
     const legend = buildChartLegend(
@@ -203,26 +214,51 @@ describe("panel query and chart rendering", () => {
     ]);
   });
 
-  it("keeps misaligned timestamps as honest gaps and rejects invalid log values", () => {
+  it("aligns multi-query line timestamps to declared buckets and preserves real gaps", () => {
     const left = series({
       label: "requests",
       queryRef: RequestsVsUsersPanel.queries[0].refId,
-      values: [["2026-08-28T08:00:00Z", 12]],
+      values: [
+        ["2026-08-28T08:00:00.040Z", 12],
+        ["2026-08-28T08:00:30.040Z", 14],
+      ],
     });
     const right = series({
       axis: "right",
       label: "users",
       queryRef: RequestsVsUsersPanel.queries[1]!.refId,
-      values: [["2026-08-28T08:01:00Z", 8]],
+      values: [
+        ["2026-08-28T08:00:00.790Z", 8],
+        ["2026-08-28T08:01:00.790Z", 9],
+      ],
     });
     const model = buildMetricChartModel({
       axes: RequestsVsUsersPanel.axes,
       series: [left, right],
       visualization: "line",
     });
-    expect(model.rows).toMatchObject([{ "series-0": 12 }, { "series-1": 8 }]);
-    expect(model.rows[0]).not.toHaveProperty("series-1");
-    expect(model.rows[1]).not.toHaveProperty("series-0");
+    expect(model.rows).toMatchObject([
+      { "series-0": 12, "series-1": 8 },
+      { "series-0": 14 },
+      { "series-1": 9 },
+    ]);
+    expect(model.rows[1]).not.toHaveProperty("series-1");
+    expect(model.rows[2]).not.toHaveProperty("series-0");
+
+    expect(model.series).toMatchObject([
+      { key: "series-0", label: "requests" },
+      { key: "series-1", label: "users" },
+    ]);
+
+    expect(model.rows[0]?.atMs).toBe(Date.parse("2026-08-28T08:00:00.000Z"));
+  });
+
+  it("rejects invalid log values", () => {
+    const left = series({
+      label: "requests",
+      queryRef: RequestsVsUsersPanel.queries[0].refId,
+      values: [["2026-08-28T08:00:00Z", 12]],
+    });
 
     expect(
       buildMetricChartModel({

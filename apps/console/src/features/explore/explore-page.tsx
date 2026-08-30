@@ -108,7 +108,7 @@ function MetricsExplorer({
     window,
     service,
   );
-  const series = metricResult.data ? toPanelSeries(metricResult.data.series) : [];
+  const series = metricResult.data ? toPanelSeries(metricResult.data) : [];
   const axis: Axis = { id: "left", unit: { _tag: "auto" } };
   const catalogUnavailable =
     (runtime.isError && !runtime.data) || (catalog.isError && !catalog.data);

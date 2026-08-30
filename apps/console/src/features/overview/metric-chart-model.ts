@@ -72,7 +72,7 @@ export function buildMetricChartModel({
   const descriptors = series.map((item, index) => {
     const key = `series-${index}`;
     for (const point of item.points) {
-      const atMs = epochMilliseconds(point.at);
+      const atMs = alignedBucketTimestamp(point.at, item.bucketDurationMs);
       const row = rowsByTime.get(atMs) ?? { atMs };
       const total = totals.get(`${item.axis}:${atMs}`);
       row[key] = total === undefined ? point.value : total === 0 ? 0 : point.value / total;
@@ -161,9 +161,12 @@ const percentTotals = (series: ReadonlyArray<PanelSeries>) => {
   const totals = new Map<string, number>();
   for (const item of series) {
     for (const point of item.points) {
-      const key = `${item.axis}:${epochMilliseconds(point.at)}`;
+      const key = `${item.axis}:${alignedBucketTimestamp(point.at, item.bucketDurationMs)}`;
       totals.set(key, (totals.get(key) ?? 0) + point.value);
     }
   }
   return totals;
 };
+
+const alignedBucketTimestamp = (at: PanelSeries["points"][number]["at"], durationMs: number) =>
+  Math.floor(epochMilliseconds(at) / durationMs) * durationMs;

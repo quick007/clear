@@ -80,6 +80,33 @@ describe("MetricQueryEngine", () => {
     }),
   );
 
+  it.effect("anchors metric buckets independently of request timing", () =>
+    Effect.gen(function* () {
+      const queryAt = (millisecondOffset: number) =>
+        new MetricQuery({
+          metric: metricName,
+          aggregation: "count",
+          range: {
+            _tag: "absolute",
+            start: DateTime.fromDateUnsafe(
+              new Date(Date.parse("2026-08-28T02:39:50.000Z") + millisecondOffset),
+            ),
+            end: DateTime.fromDateUnsafe(
+              new Date(Date.parse("2026-08-28T02:40:10.000Z") + millisecondOffset),
+            ),
+          },
+          step: "10s",
+        });
+      const first = yield* queryMetricPoints([histogram(1n, 10, 10, [1n, 0n])], queryAt(47));
+      const second = yield* queryMetricPoints([histogram(1n, 10, 10, [1n, 0n])], queryAt(892));
+      const timestamps = (result: typeof first) =>
+        result.series[0]?.points.map((point) => DateTime.toEpochMillis(point.at));
+
+      assert.deepStrictEqual(timestamps(first), [Date.parse("2026-08-28T02:40:00.000Z")]);
+      assert.deepStrictEqual(timestamps(second), timestamps(first));
+    }),
+  );
+
   it.effect("accepts seven day windows and rejects anything wider", () =>
     Effect.gen(function* () {
       const at = DateTime.fromDateUnsafe(new Date(Number(observedAt / 1_000_000n)));

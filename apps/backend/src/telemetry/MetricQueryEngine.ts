@@ -333,7 +333,7 @@ export const queryMetricPoints = (metrics: ReadonlyArray<MetricPoint>, query: Me
         attributes: group.selected,
         buckets: new Map(),
       };
-      const bucket = bounds.start + Math.floor((at - bounds.start) / step) * step;
+      const bucket = Math.floor(at / step) * step;
       const bucketPoints = target.buckets.get(bucket) ?? [];
       bucketPoints.push(point);
       target.buckets.set(bucket, bucketPoints);

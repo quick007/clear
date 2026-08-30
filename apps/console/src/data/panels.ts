@@ -35,9 +35,20 @@ export const panelPalette = {
 
 const seriesTones = ["orange", "blue", "red", "violet", "amber", "green", "cyan", "gray"] as const;
 
+const queryStepMilliseconds = {
+  "10s": 10 * 1_000, // 10 seconds
+  "30s": 30 * 1_000, // 30 seconds
+  "1m": 60 * 1_000, // 1 minute
+  "5m": 5 * 60 * 1_000, // 5 minutes
+} as const;
+
+export const metricQueryBucketDuration = (step: MetricQuery["step"]) =>
+  queryStepMilliseconds[step ?? "30s"];
+
 export type PanelSeries = {
   readonly attributes: TelemetryAttributes;
   readonly axis: AxisId;
+  readonly bucketDurationMs: number;
   readonly color: string;
   readonly fillOpacity?: number;
   readonly label: string;
@@ -213,6 +224,7 @@ export const materializePanelSeries = (result: MetricQueryResult, plan: PanelQue
     return {
       attributes: series.attributes,
       axis: plan.axis,
+      bucketDurationMs: metricQueryBucketDuration(result.query.step),
       color: grouped ? panelPalette[tone] : plan.color,
       fillOpacity: plan.fillOpacity,
       label: grouped

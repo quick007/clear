@@ -1,4 +1,9 @@
 export type ConnectionStepStatus = "complete" | "current" | "upcoming";
+export type ConnectionState =
+  | "awaiting-signal"
+  | "connected"
+  | "not-started"
+  | "previously-received-data";
 
 type SignalProgress<FirstSeen> = ReadonlyArray<{
   readonly firstSeenAt: FirstSeen | null;
@@ -17,6 +22,14 @@ export function deriveConnectionProgress<FirstSeen>({
   const hasObservedSignal = signalHealth.some(
     (signal) => signal.firstSeenAt !== null || signal.status !== "inactive",
   );
+  const connectionState: ConnectionState = hasActiveKey
+    ? hasObservedSignal
+      ? "connected"
+      : "awaiting-signal"
+    : hasObservedSignal
+      ? "previously-received-data"
+      : "not-started";
+  const isConnected = connectionState === "connected";
   const nextStep = !hasActiveKey
     ? "create an ingest key"
     : !hasObservedSignal
@@ -24,20 +37,24 @@ export function deriveConnectionProgress<FirstSeen>({
       : null;
 
   return {
-    completedCount: [hasActiveKey, hasObservedSignal, hasObservedSignal].filter(Boolean).length,
-    exporterStatus: hasObservedSignal ? "complete" : hasActiveKey ? "current" : "upcoming",
+    completedCount: [hasActiveKey, isConnected, isConnected].filter(Boolean).length,
+    connectionState,
+    exporterStatus: isConnected ? "complete" : hasActiveKey ? "current" : "upcoming",
     hasActiveKey,
     hasHealthySignal,
     hasObservedSignal,
+    isConnected,
     keyStatus: hasActiveKey ? "complete" : "current",
     nextStep,
-    signalStatus: hasObservedSignal ? "complete" : "upcoming",
+    signalStatus: isConnected ? "complete" : "upcoming",
   } satisfies {
     completedCount: number;
+    connectionState: ConnectionState;
     exporterStatus: ConnectionStepStatus;
     hasActiveKey: boolean;
     hasHealthySignal: boolean;
     hasObservedSignal: boolean;
+    isConnected: boolean;
     keyStatus: ConnectionStepStatus;
     nextStep: string | null;
     signalStatus: ConnectionStepStatus;

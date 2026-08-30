@@ -1,42 +1,54 @@
 import { CheckmarkCircle02Icon, CloudUploadIcon } from "@hugeicons/core-free-icons";
 import * as stylex from "@stylexjs/stylex";
+import { Match } from "effect";
 import type { ReactNode } from "react";
 
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Icon } from "../../ui/icon";
-import type { ConnectionStepStatus } from "./connection-progress";
+import type { ConnectionState, ConnectionStepStatus } from "./connection-progress";
 
 export function ConnectionSummary({
   completedCount,
   healthy,
   nextStep,
-  connected,
+  state,
 }: {
   completedCount: number;
   healthy: boolean;
   nextStep: string | null;
-  connected: boolean;
+  state: ConnectionState;
 }) {
+  const connected = state === "connected";
+  const copy = Match.value(state).pipe(
+    Match.when("connected", () =>
+      healthy
+        ? {
+            detail: "Clear has received a fresh signal from this project.",
+            title: "Telemetry is flowing",
+          }
+        : {
+            detail: "Clear has received this project's signals before. Recent activity is delayed.",
+            title: "Telemetry is connected",
+          },
+    ),
+    Match.when("previously-received-data", () => ({
+      detail: "Create an ingest key to let this project send telemetry again.",
+      title: "Telemetry was received before",
+    })),
+    Match.orElse(() => ({
+      detail: `Next: ${nextStep ?? "finish connection setup"}.`,
+      title: `${completedCount} of 3 steps complete`,
+    })),
+  );
+
   return (
     <section aria-live="polite" {...stylex.props(styles.summary, connected && styles.summaryReady)}>
       <span {...stylex.props(styles.summaryIcon, connected && styles.summaryIconReady)}>
         <Icon icon={connected ? CheckmarkCircle02Icon : CloudUploadIcon} size={18} />
       </span>
       <span {...stylex.props(styles.summaryCopy)}>
-        <strong>
-          {healthy
-            ? "Telemetry is flowing"
-            : connected
-              ? "Telemetry is connected"
-              : `${completedCount} of 3 steps complete`}
-        </strong>
-        <small>
-          {healthy
-            ? "Clear has received a fresh signal from this project."
-            : connected
-              ? "Clear has received this project's signals before. Recent activity is delayed."
-              : `Next: ${nextStep ?? "finish connection setup"}.`}
-        </small>
+        <strong>{copy.title}</strong>
+        <small>{copy.detail}</small>
       </span>
       <span aria-hidden {...stylex.props(styles.progressTrack)}>
         {[0, 1, 2].map((step) => (

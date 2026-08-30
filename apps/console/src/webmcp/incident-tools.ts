@@ -1,10 +1,27 @@
+import type { SessionMode } from "../api/session-source";
 import { compactIncident, compactMutation, incidentWasCompacted } from "./compact";
 import type { GroundtruthToolOperations } from "./operations";
 import { AddTimelineNoteInput, CloseIncidentInput, SetHypothesisInput } from "./schemas";
 import { tool } from "./tool-contract";
 
-export const makeIncidentTools = (operations: GroundtruthToolOperations) =>
-  [
+const closeIncidentGuidance = (mode: SessionMode) =>
+  mode === "sandbox"
+    ? {
+        description:
+          "Closes the currently open incident with an evidence-based summary. Use after reviewing the relevant evidence and establishing the root cause. The sandbox has no remediation step, so visible recovery is not required.",
+        failureHint:
+          "Establish the root cause from the available evidence and provide a non-empty summary.",
+      }
+    : {
+        description:
+          "Closes the currently open incident with an evidence-based summary. Use after establishing the root cause. If remediation occurred, confirm that recovery is visible in current telemetry before closing.",
+        failureHint:
+          "Establish the root cause, confirm visible recovery when remediation occurred, and provide a non-empty summary.",
+      };
+
+export const makeIncidentTools = (operations: GroundtruthToolOperations, mode: SessionMode) => {
+  const closeGuidance = closeIncidentGuidance(mode);
+  return [
     tool({
       name: "add_timeline_note",
       title: "Add timeline note",
@@ -34,8 +51,7 @@ export const makeIncidentTools = (operations: GroundtruthToolOperations) =>
     tool({
       name: "close_incident",
       title: "Close incident",
-      description:
-        "Closes the currently open incident with an evidence-based summary. Use only after recovery is visible and the root cause is established.",
+      description: closeGuidance.description,
       input: CloseIncidentInput,
       readOnly: false,
       returnsUntrustedContent: true,
@@ -44,6 +60,7 @@ export const makeIncidentTools = (operations: GroundtruthToolOperations) =>
       format: compactIncident,
       resultOptions: (incident) => ({ truncated: incidentWasCompacted(incident) }),
       successHint: "The incident-scoped tools are now unavailable until another incident opens.",
-      failureHint: "Confirm recovery with current telemetry and provide a non-empty summary.",
+      failureHint: closeGuidance.failureHint,
     }),
   ] as const;
+};

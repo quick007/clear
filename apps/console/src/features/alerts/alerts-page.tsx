@@ -24,6 +24,11 @@ import { StaleDataNotice } from "../../ui/stale-data-notice";
 import { AlertSection, ManualAlertRow, ThresholdAlertRow } from "./alert-list";
 import { ManualAlertDialog } from "./manual-alert-dialog";
 
+export const investigationWorkspaceNavigation = {
+  search: { guide: undefined },
+  to: "/board",
+} as const;
+
 export function AlertsPage() {
   const runtime = useRuntimeQuery();
   const projectId = runtime.data?.projectId ?? null;
@@ -73,11 +78,7 @@ export function AlertsPage() {
     startInvestigation.mutate(
       { alertId, payload: StartInvestigationRequest.make({}) },
       {
-        onSuccess: (result) =>
-          void navigate({
-            params: { incidentId: result.incident.id },
-            to: "/incidents/$incidentId",
-          }),
+        onSuccess: () => void navigate(investigationWorkspaceNavigation),
       },
     );
   };
@@ -150,10 +151,7 @@ export function AlertsPage() {
               Finish the current investigation before starting another from an alert.
             </small>
           </span>
-          <Button
-            render={<Link params={{ incidentId: openIncident.id }} to="/incidents/$incidentId" />}
-            tone="secondary"
-          >
+          <Button render={<Link {...investigationWorkspaceNavigation} />} tone="secondary">
             Open investigation
           </Button>
         </section>
@@ -215,10 +213,7 @@ export function AlertsPage() {
               if (!result.isSuccess) return;
               startInvestigation.reset();
               if (result.data.openIncident) {
-                void navigate({
-                  params: { incidentId: result.data.openIncident.id },
-                  to: "/incidents/$incidentId",
-                });
+                void navigate(investigationWorkspaceNavigation);
               }
             });
           }}

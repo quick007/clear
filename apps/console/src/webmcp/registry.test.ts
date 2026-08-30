@@ -335,7 +335,7 @@ describe("GroundtruthToolRegistry", () => {
         return snapshot;
       },
     });
-    const closeIncident = makeIncidentTools(operations).find(
+    const closeIncident = makeIncidentTools(operations, "hosted").find(
       (entry) => entry.name === "close_incident",
     );
 
@@ -351,6 +351,34 @@ describe("GroundtruthToolRegistry", () => {
     await vi.runAllTimersAsync();
     expect(refreshes).toBe(1);
     vi.useRealTimers();
+  });
+
+  it("registers mode-aware close guidance", async () => {
+    const sessions = fakeSessions({ projectId, mode: "sandbox", incident: openIncident });
+    const modelContext = fakeModelContext();
+    const registry = new GroundtruthToolRegistry({
+      modelContext: modelContext.target,
+      sessions: sessions.source,
+      operations: fakeOperations(),
+    });
+
+    await registry.start();
+    expect(modelContext.tools.get("close_incident")?.description).toContain(
+      "sandbox has no remediation step",
+    );
+    expect(modelContext.tools.get("close_incident")?.description).toContain(
+      "visible recovery is not required",
+    );
+
+    await sessions.set({ projectId, mode: "hosted", incident: openIncident });
+    expect(modelContext.tools.get("close_incident")?.description).toContain(
+      "If remediation occurred",
+    );
+    expect(modelContext.tools.get("close_incident")?.description).toContain(
+      "confirm that recovery is visible",
+    );
+
+    registry.stop();
   });
 
   it("returns open_incident before refreshing and registering its incident scope", async () => {

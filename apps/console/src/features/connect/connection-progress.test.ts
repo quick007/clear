@@ -45,8 +45,10 @@ describe("connection progress", () => {
     expect(progress).toEqual(
       expect.objectContaining({
         completedCount: 3,
+        connectionState: "connected",
         exporterStatus: "complete",
         hasHealthySignal: false,
+        isConnected: true,
         nextStep: null,
         signalStatus: "complete",
       }),
@@ -65,10 +67,49 @@ describe("connection progress", () => {
     expect(progress).toEqual(
       expect.objectContaining({
         completedCount: 3,
+        connectionState: "connected",
         hasHealthySignal: true,
+        isConnected: true,
         nextStep: null,
         signalStatus: "complete",
       }),
     );
+  });
+
+  it("preserves previous data without claiming a revoked project is connected", () => {
+    const progress = deriveConnectionProgress({
+      activeKeyCount: 0,
+      signalHealth: [
+        { firstSeenAt: "2026-08-29T10:00:00Z", status: "delayed" },
+        ...inactiveSignals.slice(1),
+      ],
+    });
+
+    expect(progress).toEqual(
+      expect.objectContaining({
+        completedCount: 0,
+        connectionState: "previously-received-data",
+        exporterStatus: "upcoming",
+        hasObservedSignal: true,
+        isConnected: false,
+        keyStatus: "current",
+        nextStep: "create an ingest key",
+        signalStatus: "upcoming",
+      }),
+    );
+  });
+
+  it("does not report a fresh historical signal as connected without an active key", () => {
+    const progress = deriveConnectionProgress({
+      activeKeyCount: 0,
+      signalHealth: [
+        { firstSeenAt: "2026-08-29T10:00:00Z", status: "healthy" },
+        ...inactiveSignals.slice(1),
+      ],
+    });
+
+    expect(progress.connectionState).toBe("previously-received-data");
+    expect(progress.hasHealthySignal).toBe(true);
+    expect(progress.isConnected).toBe(false);
   });
 });

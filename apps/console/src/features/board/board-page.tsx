@@ -124,7 +124,7 @@ export function BoardPage() {
     hasOpenIncident:
       overview.data?.openIncident !== null && overview.data?.openIncident !== undefined,
     hypotheses: incident.data?.hypotheses ?? [],
-    panelCount: board.data?.panels.length ?? 0,
+    panels: board.data?.panels ?? [],
   });
 
   return (

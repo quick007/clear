@@ -1,5 +1,5 @@
 import { Duration, Effect, Schedule } from "effect";
-import type { ToolSessionSnapshot, ToolSessionSource } from "../api/session-source";
+import type { SessionMode, ToolSessionSnapshot, ToolSessionSource } from "../api/session-source";
 import type { GroundtruthToolOperations } from "./operations";
 import { makeAlwaysTools } from "./always-tools";
 import {
@@ -80,6 +80,7 @@ export class GroundtruthToolRegistry {
   #sandboxController: AbortController | null = null;
   #incidentController: AbortController | null = null;
   #incidentId: string | null = null;
+  #incidentMode: SessionMode | null = null;
   #unsubscribe: (() => void) | null = null;
   #reconciliation = Promise.resolve();
   #generation = 0;
@@ -150,6 +151,7 @@ export class GroundtruthToolRegistry {
     this.#incidentController?.abort();
     this.#incidentController = null;
     this.#incidentId = null;
+    this.#incidentMode = null;
   }
 
   #isActive(generation: number) {
@@ -203,17 +205,18 @@ export class GroundtruthToolRegistry {
     }
 
     const nextIncidentId = snapshot.incident?.id ?? null;
-    if (nextIncidentId === this.#incidentId) return;
+    if (nextIncidentId === this.#incidentId && snapshot.mode === this.#incidentMode) return;
 
     this.#incidentController?.abort();
     this.#incidentController = null;
     this.#incidentId = null;
+    this.#incidentMode = null;
 
     if (nextIncidentId !== null) {
       const controller = await Effect.runPromise(
         registerScope(
           this.#modelContext,
-          makeIncidentTools(this.#operations),
+          makeIncidentTools(this.#operations, snapshot.mode),
           "incident",
           lifecycleController.signal,
         ),
@@ -224,6 +227,7 @@ export class GroundtruthToolRegistry {
       }
       this.#incidentController = controller;
       this.#incidentId = nextIncidentId;
+      this.#incidentMode = snapshot.mode;
     }
   }
 }
