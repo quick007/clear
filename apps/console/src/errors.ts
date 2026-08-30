@@ -109,7 +109,9 @@ const resourceName = (error: typeof TaggedFailure.Type) => {
 
 export const normalizeConsoleFailure = (error: unknown): ConsoleFailure => {
   if (Schema.is(ConsoleFailure)(error)) return error;
-  if (Schema.isSchemaError(error)) return new ConsoleInvalidResponse();
+  // Response decoding is reported by the HTTP client as DecodeError. A bare
+  // SchemaError here means the generated client could not encode our request.
+  if (Schema.isSchemaError(error)) return new ConsoleInvalidRequest();
   if (HttpClientError.isHttpClientError(error)) return fromHttpClientError(error);
   if (!isTaggedFailure(error)) return new ConsoleUnexpected();
 

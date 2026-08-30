@@ -18,6 +18,7 @@ import { ContentState, Page, PageHeader } from "../../ui/page";
 import { StaleDataNotice } from "../../ui/stale-data-notice";
 import { StatusPill } from "../../ui/status";
 import { traceSpanGeometry } from "./trace-geometry";
+import { retryAttemptCount } from "./trace-insights";
 import {
   traceContextPath,
   traceExplorerSearch,
@@ -87,7 +88,7 @@ export function TraceDetailPage() {
   }
 
   const detail = trace.data;
-  const retryCount = detail.spans.filter((span) => /attempt[= ]\d/i.test(span.name)).length;
+  const retryCount = retryAttemptCount(detail.spans);
   const rootStart = detail.summary.startTimeUnixNano;
   const totalNanos = Math.max(1, Number(detail.summary.durationMs * 1_000_000));
   const user = detail.spans

@@ -3,11 +3,11 @@
 [![CI](https://github.com/quick007/clear/actions/workflows/ci.yml/badge.svg)](https://github.com/quick007/clear/actions/workflows/ci.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-f4b968.svg)](LICENSE)
 
-**OpenTelemetry for you and the agent that knows your code.**
+**Your agent knows the code. Clear gives it the evidence.**
 
-Clear turns metrics, logs, and traces into one live investigation surface for people and coding agents. The same boards, queries, alerts, traces, and incident context available in the UI are exposed as typed WebMCP site tools, so your existing agent can diagnose from the evidence while you watch and steer.
+Clear is a live OpenTelemetry workspace shared by you and the coding agent you already use. Metrics, logs, traces, deploys, alerts, and incident context stay in one place. The same investigation surface is exposed as typed WebMCP site tools, so you can steer while your agent queries evidence, tests hypotheses, and composes the views that make a diagnosis legible.
 
-Clear is observability, not an execution layer. It never checks out your repository or touches production. When the cause is clear, your agent fixes it with the repository and infrastructure access it already has. Deploy events and recovering telemetry flow back into the board.
+Clear stops at observability. It never checks out your repository, stores deploy credentials, or executes a fix. Your agent uses the repository and infrastructure access it already has. The result flows back into Clear as a deploy event and recovering telemetry.
 
 ![Clear homepage with a translucent observability surface over its paper shader](media/devpost/outputs/clear-devpost-thumbnail.jpg)
 
@@ -21,14 +21,14 @@ Clear is observability, not an execution layer. It never checks out your reposit
 | API reference    | [clear-runtime.onrender.com/docs](https://clear-runtime.onrender.com/docs)                   |
 | Source           | [github.com/quick007/clear](https://github.com/quick007/clear)                               |
 
-The anonymous sandbox and real OTLP runtime are live. Account-backed project creation is waiting on the final `seufert.sh` DNS cutover. The submission video is being recorded against the real checkout stack.
+The anonymous sandbox and real OTLP runtime are live. Sign in with ChatGPT when you want to create a project and point your own exporter at Clear. The submission video is recorded against the real checkout stack.
 
 ### Thirty-second path
 
 1. Open the live sandbox in ChatGPT's in-app browser with site tools available, or in Chrome with WebMCP enabled.
-2. Select **Demo incident**. No login or infrastructure setup is required.
-3. Copy the prompt shown on the board: `Investigate the active alerts and show me why.`
-4. Keep the board visible while your agent queries telemetry, tests hypotheses, and composes the evidence you need.
+2. Select **Investigate an incident**. The walkthrough starts from a healthy baseline before introducing the controlled failure.
+3. Copy the suggested prompt from the board into your agent conversation.
+4. Keep the board visible while your agent queries telemetry, tests explanations, and composes the evidence you need.
 
 Each visitor receives an isolated two-hour sandbox. It covers investigation and diagnosis, then resets cleanly. It does not pretend that a code change or deployment happened.
 

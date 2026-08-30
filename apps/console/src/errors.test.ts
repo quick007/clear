@@ -1,6 +1,6 @@
-import { Unauthorized } from "@groundtruth/api-contract";
+import { CreatePanelRequest, Unauthorized } from "@groundtruth/api-contract";
 import { AccessDenied, ProjectId, QuotaExceeded } from "@groundtruth/domain";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import {
@@ -60,6 +60,14 @@ describe("normalizeConsoleFailure", () => {
     );
     expect(rejected).toBeInstanceOf(ConsoleUnexpected);
     expect(presentConsoleFailure(rejected).message).not.toContain("secret diagnostic");
+  });
+
+  it("classifies a local request encoding failure as an invalid request", async () => {
+    const schemaError = await Effect.runPromise(
+      Effect.flip(Schema.encodeUnknownEffect(CreatePanelRequest)({ dashboardId: "invalid" })),
+    );
+
+    expect(normalizeConsoleFailure(schemaError)).toBeInstanceOf(ConsoleInvalidRequest);
   });
 
   it("records an unexpected original cause without adding it to safe copy", () => {

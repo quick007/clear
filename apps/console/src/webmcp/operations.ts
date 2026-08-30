@@ -1,8 +1,12 @@
 import {
   AddTimelineNoteRequest,
+  AnnotatePanelRequest,
   CloseIncidentRequest,
+  CreateAlertRequest,
+  CreatePanelRequest,
   OpenIncidentRequest,
   SetHypothesisRequest,
+  UpdatePanelRequest,
 } from "@groundtruth/api-contract";
 import { LogSearch, MetricQuery, TraceSearch } from "@groundtruth/telemetry";
 import { DateTime } from "effect";
@@ -78,7 +82,7 @@ export const makeToolOperations = (api: BrowserApiClient, sessions: ToolSessionS
       api.run(
         api.client.alerts.createAlert({
           params: { projectId: projectId() },
-          payload: { ...input, enabled: input.enabled ?? true },
+          payload: new CreateAlertRequest({ ...input, enabled: input.enabled ?? true }),
         }),
         signal,
       ),
@@ -162,7 +166,7 @@ export const makeToolOperations = (api: BrowserApiClient, sessions: ToolSessionS
       api.run(
         api.client.board.createPanel({
           params: { projectId: projectId() },
-          payload: input,
+          payload: new CreatePanelRequest(input),
         }),
         signal,
       ),
@@ -170,11 +174,11 @@ export const makeToolOperations = (api: BrowserApiClient, sessions: ToolSessionS
       api.run(
         api.client.board.updatePanel({
           params: { projectId: projectId(), panelId: input.panelId },
-          payload: {
+          payload: new UpdatePanelRequest({
             spec: input.spec,
             position: input.position,
             expectedRevision: input.expectedRevision,
-          },
+          }),
         }),
         signal,
       ),
@@ -189,7 +193,10 @@ export const makeToolOperations = (api: BrowserApiClient, sessions: ToolSessionS
       api.run(
         api.client.board.annotatePanel({
           params: { projectId: projectId(), panelId: input.panelId },
-          payload: { at: input.at ?? DateTime.nowUnsafe(), label: input.label },
+          payload: new AnnotatePanelRequest({
+            at: input.at ?? DateTime.nowUnsafe(),
+            label: input.label,
+          }),
         }),
         signal,
       ),
