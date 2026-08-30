@@ -157,8 +157,8 @@
     "editorial": {
       "theme": "dark",
       "headline": {
-        "x": 360,
-        "y": 72,
+        "x": 295,
+        "y": 220,
         "lines": ["Let your agent see production"],
         "size": 88
       }
