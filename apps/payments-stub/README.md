@@ -4,6 +4,9 @@ A private, deterministic payments dependency for the Clear incident
 stack. It exports real OTLP metrics, logs, and traces and models a small upstream
 failure becoming worse under retry pressure.
 
+This is canonical deployed incident-service code. The hosted Render runtime
+runs it privately alongside the backend, Collector, and state stores.
+
 ## HTTP surface
 
 - `GET /healthz`
@@ -36,6 +39,14 @@ vp run test
 vp run build
 vp run start
 ```
+
+## Key files
+
+- [`src/main.ts`](src/main.ts): Effect runtime and HTTP server.
+- [`src/routes.ts`](src/routes.ts): payment and control routes.
+- [`src/failure-model.ts`](src/failure-model.ts): deterministic failure and overload model.
+- [`src/payments-service.ts`](src/payments-service.ts): authorization behavior.
+- [`src/telemetry.ts`](src/telemetry.ts): OpenTelemetry SDK and exporters.
 
 ```sh
 vp exec docker build -f apps/payments-stub/Dockerfile -t clear-payments .

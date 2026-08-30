@@ -3,11 +3,11 @@
 [![CI](https://github.com/quick007/clear/actions/workflows/ci.yml/badge.svg)](https://github.com/quick007/clear/actions/workflows/ci.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-f4b968.svg)](LICENSE)
 
-**The incident is in Clear. The fix is in the repo.**
+**OpenTelemetry for you and the agent that knows your code.**
 
-Clear is an open source OpenTelemetry observability surface that people and their own coding agents can use together. It accepts metrics, logs, and traces, turns them into a live incident board, and exposes the same investigation surface as typed WebMCP site tools.
+Clear turns metrics, logs, and traces into one live investigation surface for people and coding agents. The same boards, queries, alerts, traces, and incident context available in the UI are exposed as typed WebMCP site tools, so your existing agent can diagnose from the evidence while you watch and steer.
 
-Clear observes. It does not edit repositories, deploy services, or hold infrastructure credentials. Your agent keeps using the access you already gave it. Clear gives both of you a shared place to understand an incident and see the result of the fix.
+Clear is observability, not an execution layer. It never checks out your repository or touches production. When the cause is clear, your agent fixes it with the repository and infrastructure access it already has. Deploy events and recovering telemetry flow back into the board.
 
 ![Clear homepage with a translucent observability surface over its paper shader](media/devpost/outputs/clear-devpost-thumbnail.jpg)
 
@@ -107,18 +107,19 @@ Requirements:
 - Docker Engine with Compose v2
 - At least 4 GB available to Docker
 
-Install and validate the TypeScript workspace:
-
-```sh
-vp install
-vp run ready
-```
-
 Create local configuration:
 
 ```sh
 cp .env.example .env
 cp apps/console/.env.example apps/console/.env.local
+cp apps/checkout-web/.env.example apps/checkout-web/.env.local
+```
+
+Install and validate the TypeScript workspace:
+
+```sh
+vp install
+vp run ready
 ```
 
 Start the console:
@@ -164,7 +165,6 @@ apps/
   checkout-api/     Intentionally broken, instrumented example service
   checkout-web/     Customer-facing storefront for the example incident
   payments-stub/    Deterministic failing dependency
-  load-generator/   Repeatable incident controller
 packages/
   api-contract/     Typed Effect HTTP API contract and client
   domain/           Domain models, IDs, and errors
@@ -173,6 +173,7 @@ packages/
   telemetry/        Telemetry query and ingest models
   telemetry-gen/    Deterministic sandbox telemetry
 examples/
+  load-generator/   Repeatable incident controller
   node-otel/        Runnable official OpenTelemetry Node example
 infra/              Compose, Render deployment, migrations, and runbooks
 docs/               Architecture, integration, operation, and design notes

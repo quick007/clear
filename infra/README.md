@@ -21,9 +21,9 @@ The fallback console supports the anonymous sandbox. Durable project login is no
 
 The runtime exposes an interactive API reference at `https://clear-runtime.onrender.com/docs` and its OpenAPI document at `https://clear-runtime.onrender.com/openapi.json`.
 
-The stateful Render service uses the `1c-2g` plan and one 10 GB disk. Nginx receives Render's public port and routes by hostname to the API or Collector. PostgreSQL, ClickHouse, the payments stub, and the scenario controller are not exposed as standalone public services.
+The stateful Render service uses the `1c-2g` plan and one 10 GB disk. Nginx receives Render's public port and routes requests to the API or Collector. PostgreSQL, ClickHouse, the payments stub, and the scenario controller are not exposed as standalone public services.
 
-The checkout API remains separate so a commit limited to `apps/checkout-api` deploys only that service. The main service keeps the free checkout service warm during the recorded scenario.
+The checkout API uses the smallest paid Render web-service plan. It remains separate so a commit limited to `apps/checkout-api` deploys only that service and produces the real deploy shown in the recorded scenario. Both services communicate over Render's private network on non-reserved ports.
 
 ## Hosted limits
 

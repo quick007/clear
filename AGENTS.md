@@ -24,9 +24,10 @@ apps/                 Product and incident services
   checkout-api/       Intentionally broken example API
   checkout-web/       Example storefront
   payments-stub/      Controlled upstream dependency
-  load-generator/     Retry-storm scenario controller
 packages/             Shared contracts, models, persistence, and panel DSL
-examples/             Standalone OpenTelemetry integrations
+examples/             Examples and incident scenario tooling
+  load-generator/     Retry-storm scenario controller
+  node-otel/           Standalone OpenTelemetry Node integration
 infra/                Local and Render infrastructure
 docs/                 Product, architecture, and operations documentation
 video/                Submission script, shot list, and media tooling

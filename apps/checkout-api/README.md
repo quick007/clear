@@ -3,6 +3,10 @@
 The public checkout service used by the Clear incident stack. It emits
 metrics, logs, and traces over OTLP and calls the private payments service.
 
+This is canonical deployed example-service code. Render runs it separately from
+the stateful Clear runtime so a checkout-only commit produces a real isolated
+deploy during the incident walkthrough.
+
 `src/lib/retry.ts` is intentionally naive. It performs three immediate retries
 without backoff, jitter, a retry budget, or a circuit breaker. Keep that bug in
 the incident branch.
@@ -40,13 +44,21 @@ including immediate retries, is recorded separately in
 Copy `.env.example` and set `PAYMENTS_SERVICE_TOKEN`. Configure the payments
 address with either `PAYMENTS_BASE_URL` or Render's `PAYMENTS_HOSTPORT`.
 
-Set `GROUNDTRUTH_INGEST_KEY` to add `x-clear-ingest-key` to every OTLP
-export. The standard OpenTelemetry exporter endpoint variables remain
-supported.
+In the hosted stack, set `GROUNDTRUTH_RUNTIME_HOSTPORT` to the Clear runtime's
+private host and port. The service derives its payments address, deploy-event
+endpoint, and OTLP logs, metrics, and traces endpoints from that value. This is
+the preferred Render configuration because it keeps service-to-service traffic
+on the private network.
 
-When `GROUNDTRUTH_DEPLOY_EVENTS_URL` and `GROUNDTRUTH_INGEST_KEY` are present,
-startup reports a deploy event using `RENDER_GIT_COMMIT` and
-`RENDER_EXTERNAL_URL`. Reporting failures are logged and never prevent startup.
+Set `GROUNDTRUTH_INGEST_KEY` to add `x-clear-ingest-key` to every OTLP
+export. For local or standalone deployments, direct endpoint overrides remain
+supported: `PAYMENTS_BASE_URL`, `GROUNDTRUTH_DEPLOY_EVENTS_URL`, and the
+standard `OTEL_EXPORTER_OTLP_*_ENDPOINT` variables take precedence over the
+derived runtime endpoints.
+
+When a deploy-event endpoint and `GROUNDTRUTH_INGEST_KEY` are available, startup
+reports a deploy event using `RENDER_GIT_COMMIT` and `RENDER_EXTERNAL_URL`.
+Reporting failures are logged and never prevent startup.
 
 ## Commands
 
@@ -56,6 +68,14 @@ vp run test
 vp run build
 vp run start
 ```
+
+## Key files
+
+- [`src/main.ts`](src/main.ts): Effect runtime and HTTP server.
+- [`src/routes.ts`](src/routes.ts): health and checkout routes.
+- [`src/checkout-service.ts`](src/checkout-service.ts): checkout workflow.
+- [`src/lib/retry.ts`](src/lib/retry.ts): intentionally broken retry policy.
+- [`src/telemetry.ts`](src/telemetry.ts): OpenTelemetry SDK and exporters.
 
 Build the container from the repository root so the workspace lockfile is in
 the Docker context:

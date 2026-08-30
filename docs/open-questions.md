@@ -29,7 +29,7 @@ The high-level product and deployment questions are settled for the hackathon re
 
 - Use the Render hackathon credit and keep the recurring footprint within it.
 - Run the stateful Clear stack on one Render 1 CPU, 2 GB service with a 10 GB persistent disk.
-- Keep the checkout API on a separate Render service so a checkout-only commit produces a clean real deployment in the video.
+- Keep the checkout API on the smallest paid Render web-service plan so it can receive private traffic and a checkout-only commit produces a clean real deployment in the video.
 - Publish the console and storefront with ChatGPT Sites.
 - Do not add Cloudflare, Fly.io, or another host unless a verified platform limitation blocks the chosen topology.
 

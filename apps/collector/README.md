@@ -4,6 +4,10 @@ This service is Clear's OpenTelemetry data plane. It accepts metrics, logs, and 
 
 Protocol parsing stays in the official OpenTelemetry Collector components. Clear does not implement protobuf or gRPC handlers.
 
+In the hosted deployment the Collector runs inside the stateful Render runtime
+and receives OTLP/HTTP through the shared ingress. The local distribution also
+exposes OTLP/gRPC.
+
 ## Component pipeline
 
 Each stable signal follows the same path:
@@ -27,6 +31,15 @@ The generated distribution contains:
 - A small Clear exporter built on `exporterhelper` for retries, bounded queueing, and observability.
 
 Component versions are pinned in `builder-config.yaml`. The OpenTelemetry Collector Builder generates the runtime shell.
+
+## Key files
+
+- [`builder-config.yaml`](builder-config.yaml): pinned Collector distribution.
+- [`config/local.yaml`](config/local.yaml): local HTTP and gRPC pipeline.
+- [`config/hosted-http.yaml`](config/hosted-http.yaml): hosted HTTP pipeline.
+- [`internal/ingestauthextension/`](internal/ingestauthextension): project-key authentication.
+- [`internal/groundtruthexporter/`](internal/groundtruthexporter): bounded backend exporter.
+- [`integration/`](integration): generated-distribution and all-signal tests.
 
 ## Authentication and project isolation
 
@@ -140,7 +153,7 @@ The queue is intentionally in memory. Collector authentication context is not sa
 
 ## Hosted configuration
 
-The hosted configuration binds OTLP/HTTP behind the stateful Render service's Nginx ingress. The public endpoint is `https://otlp.clear.seufert.sh`, and the health listener remains private.
+The hosted configuration binds OTLP/HTTP behind the stateful Render service's Nginx ingress. The current public endpoint is `https://clear-runtime.onrender.com`; `https://otlp.clear.seufert.sh` is reserved for the later custom-domain cutover. The health listener remains private.
 
 `config/local.yaml` exposes gRPC and HTTP for contributor development. Hosted gRPC is deferred for the hackathon release.
 

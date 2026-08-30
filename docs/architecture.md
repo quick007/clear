@@ -105,10 +105,10 @@ All three services emit real OTLP metrics, logs, and traces. The deterministic g
 
 The hackathon deployment uses:
 
-- ChatGPT Sites for `clear.seufert.sh` and `checkout.clear.seufert.sh`
+- ChatGPT Sites for the console and checkout storefront
 - one Render 1 CPU, 2 GB stateful service with a 10 GB disk for the Effect API, Collector, PostgreSQL, ClickHouse, payments stub, and load generator
-- one separate Render checkout API service so a checkout-only commit produces an isolated real deploy in the video
-- `api.clear.seufert.sh`, `otlp.clear.seufert.sh`, and `checkout-api.clear.seufert.sh` as public Render domains
+- one separate paid Render checkout API service so it can receive private traffic and a checkout-only commit produces an isolated real deploy in the video
+- current `chatgpt.site` and `onrender.com` fallback hostnames, with the `seufert.sh` names reserved for a later manual custom-domain cutover
 
 The hosted stack is single-instance. It does not claim horizontal scaling, high availability, or off-host backups. `infra/compose.yaml` remains a contributor-only local environment, not a supported self-hosted release.
 

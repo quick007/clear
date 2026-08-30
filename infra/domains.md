@@ -1,6 +1,6 @@
 # Domain plan
 
-All hosted endpoints use subdomains of `seufert.sh`. The API is a child of the console hostname, so the short-lived Sites handoff nonce can be scoped to `clear.seufert.sh` while the long-lived API session cookie remains host-only.
+This is the planned custom-domain cutover. The current deployment keeps the platform-provided `chatgpt.site` and `onrender.com` hostnames until the personal DNS zone is available. After cutover, the API is a child of the console hostname, so the short-lived Sites handoff nonce can be scoped to `clear.seufert.sh` while the long-lived API session cookie remains host-only.
 
 | Hostname                        | Platform      | Purpose                        | DNS target source                  |
 | ------------------------------- | ------------- | ------------------------------ | ---------------------------------- |
