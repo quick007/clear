@@ -12,7 +12,12 @@ export default defineConfig(({ mode }) => {
   if (mode !== "test") readConsoleConfig(loadEnv(mode, appRoot, ""));
 
   return {
-    plugins: [stylex.vite({ devMode: "full", useCSSLayers: true }), react(), sites(), cloudflare()],
+    plugins: [
+      stylex.vite({ devMode: "full", useCSSLayers: true }),
+      react(),
+      sites(),
+      cloudflare({ viteEnvironment: { name: "server" } }),
+    ],
     resolve: {
       dedupe: ["react", "react-dom"],
     },

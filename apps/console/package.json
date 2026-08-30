@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vp build && vp exec node scripts/prepare-sites-worker.mjs",
+    "build": "vp build",
     "dev": "vp dev",
     "preview": "vp preview",
     "test": "vp test --run --config vitest.config.ts"
