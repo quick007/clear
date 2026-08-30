@@ -45,9 +45,9 @@ services:
       sizeGB: 10
     envVars:
       - key: GROUNDTRUTH_PUBLIC_URL
-        value: https://api.clear.seufert.sh
+        value: https://clear-runtime.onrender.com
       - key: GROUNDTRUTH_CONSOLE_ORIGIN
-        value: https://clear.seufert.sh
+        value: https://clear-observability.seufert.chatgpt.site
       - key: GROUNDTRUTH_POSTGRES_PASSWORD
         generateValue: true
       - key: GROUNDTRUTH_CLICKHOUSE_PASSWORD
@@ -138,7 +138,7 @@ services:
       - key: OTEL_SERVICE_NAME
         value: checkout-api
       - key: OTEL_EXPORTER_OTLP_ENDPOINT
-        value: https://otlp.clear.seufert.sh
+        value: https://clear-runtime.onrender.com
       - key: OTEL_EXPORTER_OTLP_PROTOCOL
         value: http/protobuf
       - key: GROUNDTRUTH_INGEST_KEY
@@ -147,7 +147,7 @@ services:
           name: clear-runtime
           envVarKey: GROUNDTRUTH_DEMO_INGEST_KEY
       - key: PAYMENTS_BASE_URL
-        value: https://api.clear.seufert.sh/internal/payments
+        value: https://clear-runtime.onrender.com/internal/payments
       - key: PAYMENTS_SERVICE_TOKEN
         fromService:
           type: web
@@ -156,8 +156,8 @@ services:
       - key: UPSTREAM_TIMEOUT_MS
         value: 750 # 750 milliseconds
       - key: GROUNDTRUTH_DEPLOY_EVENTS_URL
-        value: https://api.clear.seufert.sh/v1/events/deploy
+        value: https://clear-runtime.onrender.com/v1/events/deploy
       - key: CHECKOUT_WEB_ORIGIN
-        value: https://checkout.clear.seufert.sh
+        value: https://clear-checkout.seufert.chatgpt.site
       - key: NODE_OPTIONS
         value: --max-old-space-size=320
