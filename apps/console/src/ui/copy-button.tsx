@@ -11,10 +11,12 @@ type CopyStatus = "failed" | "idle" | "success";
 export function CopyButton({
   compact = true,
   label = "Copy",
+  tone = "ghost",
   value,
 }: {
   compact?: boolean;
   label?: string;
+  tone?: "ghost" | "primary" | "secondary";
   value: string;
 }) {
   const [status, setStatus] = useState<CopyStatus>("idle");
@@ -42,7 +44,7 @@ export function CopyButton({
 
   return (
     <span {...stylex.props(styles.wrapper)}>
-      <Button compact={compact} onClick={copy} tone="ghost">
+      <Button compact={compact} onClick={copy} tone={tone}>
         <Icon icon={status === "success" ? CheckmarkCircle02Icon : Copy01Icon} size={14} />
         {statusLabel}
       </Button>

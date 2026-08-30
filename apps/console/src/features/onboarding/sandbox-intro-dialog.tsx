@@ -5,7 +5,10 @@ import type { ReactNode } from "react";
 
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
+import { CopyButton } from "../../ui/copy-button";
 import { Icon } from "../../ui/icon";
+
+export type SandboxAgentAccess = "checking" | "failed" | "ready" | "unsupported";
 
 const steps = [
   {
@@ -25,22 +28,28 @@ const steps = [
 ] as const;
 
 export function SandboxIntroDialog({
+  agentAccess,
   blocked,
   error,
   onOpenChange,
   onRestart,
+  onRetryAgentAccess,
   onStart,
   open,
   pending,
+  shareUrl,
   state,
 }: {
+  agentAccess: SandboxAgentAccess;
   blocked: boolean;
   error?: ReactNode;
   onOpenChange: (open: boolean) => void;
   onRestart: () => void;
+  onRetryAgentAccess: () => void;
   onStart: () => void;
   open: boolean;
   pending: boolean;
+  shareUrl: string;
   state: "active" | "baseline" | "complete";
 }) {
   return (
@@ -96,6 +105,7 @@ export function SandboxIntroDialog({
                 </li>
               ))}
             </ol>
+            {state === "baseline" ? <AgentAccessNotice access={agentAccess} /> : null}
             <p {...stylex.props(styles.boundary)}>
               Clear helps you diagnose and preserves the evidence. Your coding agent keeps control
               of the repository and any fix.
@@ -111,20 +121,121 @@ export function SandboxIntroDialog({
                 {pending ? "Resetting sandbox" : "Reset to healthy baseline"}
               </Button>
             ) : (
-              <>
-                <Dialog.Close
-                  disabled={pending || blocked}
-                  render={<Button tone="ghost">Inspect healthy baseline</Button>}
-                />
-                <Button disabled={pending || blocked} onClick={onStart} tone="primary">
-                  {pending ? "Starting incident" : "Trigger checkout incident"}
-                </Button>
-              </>
+              <BaselineActions
+                access={agentAccess}
+                blocked={blocked}
+                onRetryAgentAccess={onRetryAgentAccess}
+                onStart={onStart}
+                pending={pending}
+                shareUrl={shareUrl}
+              />
             )}
           </footer>
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+function AgentAccessNotice({ access }: { access: SandboxAgentAccess }) {
+  const copy = {
+    checking: {
+      title: "Checking agent access",
+      detail: "Clear is confirming that your agent can join this workspace before you begin.",
+    },
+    failed: {
+      title: "Agent access could not start",
+      detail:
+        "Try again before starting, or continue here without agent collaboration. This sandbox stays in this browser tab.",
+    },
+    ready: {
+      title: "Ready to investigate with your agent",
+      detail:
+        "Keep this page open with your agent. The questions you ask and the evidence it adds stay visible in the same workspace.",
+    },
+    unsupported: {
+      title: "Open this page inside ChatGPT before starting",
+      detail:
+        "Agent collaboration is not available in this browser. Copy the live URL and open it inside ChatGPT. A sandbox started here stays in this tab and will not carry over.",
+    },
+  }[access];
+
+  return (
+    <section
+      aria-live="polite"
+      {...stylex.props(
+        styles.agentAccess,
+        access === "ready" && styles.agentAccessReady,
+        access === "unsupported" && styles.agentAccessWarning,
+        access === "failed" && styles.agentAccessWarning,
+      )}
+    >
+      <strong {...stylex.props(styles.agentAccessTitle)}>{copy.title}</strong>
+      <span {...stylex.props(styles.agentAccessDetail)}>{copy.detail}</span>
+    </section>
+  );
+}
+
+function BaselineActions({
+  access,
+  blocked,
+  onRetryAgentAccess,
+  onStart,
+  pending,
+  shareUrl,
+}: {
+  access: SandboxAgentAccess;
+  blocked: boolean;
+  onRetryAgentAccess: () => void;
+  onStart: () => void;
+  pending: boolean;
+  shareUrl: string;
+}) {
+  if (access === "unsupported") {
+    return (
+      <>
+        <Button disabled={pending || blocked} onClick={onStart} tone="ghost">
+          {pending ? "Starting incident" : "Continue here without an agent"}
+        </Button>
+        <CopyButton
+          compact={false}
+          label="Copy live URL for ChatGPT"
+          tone="primary"
+          value={shareUrl}
+        />
+      </>
+    );
+  }
+  if (access === "failed") {
+    return (
+      <>
+        <Button disabled={pending || blocked} onClick={onStart} tone="ghost">
+          {pending ? "Starting incident" : "Continue here without an agent"}
+        </Button>
+        <Button disabled={pending || blocked} onClick={onRetryAgentAccess} tone="primary">
+          Try agent access again
+        </Button>
+      </>
+    );
+  }
+  return (
+    <>
+      <Dialog.Close
+        disabled={pending || blocked}
+        render={<Button tone="ghost">Inspect healthy baseline</Button>}
+      />
+      <Button
+        disabled={pending || blocked || access === "checking"}
+        onClick={onStart}
+        tone="primary"
+      >
+        {access === "checking"
+          ? "Checking agent access"
+          : pending
+            ? "Starting incident"
+            : "Trigger checkout incident"}
+      </Button>
+    </>
   );
 }
 
@@ -225,12 +336,33 @@ const styles = stylex.create({
     margin: 0,
     padding: space.x3,
   },
+  agentAccess: {
+    backgroundColor: colors.canvas,
+    borderColor: colors.lineStrong,
+    borderRadius: radii.md,
+    borderStyle: "solid",
+    borderWidth: 1,
+    display: "grid",
+    gap: space.x1,
+    padding: space.x3,
+  },
+  agentAccessReady: {
+    backgroundColor: colors.greenWash,
+    borderColor: "rgba(52, 211, 153, 0.24)",
+  },
+  agentAccessWarning: {
+    backgroundColor: colors.amberWash,
+    borderColor: "rgba(251, 191, 36, 0.26)",
+  },
+  agentAccessTitle: { fontSize: 12, fontWeight: 500 },
+  agentAccessDetail: { color: colors.textMuted, fontSize: 11, lineHeight: 1.5 },
   footer: {
     alignItems: "center",
     borderTopColor: colors.line,
     borderTopStyle: "solid",
     borderTopWidth: 1,
     display: "flex",
+    flexWrap: "wrap",
     gap: space.x2,
     justifyContent: "flex-end",
     padding: { default: space.x5, "@media (max-width: 520px)": space.x4 },

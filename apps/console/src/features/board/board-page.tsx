@@ -25,7 +25,11 @@ import { SandboxIntroDialog } from "../onboarding/sandbox-intro-dialog";
 import { boardContextMessage, type BoardDependencyState } from "./board-context";
 import { chartNeedsFullWidth } from "./panel-layout";
 import { LivePanel } from "./panel-renderer";
-import { getGroundtruthToolStatus, subscribeGroundtruthToolStatus } from "../../webmcp/bootstrap";
+import {
+  getGroundtruthToolStatus,
+  startGroundtruthTools,
+  subscribeGroundtruthToolStatus,
+} from "../../webmcp/bootstrap";
 
 const investigationPrompts = {
   baseline: "",
@@ -56,6 +60,15 @@ export function BoardPage() {
     getGroundtruthToolStatus,
     getGroundtruthToolStatus,
   );
+  const agentAccess =
+    toolStatus === "ready"
+      ? "ready"
+      : toolStatus === "unsupported"
+        ? "unsupported"
+        : toolStatus === "failed"
+          ? "failed"
+          : "checking";
+  const shareUrl = new URL("/board?guide=true", window.location.origin).toString();
   const boardUnavailable = (runtime.isError && !runtime.data) || (board.isError && !board.data);
   const boardFailure = runtime.isError && !runtime.data ? runtime.error : board.error;
   const catalogState = dependencyState(catalog.isError, catalog.data !== undefined);
@@ -143,15 +156,22 @@ export function BoardPage() {
       {runtime.data?.mode === "sandbox" && overview.data && incidents.data ? (
         <>
           <SandboxIntroDialog
+            agentAccess={agentAccess}
             blocked={triggerOutcomeUnknown || resetOutcomeUnknown}
             error={stage === "reviewed" ? resetError : triggerError}
             onOpenChange={(open) => {
               if (!open) closeGuide();
             }}
             onRestart={restartWalkthrough}
+            onRetryAgentAccess={() => {
+              void startGroundtruthTools().catch((error: unknown) => {
+                console.warn("Clear agent access could not start", error);
+              });
+            }}
             onStart={startIncident}
             open={search.guide === true}
             pending={triggerIncident.isPending || resetSandbox.isPending}
+            shareUrl={shareUrl}
             state={
               stage === "reviewed" ? "complete" : overview.data.openIncident ? "active" : "baseline"
             }
@@ -161,10 +181,10 @@ export function BoardPage() {
               stage === "baseline" ? (
                 <Button
                   disabled={triggerIncident.isPending || triggerOutcomeUnknown}
-                  onClick={startIncident}
+                  onClick={() => void navigate({ search: { guide: true } })}
                   tone="primary"
                 >
-                  {triggerIncident.isPending ? "Starting incident" : "Trigger checkout incident"}
+                  Start investigation
                 </Button>
               ) : stage === "diagnosed" && overview.data.openIncident ? (
                 <Button
