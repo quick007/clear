@@ -1,6 +1,8 @@
 import { Effect, Match, Schema } from "effect";
 import { HttpClientError } from "effect/unstable/http";
 
+import { signInHref } from "./auth-route";
+
 export class ConsoleUnavailable extends Schema.TaggedError<ConsoleUnavailable>()(
   "ConsoleUnavailable",
   { retryable: Schema.Boolean },
@@ -283,12 +285,6 @@ export const presentConsoleFailure = (error: unknown): ErrorPresentation =>
     }),
     Match.exhaustive,
   );
-
-const signInHref = (returnPath: string) => {
-  const safeReturnPath =
-    returnPath.startsWith("/") && !returnPath.startsWith("//") ? returnPath : "/board";
-  return `/auth/chatgpt?returnPath=${encodeURIComponent(safeReturnPath)}`;
-};
 
 const noRecovery = { _tag: "None" } as const;
 const retryRecovery = { _tag: "Retry", label: "Try again" } as const;

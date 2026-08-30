@@ -118,7 +118,7 @@ describe("recoveryActionForConsoleFailure", () => {
       }),
     ).toEqual({
       _tag: "Link",
-      href: "/auth/chatgpt?returnPath=%2Fincidents%2Fincident-1%3Ftab%3Dtimeline",
+      href: "/sign-in?returnPath=%2Fincidents%2Fincident-1%3Ftab%3Dtimeline",
       label: "Log in again",
     });
   });
@@ -130,7 +130,7 @@ describe("recoveryActionForConsoleFailure", () => {
       }),
     ).toEqual({
       _tag: "Link",
-      href: "/auth/chatgpt?returnPath=%2Fconnect",
+      href: "/sign-in?returnPath=%2Fconnect",
       label: "Log in to create a project",
     });
   });

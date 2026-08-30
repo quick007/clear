@@ -3,6 +3,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 
+import { signInHref } from "../../auth-route";
 import { errorMessage, formatRelativeTime } from "../../data/format";
 import {
   useCreateIngestKey,
@@ -136,10 +137,7 @@ export function ProjectSettingsPage() {
         {sandbox ? (
           <div {...stylex.props(styles.loginCard)}>
             <span>Log in to create a project and manage real ingest keys.</span>
-            <a
-              href="/auth/chatgpt?returnPath=%2Fsettings%2Fproject"
-              {...stylex.props(styles.loginLink)}
-            >
+            <a href={signInHref("/settings/project")} {...stylex.props(styles.loginLink)}>
               Log in with ChatGPT
             </a>
           </div>

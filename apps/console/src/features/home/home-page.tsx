@@ -2,13 +2,12 @@ import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 
+import { signInHref } from "../../auth-route";
 import { colors, space } from "../../theme/tokens.stylex";
 import { buttonStyles, buttonToneStyles } from "../../ui/button";
 import { ClearMark } from "../../ui/clear-mark";
 import { Icon } from "../../ui/icon";
 import { HomeAtmosphere } from "./home-atmosphere";
-
-const loginHref = "/auth/chatgpt?returnPath=%2Fconnect";
 
 export function HomePage() {
   return (
@@ -38,7 +37,7 @@ export function HomePage() {
               <Icon icon={ArrowRight01Icon} size={17} />
             </Link>
             <a
-              href={loginHref}
+              href={signInHref("/connect")}
               {...stylex.props(buttonStyles.button, buttonToneStyles.secondary, buttonStyles.large)}
             >
               Connect your telemetry

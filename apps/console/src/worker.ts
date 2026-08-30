@@ -1,7 +1,8 @@
-const authPath = "/auth/chatgpt";
+import { isSafeReturnPath, signInHref, signInPath } from "./auth-route";
+
 const callbackPath = "/v1/auth/chatgpt/callback";
 const handoffPath = "/v1/auth/handoffs";
-const signInPath = "/signin-with-chatgpt";
+const sitesSignInPath = "/signin-with-chatgpt";
 const handoffNonceCookieName = "groundtruth_handoff_nonce";
 const handoffNonceMaxAgeSeconds = 60; // 1 minute
 const backendTimeoutMillis = 8 * 1000; // 8 seconds
@@ -84,24 +85,10 @@ const handoffCookie = (requestUrl: URL, apiOrigin: string, browserNonce: string)
   return attributes.join("; ");
 };
 
-const hasControlCharacter = (value: string) =>
-  Array.from(value).some((character) => {
-    const codePoint = character.codePointAt(0);
-    return codePoint !== undefined && (codePoint <= 31 || codePoint === 127);
-  });
-
-const validReturnPath = (value: string) =>
-  value.length >= 1 &&
-  value.length <= 512 &&
-  value.startsWith("/") &&
-  !value.startsWith("//") &&
-  !value.includes("\\") &&
-  !hasControlCharacter(value);
-
 const readReturnPath = (url: URL) => {
   const values = url.searchParams.getAll("returnPath");
   if (values.length === 0) return "/";
-  if (values.length !== 1 || !validReturnPath(values[0] ?? "")) return undefined;
+  if (values.length !== 1 || !isSafeReturnPath(values[0] ?? "")) return undefined;
   return values[0];
 };
 
@@ -122,11 +109,8 @@ const readDisplayName = (headers: Headers) => {
 };
 
 const signInRedirect = (returnPath: string) => {
-  const returnTo = new URL(authPath, "https://groundtruth.invalid");
-  returnTo.searchParams.set("returnPath", returnPath);
-
-  const signIn = new URL(signInPath, "https://groundtruth.invalid");
-  signIn.searchParams.set("return_to", `${returnTo.pathname}${returnTo.search}`);
+  const signIn = new URL(sitesSignInPath, "https://groundtruth.invalid");
+  signIn.searchParams.set("return_to", signInHref(returnPath));
   return redirect(`${signIn.pathname}${signIn.search}`);
 };
 
@@ -239,7 +223,7 @@ export const handleRequest = async (request: Request, env: AuthEnv) => {
     );
   }
 
-  if (url.pathname === authPath) return handleAuth(request, env, url);
+  if (url.pathname === signInPath) return handleAuth(request, env, url);
 
   if (!isApiPath(url.pathname)) return serveApplication(request, env, url);
 

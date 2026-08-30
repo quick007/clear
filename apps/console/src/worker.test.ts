@@ -30,12 +30,12 @@ describe("Sites authentication Worker", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("leaves sign-in optional for anonymous visitors", async () => {
-    const response = await handleRequest(request("/auth/chatgpt?returnPath=%2Fboard"), env);
+    const response = await handleRequest(request("/sign-in?returnPath=%2Fboard"), env);
 
     expect(response.status).toBe(303);
     const location = response.headers.get("location");
     expect(location).toContain("/signin-with-chatgpt?return_to=");
-    expect(decodeURIComponent(location ?? "")).toContain("/auth/chatgpt?returnPath=%2Fboard");
+    expect(decodeURIComponent(location ?? "")).toContain("/sign-in?returnPath=%2Fboard");
     expect(response.headers.get("cache-control")).toBe("no-store, private");
   });
 
@@ -46,7 +46,7 @@ describe("Sites authentication Worker", () => {
       vi.stubGlobal("fetch", backendFetch);
 
       const response = await handleRequest(
-        request(`/auth/chatgpt?returnPath=${encodeURIComponent(returnPath)}`, {
+        request(`/sign-in?returnPath=${encodeURIComponent(returnPath)}`, {
           headers: authenticatedHeaders,
         }),
         env,
@@ -83,7 +83,7 @@ describe("Sites authentication Worker", () => {
     vi.stubGlobal("fetch", backendFetch);
 
     const response = await handleRequest(
-      request("/auth/chatgpt?returnPath=%2Ftraces%3Fservice%3Dcheckout-api", {
+      request("/sign-in?returnPath=%2Ftraces%3Fservice%3Dcheckout-api", {
         headers: {
           "oai-authenticated-user-id": "chatgpt-user-1",
           "oai-authenticated-user-email": " operator@example.com ",
@@ -127,7 +127,7 @@ describe("Sites authentication Worker", () => {
     vi.stubGlobal("fetch", backendFetch);
 
     const response = await handleRequest(
-      request("/auth/chatgpt", {
+      request("/sign-in", {
         headers: {
           ...authenticatedHeaders,
           "oai-authenticated-user-full-name": "%E0%A4%A",
@@ -158,8 +158,8 @@ describe("Sites authentication Worker", () => {
     );
 
     const authenticated = { headers: authenticatedHeaders };
-    const first = await handleRequest(request("/auth/chatgpt", authenticated), env);
-    const second = await handleRequest(request("/auth/chatgpt", authenticated), env);
+    const first = await handleRequest(request("/sign-in", authenticated), env);
+    const second = await handleRequest(request("/sign-in", authenticated), env);
 
     expect(nonces).toHaveLength(2);
     expect(nonces[0]).not.toBe(nonces[1]);
@@ -187,7 +187,7 @@ describe("Sites authentication Worker", () => {
     );
 
     const response = await handleRequest(
-      new Request("http://localhost:5173/auth/chatgpt", {
+      new Request("http://localhost:5173/sign-in", {
         headers: authenticatedHeaders,
       }),
       localEnv,
@@ -209,7 +209,7 @@ describe("Sites authentication Worker", () => {
     );
 
     const response = await handleRequest(
-      request("/auth/chatgpt", {
+      request("/sign-in", {
         headers: authenticatedHeaders,
       }),
       env,

@@ -3,6 +3,7 @@ import { Chart01Icon, Logout01Icon, Plug01Icon } from "@hugeicons/core-free-icon
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 
+import { signInHref } from "../auth-route";
 import { useLogoutMutation } from "../data/queries";
 import { mutationOutcomeIsUnknown } from "../errors";
 import { colors, radii, space } from "../theme/tokens.stylex";
@@ -24,11 +25,7 @@ export function SidebarAccountFooter({
   if (!account) {
     return (
       <div {...stylex.props(styles.footer)}>
-        <a
-          href="/auth/chatgpt?returnPath=%2Fconnect"
-          onClick={onNavigate}
-          {...stylex.props(styles.login)}
-        >
+        <a href={signInHref("/connect")} onClick={onNavigate} {...stylex.props(styles.login)}>
           <span {...stylex.props(styles.avatar, styles.guestAvatar)}>
             <Icon icon={Chart01Icon} size={16} />
           </span>

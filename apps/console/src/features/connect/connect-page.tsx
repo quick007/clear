@@ -8,6 +8,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { signInHref } from "../../auth-route";
 import { getConsoleConfig } from "../../config";
 import { errorMessage, formatRelativeTime } from "../../data/format";
 import {
@@ -104,7 +105,7 @@ export function ConnectPage() {
               project, then point any OpenTelemetry SDK or Collector at it.
             </p>
           </div>
-          <Button large render={<a href="/auth/chatgpt?returnPath=%2Fconnect" />} tone="primary">
+          <Button large render={<a href={signInHref("/connect")} />} tone="primary">
             Sign in to create a project
           </Button>
         </section>
