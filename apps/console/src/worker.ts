@@ -188,7 +188,8 @@ const createHandoff = (
             returnPath,
             browserNonce,
           }),
-          redirect: "error",
+          // workerd supports manual redirect handling, then the status check below fails closed.
+          redirect: "manual",
           signal: AbortSignal.timeout(backendTimeoutMillis),
         }),
       catch: () => new HandoffTransportFailure({ origin }),

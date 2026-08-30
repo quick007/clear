@@ -3,7 +3,7 @@
   "name": "clear-console",
   "main": "./src/worker.ts",
   "compatibility_date": "2026-08-28",
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "compatibility_flags": ["nodejs_compat"],
   "secrets": {
     "required": ["GROUNDTRUTH_SITE_HANDOFF_SECRET"],
   },

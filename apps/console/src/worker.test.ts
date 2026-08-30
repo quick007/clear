@@ -66,7 +66,7 @@ describe("Sites authentication Worker", () => {
     const backendFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       expect(requestUrl(input)).toBe("https://api.clear.test/v1/auth/handoffs");
       expect(init?.method).toBe("POST");
-      expect(init?.redirect).toBe("error");
+      expect(init?.redirect).toBe("manual");
       expect(new Headers(init?.headers).get("authorization")).toBe("Bearer sites-handoff-secret");
       const body = jsonBody(init?.body);
       expect(body).toMatchObject({
@@ -253,6 +253,32 @@ describe("Sites authentication Worker", () => {
       status: 401,
     });
     expect(JSON.stringify(consoleError.mock.calls)).not.toContain("Sites service credential");
+  });
+
+  it("rejects backend redirects without following them", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(null, {
+            status: 302,
+            headers: { location: "https://elsewhere.test" },
+          }),
+      ),
+    );
+
+    const response = await handleRequest(
+      request("/sign-in", { headers: authenticatedHeaders }),
+      env,
+    );
+
+    expect(response.status).toBe(502);
+    expect(consoleError).toHaveBeenCalledWith("[Clear] authentication handoff failed", {
+      failureClass: "HandoffStatusFailure",
+      origin: "https://api.clear.test",
+      status: 302,
+    });
   });
 
   it("classifies transport failures without logging request secrets or identity", async () => {
