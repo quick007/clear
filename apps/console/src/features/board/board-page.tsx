@@ -1,10 +1,10 @@
 import * as stylex from "@stylexjs/stylex";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useRef, type ReactNode } from "react";
 
 import { errorMessage } from "../../data/format";
 import {
   useBoardQuery,
+  useIncidentQuery,
   useMetricCatalogQuery,
   useOverviewQuery,
   useRuntimeQuery,
@@ -14,23 +14,26 @@ import { mutationOutcomeIsUnknown } from "../../errors";
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
 import { ConsoleFailureActions } from "../../ui/console-failure-actions";
-import { CopyButton } from "../../ui/copy-button";
 import { MutationFailureNotice } from "../../ui/mutation-failure-notice";
 import { ContentState } from "../../ui/page";
+import { InvestigationGuide } from "../onboarding/investigation-guide";
+import { investigationStage } from "../onboarding/investigation-progress";
+import { SandboxIntroDialog } from "../onboarding/sandbox-intro-dialog";
 import { boardContextMessage, type BoardDependencyState } from "./board-context";
 import { LivePanel } from "./panel-renderer";
 
-const investigationPrompt = "Investigate the active alerts and show me why.";
+const investigationPrompt =
+  "Investigate the active checkout alert. Compare request volume with unique users and retries, then show the evidence on the board.";
 
 export function BoardPage() {
   const search = useSearch({ from: "/board" });
   const navigate = useNavigate({ from: "/board" });
-  const startedFromHome = useRef(false);
   const runtime = useRuntimeQuery();
   const projectId = runtime.data?.projectId ?? null;
   const board = useBoardQuery(projectId);
   const catalog = useMetricCatalogQuery(projectId);
   const overview = useOverviewQuery(projectId);
+  const incident = useIncidentQuery(projectId, overview.data?.openIncident?.id ?? null);
   const triggerIncident = useTriggerSandboxIncident(projectId!);
   const boardUnavailable = (runtime.isError && !runtime.data) || (board.isError && !board.data);
   const boardFailure = runtime.isError && !runtime.data ? runtime.error : board.error;
@@ -39,29 +42,33 @@ export function BoardPage() {
   const dependencyFailure = catalogState !== "available" || overviewState !== "available";
   const triggerOutcomeUnknown =
     triggerIncident.isError && mutationOutcomeIsUnknown(triggerIncident.error);
-  useEffect(() => {
-    if (
-      !search.start ||
-      startedFromHome.current ||
-      runtime.data?.mode !== "sandbox" ||
-      overview.data === undefined ||
-      overview.data?.openIncident ||
-      projectId === null
-    ) {
-      return;
-    }
-    startedFromHome.current = true;
-    triggerIncident.mutate(undefined, {
-      onSettled: () => void navigate({ replace: true, search: { start: undefined } }),
-    });
-  }, [
-    navigate,
-    overview.data?.openIncident,
-    projectId,
-    runtime.data?.mode,
-    search.start,
-    triggerIncident,
-  ]);
+  const closeGuide = () => void navigate({ replace: true, search: { guide: undefined } });
+  const startIncident = () => {
+    if (triggerOutcomeUnknown || triggerIncident.isPending) return;
+    triggerIncident.mutate(undefined, { onSuccess: closeGuide });
+  };
+  const mutationError = triggerIncident.isError ? (
+    <MutationFailureNotice
+      checkLabel="Check incident state"
+      checking={overview.isFetching || board.isFetching}
+      error={triggerIncident.error}
+      onCheckState={() => {
+        void Promise.all([overview.refetch(), board.refetch()]).then(
+          ([overviewResult, boardResult]) => {
+            if (!overviewResult.isSuccess || !boardResult.isSuccess) return;
+            triggerIncident.reset();
+            if (overviewResult.data.openIncident) closeGuide();
+          },
+        );
+      }}
+    />
+  ) : null;
+  const stage = investigationStage({
+    hasOpenIncident:
+      overview.data?.openIncident !== null && overview.data?.openIncident !== undefined,
+    hypotheses: incident.data?.hypotheses ?? [],
+    panelCount: board.data?.panels.length ?? 0,
+  });
 
   return (
     <div {...stylex.props(styles.page)}>
@@ -76,44 +83,34 @@ export function BoardPage() {
         </div>
       </header>
 
-      {runtime.data?.mode === "sandbox" && overview.data && !overview.data.openIncident ? (
-        <SandboxStart
-          blocked={triggerOutcomeUnknown}
-          error={
-            triggerIncident.isError ? (
-              <MutationFailureNotice
-                checkLabel="Check incident state"
-                checking={overview.isFetching || board.isFetching}
-                error={triggerIncident.error}
-                onCheckState={() => {
-                  void Promise.all([overview.refetch(), board.refetch()]).then(
-                    ([overviewResult, boardResult]) => {
-                      if (!overviewResult.isSuccess || !boardResult.isSuccess) return;
-                      triggerIncident.reset();
-                    },
-                  );
-                }}
-              />
-            ) : null
-          }
-          onStart={() => {
-            if (!triggerOutcomeUnknown) triggerIncident.mutate();
-          }}
-          pending={triggerIncident.isPending}
-        />
-      ) : null}
-
-      {runtime.data?.mode === "sandbox" &&
-      overview.data?.openIncident &&
-      board.data &&
-      board.data.panels.length <= 1 ? (
-        <aside aria-label="Suggested agent prompt" {...stylex.props(styles.agentPrompt)}>
-          <span {...stylex.props(styles.agentPromptCopy)}>
-            <strong {...stylex.props(styles.agentPromptTitle)}>Ask your agent</strong>
-            <span>{investigationPrompt}</span>
-          </span>
-          <CopyButton label="Copy suggested prompt" value={investigationPrompt} />
-        </aside>
+      {runtime.data?.mode === "sandbox" && overview.data ? (
+        <>
+          <SandboxIntroDialog
+            blocked={triggerOutcomeUnknown}
+            error={mutationError}
+            onOpenChange={(open) => {
+              if (!open) closeGuide();
+            }}
+            onStart={startIncident}
+            open={search.guide === true}
+            pending={triggerIncident.isPending}
+          />
+          <InvestigationGuide
+            action={
+              <Button
+                disabled={triggerIncident.isPending || triggerOutcomeUnknown}
+                onClick={startIncident}
+                tone="primary"
+              >
+                {triggerIncident.isPending ? "Starting incident" : "Start incident"}
+              </Button>
+            }
+            onOpenGuide={() => void navigate({ search: { guide: true } })}
+            prompt={investigationPrompt}
+            stage={stage}
+          />
+          {search.guide ? null : mutationError}
+        </>
       ) : null}
 
       {!boardUnavailable && !board.data && (runtime.isPending || board.isPending) ? (
@@ -210,37 +207,6 @@ function BoardContextNotice({
 const dependencyState = (failed: boolean, loaded: boolean): BoardDependencyState =>
   failed ? (loaded ? "stale" : "missing") : "available";
 
-function SandboxStart({
-  blocked,
-  error,
-  onStart,
-  pending,
-}: {
-  blocked: boolean;
-  error: ReactNode;
-  onStart: () => void;
-  pending: boolean;
-}) {
-  return (
-    <section aria-labelledby="start-incident-title" {...stylex.props(styles.sandboxStart)}>
-      <div {...stylex.props(styles.sandboxIntro)}>
-        <div>
-          <h2 id="start-incident-title" {...stylex.props(styles.sandboxTitle)}>
-            Start an incident
-          </h2>
-          <p {...stylex.props(styles.sandboxCopy)}>
-            Introduce a controlled retry storm, then ask your agent to investigate what changed.
-          </p>
-        </div>
-        <Button disabled={pending || blocked} onClick={onStart} tone="primary">
-          {pending ? "Starting incident" : "Start incident"}
-        </Button>
-      </div>
-      {error}
-    </section>
-  );
-}
-
 const styles = stylex.create({
   page: {
     marginInline: "auto",
@@ -266,31 +232,6 @@ const styles = stylex.create({
     },
     paddingBottom: space.x10,
   },
-  agentPrompt: {
-    alignItems: "center",
-    backdropFilter: "blur(10px) saturate(108%)",
-    backgroundColor: colors.materialSurface,
-    borderColor: colors.materialLine,
-    borderRadius: radii.md,
-    borderStyle: "solid",
-    borderWidth: 1,
-    boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.045)",
-    color: colors.textMuted,
-    display: "flex",
-    fontSize: 13,
-    gap: space.x4,
-    justifyContent: "space-between",
-    marginBottom: space.x4,
-    paddingBlock: space.x3,
-    paddingInline: space.x4,
-  },
-  agentPromptCopy: {
-    alignItems: { default: "center", "@media (max-width: 620px)": "start" },
-    display: "flex",
-    flexDirection: { default: "row", "@media (max-width: 620px)": "column" },
-    gap: { default: space.x3, "@media (max-width: 620px)": 2 },
-  },
-  agentPromptTitle: { color: colors.text, fontWeight: 500, whiteSpace: "nowrap" },
   contextNotice: {
     alignItems: "center",
     backgroundColor: colors.surface,
@@ -308,31 +249,4 @@ const styles = stylex.create({
     paddingInline: space.x3,
   },
   contextNoticeCopy: { lineHeight: 1.45 },
-  sandboxStart: {
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderRadius: radii.lg,
-    borderStyle: "solid",
-    borderWidth: 1,
-    display: "grid",
-    gap: space.x5,
-    marginBottom: space.x6,
-    padding: { default: space.x6, "@media (max-width: 620px)": space.x5 },
-  },
-  sandboxIntro: {
-    alignItems: { default: "center", "@media (max-width: 620px)": "stretch" },
-    display: "flex",
-    flexDirection: { default: "row", "@media (max-width: 620px)": "column" },
-    gap: space.x5,
-    justifyContent: "space-between",
-  },
-  sandboxTitle: { fontSize: 18, fontWeight: 500, marginBlock: 0 },
-  sandboxCopy: {
-    color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 1.55,
-    marginBlock: space.x2,
-    maxWidth: 680,
-  },
-  sandboxError: { color: colors.red, fontSize: 12, marginBlock: 0 },
 });

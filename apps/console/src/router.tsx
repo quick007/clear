@@ -64,7 +64,7 @@ const boardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/board",
   validateSearch: (search: Record<string, unknown>) => ({
-    start: search.start === true || search.start === "true" ? true : undefined,
+    guide: search.guide === true || search.guide === "true" ? true : undefined,
   }),
 });
 
@@ -74,6 +74,7 @@ const exploreRoute = createRoute({
   path: "/explore",
   validateSearch: (search: Record<string, unknown>) => ({
     metric: typeof search.metric === "string" ? search.metric.slice(0, 256) : undefined,
+    query: typeof search.query === "string" ? search.query.slice(0, 256) : undefined,
     service: typeof search.service === "string" ? search.service.slice(0, 255) : undefined,
     signal:
       search.signal === "logs" || search.signal === "traces" ? search.signal : ("metrics" as const),
@@ -85,7 +86,13 @@ const logsRoute = createRoute({
   component: () => (
     <Navigate
       replace
-      search={{ metric: undefined, service: undefined, signal: "logs" as const, window: "1h" }}
+      search={{
+        metric: undefined,
+        query: undefined,
+        service: undefined,
+        signal: "logs" as const,
+        window: "1h",
+      }}
       to="/explore"
     />
   ),
@@ -97,7 +104,13 @@ const tracesRoute = createRoute({
   component: () => (
     <Navigate
       replace
-      search={{ metric: undefined, service: undefined, signal: "traces" as const, window: "1h" }}
+      search={{
+        metric: undefined,
+        query: undefined,
+        service: undefined,
+        signal: "traces" as const,
+        window: "1h",
+      }}
       to="/explore"
     />
   ),
@@ -109,6 +122,11 @@ const traceDetailRoute = createRoute({
   component: TraceDetailPage,
   getParentRoute: () => rootRoute,
   path: "/traces/$traceId",
+  validateSearch: (search: Record<string, unknown>) => ({
+    query: typeof search.query === "string" ? search.query.slice(0, 256) : undefined,
+    service: typeof search.service === "string" ? search.service.slice(0, 255) : undefined,
+    window: exploreWindow(search.window),
+  }),
 });
 
 const alertsRoute = createRoute({
@@ -121,6 +139,10 @@ const deploysRoute = createRoute({
   component: DeploysPage,
   getParentRoute: () => rootRoute,
   path: "/deploys",
+  validateSearch: (search: Record<string, unknown>) => ({
+    service: typeof search.service === "string" ? search.service.slice(0, 255) : undefined,
+    window: exploreWindow(search.window),
+  }),
 });
 
 const connectRoute = createRoute({

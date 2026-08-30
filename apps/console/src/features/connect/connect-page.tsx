@@ -64,6 +64,32 @@ export function ConnectPage() {
   }
 
   const hosted = runtime.data.mode === "hosted";
+  if (!hosted) {
+    return (
+      <Page>
+        <PageHeader
+          description="Create a durable project before sending real OpenTelemetry data."
+          title="Connect your telemetry"
+        />
+        <section {...stylex.props(styles.sandboxGate)}>
+          <span {...stylex.props(styles.sandboxGateIcon)}>
+            <Icon icon={CloudUploadIcon} size={21} />
+          </span>
+          <div {...stylex.props(styles.sandboxGateCopy)}>
+            <h2 {...stylex.props(styles.sandboxGateTitle)}>Keep the sandbox separate</h2>
+            <p {...stylex.props(styles.sandboxGateDetail)}>
+              This temporary workspace is ready for the guided incident. Sign in with ChatGPT to
+              create your own project, issue an ingest key, and connect any OpenTelemetry SDK or
+              Collector.
+            </p>
+          </div>
+          <Button large render={<a href="/auth/chatgpt?returnPath=%2Fconnect" />} tone="primary">
+            Sign in to create a project
+          </Button>
+        </section>
+      </Page>
+    );
+  }
   const exporterSnippet = `export OTEL_EXPORTER_OTLP_ENDPOINT=${endpoint}\nexport OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf\nexport OTEL_EXPORTER_OTLP_HEADERS="x-clear-ingest-key=${createdKey ?? "<your-key>"}"\nexport OTEL_SERVICE_NAME=your-service`;
 
   return (
@@ -83,32 +109,21 @@ export function ConnectPage() {
       <div {...stylex.props(styles.layout)}>
         <section {...stylex.props(styles.steps)}>
           <ConnectStep icon={Key01Icon} number="1" title="Create an ingest key">
-            {hosted ? (
-              <>
-                <p {...stylex.props(styles.copy)}>
-                  Keys belong to {overview.data.project.name}. You can keep up to three active keys
-                  and the secret is shown only once.
-                </p>
-                <Button
-                  disabled={createKey.isPending || createKeyOutcomeUnknown}
-                  onClick={() =>
-                    createKey.mutate("primary-exporter", {
-                      onSuccess: (result) => setCreatedKey(result.key),
-                    })
-                  }
-                  tone="secondary"
-                >
-                  {createKey.isPending ? "Creating key" : "Create ingest key"}
-                </Button>
-              </>
-            ) : (
-              <div {...stylex.props(styles.loginCard)}>
-                <span>Log in to create a durable project and real ingest credentials.</span>
-                <a href="/auth/chatgpt?returnPath=%2Fconnect" {...stylex.props(styles.loginLink)}>
-                  Log in with ChatGPT
-                </a>
-              </div>
-            )}
+            <p {...stylex.props(styles.copy)}>
+              Keys belong to {overview.data.project.name}. You can keep up to three active keys and
+              the secret is shown only once.
+            </p>
+            <Button
+              disabled={createKey.isPending || createKeyOutcomeUnknown}
+              onClick={() =>
+                createKey.mutate("primary-exporter", {
+                  onSuccess: (result) => setCreatedKey(result.key),
+                })
+              }
+              tone="secondary"
+            >
+              {createKey.isPending ? "Creating key" : "Create ingest key"}
+            </Button>
             {createdKey ? (
               <div {...stylex.props(styles.secret)}>
                 <span {...stylex.props(styles.secretCopy)}>
@@ -215,6 +230,42 @@ function ConnectStep({
 }
 
 const styles = stylex.create({
+  sandboxGate: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.lg,
+    borderStyle: "solid",
+    borderWidth: 1,
+    display: "grid",
+    gap: space.x5,
+    gridTemplateColumns: {
+      default: "44px minmax(0, 1fr) auto",
+      "@media (max-width: 760px)": "44px minmax(0, 1fr)",
+      "@media (max-width: 520px)": "1fr",
+    },
+    padding: { default: space.x6, "@media (max-width: 520px)": space.x5 },
+  },
+  sandboxGateIcon: {
+    alignItems: "center",
+    backgroundColor: colors.amberWash,
+    borderRadius: radii.md,
+    color: colors.amber,
+    display: "flex",
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  sandboxGateCopy: { minWidth: 0 },
+  sandboxGateTitle: { fontSize: 16, fontWeight: 500, margin: 0 },
+  sandboxGateDetail: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 1.6,
+    marginBottom: 0,
+    marginTop: space.x2,
+    maxWidth: 700,
+  },
   layout: {
     alignItems: "start",
     display: "grid",
@@ -264,22 +315,6 @@ const styles = stylex.create({
     marginBlock: 3,
   },
   copy: { color: colors.textMuted, fontSize: 12, lineHeight: 1.6, marginBlock: 0, maxWidth: 700 },
-  loginCard: {
-    alignItems: { default: "center", "@media (max-width: 620px)": "stretch" },
-    backgroundColor: colors.canvasRaised,
-    borderColor: colors.line,
-    borderRadius: radii.md,
-    borderStyle: "solid",
-    borderWidth: 1,
-    color: colors.textMuted,
-    display: "flex",
-    flexDirection: { default: "row", "@media (max-width: 620px)": "column" },
-    fontSize: 12,
-    gap: space.x4,
-    justifyContent: "space-between",
-    padding: space.x4,
-  },
-  loginLink: { color: colors.amber, flexShrink: 0, textDecoration: "none" },
   secret: {
     alignItems: { default: "center", "@media (max-width: 620px)": "stretch" },
     backgroundColor: colors.greenWash,

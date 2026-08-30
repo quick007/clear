@@ -50,7 +50,7 @@ export function MobileWorkspaceHeader({
     <header {...stylex.props(styles.mobileHeader)}>
       <Link
         aria-label="Open the board"
-        search={{ start: undefined }}
+        search={{ guide: undefined }}
         to="/board"
         {...stylex.props(styles.mobileBrand)}
       >
@@ -113,27 +113,29 @@ function SidebarContent({
         <Link
           aria-label="Open the board"
           onClick={onNavigate}
-          search={{ start: undefined }}
+          search={{ guide: undefined }}
           to="/board"
           {...stylex.props(styles.brand)}
         >
           <ClearMark />
           <span>Clear</span>
         </Link>
-        <Link onClick={onNavigate} to="/connect" {...stylex.props(styles.project)}>
+        <div {...stylex.props(styles.project)}>
           <span {...stylex.props(styles.projectMark)}>{projectName[0]?.toUpperCase() ?? "C"}</span>
           <span {...stylex.props(styles.projectCopy)}>
             <strong {...stylex.props(styles.projectName)}>{projectName}</strong>
-            <span {...stylex.props(styles.projectSummary)}>{projectSummary}</span>
+            <span {...stylex.props(styles.projectSummary)}>
+              {account ? projectSummary : `Sandbox · ${projectSummary}`}
+            </span>
           </span>
-        </Link>
+        </div>
       </div>
 
       <nav aria-label="Workspace" {...stylex.props(styles.nav)}>
         <Link
           activeProps={stylex.props(navigationStyles.linkActive)}
           onClick={onNavigate}
-          search={{ start: undefined }}
+          search={{ guide: undefined }}
           to="/board"
           {...stylex.props(navigationStyles.link)}
         >
@@ -273,8 +275,6 @@ const styles = stylex.create({
     padding: space.x3,
     boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
     color: colors.text,
-    textDecoration: "none",
-    ":hover": { backgroundColor: "rgba(255, 255, 255, 0.075)" },
   },
   projectMark: {
     alignItems: "center",
