@@ -22,10 +22,9 @@ export function HomePage() {
             <span>Clear</span>
           </a>
 
-          <h1 {...stylex.props(styles.title)}>The incident is in Clear. The fix is in the repo.</h1>
+          <h1 {...stylex.props(styles.title)}>See clearly.</h1>
           <p {...stylex.props(styles.description)}>
-            Clear is the OpenTelemetry view your coding agent diagnoses from, then fixes with the
-            repository access it already has.
+            OpenTelemetry for you and the agent that knows your code.
           </p>
 
           <div {...stylex.props(styles.actions)}>
@@ -71,9 +70,15 @@ const styles = stylex.create({
     boxShadow: "0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 32px 100px rgba(0, 0, 0, 0.18)",
     display: "flex",
     flexDirection: "column",
-    maxWidth: 680,
-    paddingBlock: { default: 64, "@media (max-width: 620px)": space.x10 },
-    paddingInline: { default: 64, "@media (max-width: 620px)": space.x6 },
+    maxWidth: "clamp(680px, 32vw, 820px)",
+    paddingBlock: {
+      default: "clamp(64px, 3.1vw, 80px)",
+      "@media (max-width: 620px)": space.x10,
+    },
+    paddingInline: {
+      default: "clamp(64px, 3.1vw, 80px)",
+      "@media (max-width: 620px)": space.x6,
+    },
     textAlign: "center",
     width: "100%",
   },
@@ -89,7 +94,11 @@ const styles = stylex.create({
     textDecoration: "none",
   },
   title: {
-    fontSize: { default: 64, "@media (max-width: 620px)": 48, "@media (max-width: 390px)": 42 },
+    fontSize: {
+      default: "clamp(72px, 3.2vw, 84px)",
+      "@media (max-width: 620px)": 52,
+      "@media (max-width: 390px)": 44,
+    },
     fontWeight: 500,
     letterSpacing: "-0.06em",
     lineHeight: 0.96,

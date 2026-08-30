@@ -1,17 +1,17 @@
-import { StaticMeshGradient } from "@paper-design/shaders-react";
+import { StaticMeshGradient, type PaperShaderElement } from "@paper-design/shaders-react";
 import * as stylex from "@stylexjs/stylex";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const shaderColors = ["#081415", "#54c4bd", "#c7f2e9", "#eef8f4", "#7baed1", "#d7a17a"];
-
-const shaderDrift = stylex.keyframes({
-  "0%": { transform: "translate3d(-1.2%, 0.7%, 0) scale(1.06)" },
-  "45%": { transform: "translate3d(0.9%, -0.6%, 0) scale(1.075)" },
-  "100%": { transform: "translate3d(1.3%, 0.5%, 0) scale(1.06)" },
-});
+const shaderPosition = 61;
+const shaderWaveXShift = 0.18;
+const shaderWaveYShift = 0.7;
+const shaderCycleMillis = 60 * 1000; // 60 seconds
+const shaderFrameMillis = 1000 / 15;
 
 export function HomeAtmosphere() {
   const [supportsWebGl, setSupportsWebGl] = useState(false);
+  const shaderRef = useRef<PaperShaderElement>(null);
 
   useEffect(() => {
     const canvas = document.createElement("canvas");
@@ -20,22 +20,69 @@ export function HomeAtmosphere() {
     context?.getExtension("WEBGL_lose_context")?.loseContext();
   }, []);
 
+  useEffect(() => {
+    if (!supportsWebGl) return;
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let animationFrame = 0;
+    let lastFrameAt = 0;
+    let startedAt = performance.now();
+
+    const setBasePosition = () => {
+      shaderRef.current?.paperShaderMount?.setUniforms({
+        u_positions: shaderPosition,
+        u_waveXShift: shaderWaveXShift,
+        u_waveYShift: shaderWaveYShift,
+      });
+    };
+
+    const renderFrame = (now: number) => {
+      if (now - lastFrameAt >= shaderFrameMillis) {
+        const phase = ((now - startedAt) / shaderCycleMillis) * Math.PI * 2;
+        shaderRef.current?.paperShaderMount?.setUniforms({
+          u_positions: shaderPosition + Math.sin(phase) * 0.08,
+          u_waveXShift: shaderWaveXShift + Math.sin(phase * 0.8) * 0.006,
+          u_waveYShift: shaderWaveYShift + Math.sin(phase * 0.65) * 0.005,
+        });
+        lastFrameAt = now;
+      }
+      animationFrame = window.requestAnimationFrame(renderFrame);
+    };
+
+    const updateAnimation = () => {
+      window.cancelAnimationFrame(animationFrame);
+      setBasePosition();
+      if (reducedMotion.matches) return;
+      startedAt = performance.now();
+      lastFrameAt = 0;
+      animationFrame = window.requestAnimationFrame(renderFrame);
+    };
+
+    reducedMotion.addEventListener("change", updateAnimation);
+    updateAnimation();
+    return () => {
+      reducedMotion.removeEventListener("change", updateAnimation);
+      window.cancelAnimationFrame(animationFrame);
+    };
+  }, [supportsWebGl]);
+
   return (
     <div aria-hidden {...stylex.props(styles.atmosphere)}>
       <div {...stylex.props(styles.shaderFrame)}>
         {supportsWebGl ? (
           <StaticMeshGradient
+            ref={shaderRef}
             colors={shaderColors}
             grainMixer={0.28}
             grainOverlay={0.2}
-            maxPixelCount={1_800_000}
+            maxPixelCount={2_800_000}
             minPixelRatio={1}
             mixing={0.72}
-            positions={61}
+            positions={shaderPosition}
             waveX={0.62}
-            waveXShift={0.18}
+            waveXShift={shaderWaveXShift}
             waveY={0.48}
-            waveYShift={0.7}
+            waveYShift={shaderWaveYShift}
             width="100%"
             height="100%"
             {...stylex.props(styles.shader)}
@@ -62,28 +109,21 @@ const styles = stylex.create({
       "radial-gradient(circle at 52% 68%, #d8f4ed 0, #6abdbb 24%, #497a8e 45%, #121c1d 74%, #070909 100%)",
     bottom: "-10%",
     height: "78%",
-    left: "-8%",
+    left: "50%",
     maskImage: "linear-gradient(to bottom, transparent 0%, #000 28%, #000 100%)",
     position: "absolute",
-    right: "-8%",
+    transform: "translateX(-50%)",
+    width: {
+      default: "116%",
+      "@media (min-width: 700px)": "max(116%, calc(78svh * 3.1))",
+    },
     WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, #000 28%, #000 100%)",
   },
   shader: {
-    animationDuration: "30s",
-    animationIterationCount: "infinite",
-    animationName: shaderDrift,
-    animationTimingFunction: "ease-in-out",
     display: "block",
     filter: "saturate(0.92) contrast(1.03)",
     height: "100%",
-    transformOrigin: "50% 62%",
-    willChange: "transform",
     width: "100%",
-    "@media (prefers-reduced-motion: reduce)": {
-      animationName: "none",
-      transform: "none",
-      willChange: "auto",
-    },
   },
   topFade: {
     backgroundImage:
