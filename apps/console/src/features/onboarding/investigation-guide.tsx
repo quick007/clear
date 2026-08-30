@@ -6,49 +6,40 @@ import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
 import { CopyButton } from "../../ui/copy-button";
 import { Icon } from "../../ui/icon";
-import type { InvestigationStage } from "./investigation-progress";
+import { investigationJourneyPosition, type InvestigationStage } from "./investigation-progress";
 
 const stageCopy = {
   baseline: {
-    title: "Begin with a healthy baseline",
+    title: "See what healthy looks like",
     detail:
-      "See normal checkout behavior first, then introduce the controlled failure when you are ready.",
+      "Checkout is stable. Use this baseline to recognize what changes, then introduce the controlled failure when you are ready.",
   },
   orient: {
-    title: "Ask your agent to investigate",
+    title: "An alert is firing. Start with a first read",
     detail:
-      "Copy the prompt into your agent conversation. Its findings and new panels will appear on this board.",
+      "Ask your agent for the most likely explanation. Its hypothesis and supporting evidence will appear in this shared workspace.",
   },
   challenge: {
-    title: "Challenge the first explanation",
+    title: "The first story fits. Try to disprove it",
     detail:
-      "If this were a real traffic surge, unique users should rise with request volume. Ask your agent to test that.",
+      "A real traffic surge should bring more users with it. Compare request volume with unique users before accepting the hypothesis.",
   },
   evidence: {
-    title: "Find where the extra requests come from",
+    title: "The traffic story is wrong. Trace the extra work",
     detail:
-      "Same users, triple the requests. Break checkout and payment calls down by attempt number.",
+      "The same users generated far more requests. Break checkout and payment calls down by attempt number to find the source.",
   },
   diagnosed: {
-    title: "Diagnosis complete",
+    title: "Retry amplification confirmed",
     detail:
-      "The evidence now supports retry amplification. Review the hypotheses and timeline before closing the incident.",
+      "Repeated upstream attempts explain the extra load. Review the evidence and preserve the conclusion in the incident record.",
   },
   reviewed: {
-    title: "Investigation recorded",
+    title: "Investigation complete",
     detail:
-      "The incident is closed, but the panels and timeline remain available as a shared record.",
+      "The evidence and conclusion are preserved in this sandbox until you reset it for another run.",
   },
 } satisfies Record<InvestigationStage, { title: string; detail: string }>;
-
-const stageIndex: Record<InvestigationStage, number> = {
-  baseline: 0,
-  orient: 0,
-  challenge: 1,
-  evidence: 1,
-  diagnosed: 2,
-  reviewed: 3,
-};
 
 const journey = ["Orient", "Test the explanation", "Confirm the cause"] as const;
 
@@ -66,7 +57,7 @@ export function InvestigationGuide({
   stage: InvestigationStage;
 }) {
   const copy = stageCopy[stage];
-  const activeIndex = stageIndex[stage];
+  const activeIndex = investigationJourneyPosition(stage);
   return (
     <aside aria-labelledby="investigation-guide-title" {...stylex.props(styles.guide)}>
       <div {...stylex.props(styles.header)}>
@@ -89,7 +80,7 @@ export function InvestigationGuide({
           </div>
         </div>
         <Button compact onClick={onOpenGuide} tone="ghost">
-          How this works
+          About this investigation
         </Button>
       </div>
 
@@ -127,10 +118,10 @@ export function InvestigationGuide({
         {stage === "orient" || stage === "challenge" || stage === "evidence" ? (
           <div {...stylex.props(styles.prompt)}>
             <span {...stylex.props(styles.promptCopy)}>
-              <small>Suggested prompt</small>
+              <small>Ask your agent next</small>
               <span>{prompt}</span>
             </span>
-            <CopyButton label="Copy prompt for your agent" value={prompt} />
+            <CopyButton label="Copy this question" value={prompt} />
           </div>
         ) : null}
       </div>

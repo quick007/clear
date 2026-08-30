@@ -7,6 +7,7 @@ import {
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  investigationJourneyPosition,
   investigationStage,
   isAttemptsGroupedRetryPanel,
   isRequestsVersusUsersPanel,
@@ -17,6 +18,15 @@ const attemptsGroupedRetries = { spec: RetryAmplificationPanel };
 const unrelatedPanel = { spec: UpstreamPressurePanel };
 
 describe("sandbox investigation progress", () => {
+  it("advances the visible journey as evidence changes", () => {
+    expect(investigationJourneyPosition("baseline")).toBe(0);
+    expect(investigationJourneyPosition("orient")).toBe(0);
+    expect(investigationJourneyPosition("challenge")).toBe(1);
+    expect(investigationJourneyPosition("evidence")).toBe(2);
+    expect(investigationJourneyPosition("diagnosed")).toBe(3);
+    expect(investigationJourneyPosition("reviewed")).toBe(3);
+  });
+
   it("starts from a healthy baseline and keeps closed investigations distinct", () => {
     expect(
       investigationStage({
@@ -117,5 +127,16 @@ describe("sandbox investigation progress", () => {
         panels: [requestsVersusUsers],
       }),
     ).toBe("evidence");
+  });
+
+  it("accepts a direct evidence-backed diagnosis without forcing the decoy path", () => {
+    expect(
+      investigationStage({
+        hasClosedIncident: false,
+        hasOpenIncident: true,
+        hypotheses: [{ status: "confirmed", text: "Immediate retries amplified payment calls" }],
+        panels: [attemptsGroupedRetries],
+      }),
+    ).toBe("diagnosed");
   });
 });

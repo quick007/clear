@@ -30,11 +30,11 @@ import { getGroundtruthToolStatus, subscribeGroundtruthToolStatus } from "../../
 const investigationPrompts = {
   baseline: "",
   orient:
-    "Investigate the active checkout alert. Tell me the leading explanation and show the most useful first panel on the board.",
+    "Investigate the checkout alert. Start with the most likely cause, and put the evidence that supports it on this board.",
   challenge:
-    "Requests tripled. If this is real traffic, where are the users? Compare request volume with unique users and show the result on the board.",
+    "Requests tripled. If this is real traffic, where are the users? Compare request volume with unique users and put the result on the board.",
   evidence:
-    "Same users, triple the requests. Where are the extra requests coming from? Break down checkout and payment calls by attempt number, show it on the board, and tell me whether the leading hypothesis survives.",
+    "The users are flat, so the extra requests have another source. Break checkout and payment calls down by attempt, add the comparison to the board, and update the hypothesis.",
   diagnosed: "",
   reviewed: "",
 } as const;
@@ -164,7 +164,7 @@ export function BoardPage() {
                   onClick={startIncident}
                   tone="primary"
                 >
-                  {triggerIncident.isPending ? "Starting incident" : "Start incident"}
+                  {triggerIncident.isPending ? "Starting incident" : "Trigger checkout incident"}
                 </Button>
               ) : stage === "diagnosed" && overview.data.openIncident ? (
                 <Button
@@ -176,15 +176,11 @@ export function BoardPage() {
                   }
                   tone="secondary"
                 >
-                  Review investigation
+                  Review and close
                 </Button>
               ) : stage === "reviewed" ? (
-                <Button
-                  disabled={resetSandbox.isPending || resetOutcomeUnknown}
-                  onClick={restartWalkthrough}
-                  tone="secondary"
-                >
-                  {resetSandbox.isPending ? "Restarting walkthrough" : "Restart walkthrough"}
+                <Button onClick={() => void navigate({ search: { guide: true } })} tone="secondary">
+                  Start over
                 </Button>
               ) : null
             }

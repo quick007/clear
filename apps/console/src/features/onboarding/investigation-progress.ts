@@ -8,6 +8,16 @@ export type InvestigationStage =
   | "diagnosed"
   | "reviewed";
 
+export const investigationJourneyPosition = (stage: InvestigationStage) =>
+  ({
+    baseline: 0,
+    orient: 0,
+    challenge: 1,
+    evidence: 2,
+    diagnosed: 3,
+    reviewed: 3,
+  })[stage];
+
 type HypothesisState = "proposed" | "testing" | "rejected" | "confirmed";
 
 type InvestigationHypothesis = {
@@ -84,12 +94,7 @@ export function investigationStage({
     (hypothesis) => hypothesis.status === "confirmed" && isRetryHypothesis(hypothesis),
   );
 
-  if (
-    hasRequestsVersusUsers &&
-    hasAttemptsGroupedRetries &&
-    hasRejectedTrafficHypothesis &&
-    hasConfirmedRetryHypothesis
-  ) {
+  if (hasAttemptsGroupedRetries && hasConfirmedRetryHypothesis) {
     return "diagnosed";
   }
   if (hasRequestsVersusUsers && hasRejectedTrafficHypothesis) return "evidence";

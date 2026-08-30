@@ -9,16 +9,18 @@ import { Icon } from "../../ui/icon";
 
 const steps = [
   {
-    title: "Break checkout",
-    detail: "An alert fires and the board fills with symptoms. The cause is not labelled.",
+    title: "Establish the baseline",
+    detail: "See normal request volume, users, latency, and errors before anything changes.",
   },
   {
-    title: "Ask for a first read",
-    detail: "Let your agent orient from the alert and the evidence already on screen.",
+    title: "Introduce the failure",
+    detail:
+      "Trigger an isolated checkout degradation. Alerts and live signals respond immediately.",
   },
   {
-    title: "Challenge the leading explanation",
-    detail: "When the first story looks plausible, ask for the comparison that could disprove it.",
+    title: "Investigate together",
+    detail:
+      "Open this workspace with the agent that knows your code, then ask it to test a hypothesis and add the evidence here.",
   },
 ] as const;
 
@@ -60,13 +62,17 @@ export function SandboxIntroDialog({
             <div {...stylex.props(styles.heading)}>
               <Dialog.Title {...stylex.props(styles.title)}>
                 {state === "complete"
-                  ? "Run the checkout investigation again"
-                  : "Find the cause of a checkout incident"}
+                  ? "Reset the checkout investigation"
+                  : state === "active"
+                    ? "How this investigation works"
+                    : "Investigate a checkout failure"}
               </Dialog.Title>
               <Dialog.Description {...stylex.props(styles.description)}>
                 {state === "complete"
-                  ? "Your previous investigation stays in Incidents. Restarting returns the sandbox to a clean baseline, ready for another run."
-                  : "A private sandbox with a checkout incident about to unfold. The OpenTelemetry evidence is yours and your agent's to investigate."}
+                  ? "Resetting clears this sandbox's panels and incident record, then returns checkout telemetry to a healthy baseline."
+                  : state === "active"
+                    ? "The incident is live. Follow the guide on the board to move from symptoms to an evidence-backed cause."
+                    : "An isolated checkout system is healthy now. Trigger a controlled incident, then use live OpenTelemetry evidence to explain what changed."}
               </Dialog.Description>
             </div>
             <Dialog.Close
@@ -91,8 +97,8 @@ export function SandboxIntroDialog({
               ))}
             </ol>
             <p {...stylex.props(styles.boundary)}>
-              This walkthrough ends at diagnosis. Clear observes your systems. It never deploys a
-              fix.
+              Clear helps you diagnose and preserves the evidence. Your coding agent keeps control
+              of the repository and any fix.
             </p>
             {error}
           </div>
@@ -102,16 +108,16 @@ export function SandboxIntroDialog({
               <Dialog.Close render={<Button tone="primary">Return to investigation</Button>} />
             ) : state === "complete" ? (
               <Button disabled={pending || blocked} onClick={onRestart} tone="primary">
-                {pending ? "Restarting walkthrough" : "Restart walkthrough"}
+                {pending ? "Resetting sandbox" : "Reset to healthy baseline"}
               </Button>
             ) : (
               <>
                 <Dialog.Close
                   disabled={pending || blocked}
-                  render={<Button tone="ghost">View healthy baseline</Button>}
+                  render={<Button tone="ghost">Inspect healthy baseline</Button>}
                 />
                 <Button disabled={pending || blocked} onClick={onStart} tone="primary">
-                  {pending ? "Starting incident" : "Start incident"}
+                  {pending ? "Starting incident" : "Trigger checkout incident"}
                 </Button>
               </>
             )}
