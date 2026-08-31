@@ -26,6 +26,7 @@ const ExplorePage = lazyRouteComponent(
   "ExplorePage",
 );
 const HomePage = lazyRouteComponent(() => import("./features/home/home-page"), "HomePage");
+const StatusPage = lazyRouteComponent(() => import("./features/status/status-page"), "StatusPage");
 const IncidentsPage = lazyRouteComponent(
   () => import("./features/incidents/incidents-page"),
   "IncidentsPage",
@@ -62,6 +63,12 @@ const indexRoute = createRoute({
   component: HomePage,
   getParentRoute: () => rootRoute,
   path: "/",
+});
+
+const statusRoute = createRoute({
+  component: StatusPage,
+  getParentRoute: () => rootRoute,
+  path: "/status",
 });
 
 const boardRoute = createRoute({
@@ -176,6 +183,7 @@ const incidentsRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  statusRoute,
   boardRoute,
   exploreRoute,
   logsRoute,

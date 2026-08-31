@@ -23,12 +23,13 @@ import {
   useWorkspaceAuthenticationRequired,
   WorkspaceFailureProvider,
 } from "./workspace-failure-context";
+import { isPublicRoute } from "./public-routes";
 
 export function AppShell() {
   const location = useLocation();
   return (
     <AppErrorBoundary>
-      {location.pathname === "/" ? <Outlet /> : <WorkspaceShell />}
+      {isPublicRoute(location.pathname) ? <Outlet /> : <WorkspaceShell />}
     </AppErrorBoundary>
   );
 }
