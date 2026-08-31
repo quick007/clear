@@ -1,19 +1,22 @@
-<p align="center">
-  <img src="media/devpost/outputs/clear-devpost-hero.png" alt="Clear: Let your agent see production" width="100%" />
-</p>
-
-# Clear
-
-[![CI](https://github.com/quick007/clear/actions/workflows/ci.yml/badge.svg)](https://github.com/quick007/clear/actions/workflows/ci.yml)
-[![MIT License](https://img.shields.io/badge/license-MIT-f4b968.svg)](LICENSE)
+<div align="center">
+  <img src="media/devpost/outputs/clear-devpost-hero.png" alt="Clear: Let your agent see production" width="640" />
+  <h1>Clear</h1>
+  <p>
+    <a href="https://github.com/quick007/clear/actions/workflows/ci.yml"><img src="https://github.com/quick007/clear/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-f4b968.svg" alt="MIT License" /></a>
+  </p>
+  <p>
+    <a href="https://clear.seufert.sh">Open Clear</a> ·
+    <a href="https://clear.seufert.sh/status">Status</a> ·
+    <a href="https://api.clear.seufert.sh/docs">API docs</a>
+  </p>
+</div>
 
 Clear is an OpenTelemetry workspace shared by you and the coding agent that already knows your code.
 
 Through WebMCP, your agent can investigate metrics, logs, and traces, build dashboards, and work through incidents on the same live surface you see. Connect any OTLP/HTTP exporter with a Clear ingest key.
 
 Clear only handles observability. It does not clone your repo, store deploy credentials, or apply fixes. That still happens through your coding agent.
-
-[Open Clear](https://clear.seufert.sh) · [Status](https://clear.seufert.sh/status) · [API docs](https://api.clear.seufert.sh/docs)
 
 ## Try it
 
