@@ -2,9 +2,10 @@ import { Schema } from "effect";
 import { JsonValue, type JsonValue as JsonValueType } from "./json-value";
 
 export const toolResultLimits = {
-  maxBytes: 48 * 1024,
+  // Chrome recommends about 1,500 characters per result. The small allowance covers JSON syntax.
+  maxBytes: 2 * 1024,
   maxDepth: 8,
-  maxStringLength: 2_048,
+  maxStringLength: 512,
 } as const;
 
 interface CompactionProfile {
@@ -161,11 +162,21 @@ const fallback = (value: JsonValueType): JsonValueType => {
   const record = value as { readonly [key: string]: JsonValueType };
   const ok = typeof record.ok === "boolean" ? record.ok : undefined;
   const hint = typeof record.hint === "string" ? truncateString(record.hint, 320) : undefined;
+  const nextCursor =
+    typeof record.nextCursor === "string" ? truncateString(record.nextCursor, 320) : undefined;
+  const data = record.data;
+  const dataRecord =
+    typeof data === "object" && data !== null && !Array.isArray(data)
+      ? (data as { readonly [key: string]: JsonValueType })
+      : undefined;
+  const summary =
+    typeof dataRecord?.summary === "string" ? truncateString(dataRecord.summary, 320) : sizeValue;
   return {
     ...(ok === undefined ? {} : { ok }),
     ...(hint === undefined ? {} : { hint }),
+    ...(nextCursor === undefined ? {} : { nextCursor }),
     truncated: true,
-    data: { summary: sizeValue },
+    data: { summary },
   };
 };
 
