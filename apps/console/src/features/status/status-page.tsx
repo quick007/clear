@@ -22,6 +22,8 @@ import {
   publicStatusPresentation,
 } from "./public-status-model";
 
+export const statusChartSlotHeight = 250;
+
 export function StatusPage() {
   const status = usePublicStatusQuery();
 
@@ -187,13 +189,15 @@ function MetricCard({ metric }: { readonly metric: PublicStatusMetric }) {
         )}
       </div>
       {hasData ? (
-        <MetricChart
-          accessibleName={`${metric.title} over the last 15 minutes`}
-          axes={[axis]}
-          series={series}
-          summary={`${metric.description} ${series.length} service series are shown.`}
-          visualization="line"
-        />
+        <div data-status-chart-slot {...stylex.props(styles.metricChartSlot)}>
+          <MetricChart
+            accessibleName={`${metric.title} over the last 15 minutes`}
+            axes={[axis]}
+            series={series}
+            summary={`${metric.description} ${series.length} service series are shown.`}
+            visualization="line"
+          />
+        </div>
       ) : (
         <div role="status" {...stylex.props(styles.metricEmpty)}>
           <span>No recent samples</span>
@@ -362,6 +366,7 @@ const styles = stylex.create({
   componentStatus: { display: "block", fontSize: 12, fontWeight: 500 },
   componentObserved: { color: colors.textSubtle, display: "block", fontSize: 11, marginTop: 4 },
   metricGrid: {
+    alignItems: "start",
     display: "grid",
     gap: 16,
     gridTemplateColumns: {
@@ -388,6 +393,13 @@ const styles = stylex.create({
     maxWidth: 250,
   },
   metricValue: { flexShrink: 0, fontFamily: "IBM Plex Mono", fontSize: 16, fontWeight: 500 },
+  metricChartSlot: {
+    height: statusChartSlotHeight,
+    minHeight: 0,
+    minWidth: 0,
+    overflow: "hidden",
+    width: "100%",
+  },
   metricEmpty: {
     alignItems: "center",
     borderColor: colors.line,
