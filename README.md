@@ -9,112 +9,94 @@
 
 Clear is an OpenTelemetry workspace shared by you and the coding agent that already knows your code.
 
-Most observability products put a vendor copilot beside the dashboard. Clear exposes metrics, logs, traces, alerts, panels, and incident context as typed WebMCP tools instead. Your agent can investigate production evidence and build durable views while you follow the same board. Connect it by pointing any OTLP/HTTP exporter at Clear.
+Through WebMCP, your agent can investigate metrics, logs, and traces, build dashboards, and work through incidents on the same live surface you see. Connect any OTLP/HTTP exporter with a Clear ingest key.
 
-Clear does not check out your repository, store deploy credentials, or execute a fix. Your agent handles code changes and deploys using the access it already has.
+Clear only handles observability. It does not clone your repo, store deploy credentials, or apply fixes. That still happens through your coding agent.
+
+[Open Clear](https://clear.seufert.sh) · [Status](https://clear.seufert.sh/status) · [API docs](https://api.clear.seufert.sh/docs)
 
 ## Try it
 
-| Surface       | URL                                                            |
-| ------------- | -------------------------------------------------------------- |
-| Live app      | [clear.seufert.sh](https://clear.seufert.sh)                   |
-| Public status | [clear.seufert.sh/status](https://clear.seufert.sh/status)     |
-| API reference | [api.clear.seufert.sh/docs](https://api.clear.seufert.sh/docs) |
-| Source        | [github.com/quick007/clear](https://github.com/quick007/clear) |
-
-### Try the demo
-
-1. Open Clear in ChatGPT's in-app browser with site tools available, or in Chrome with WebMCP enabled.
+1. Open [Clear](https://clear.seufert.sh) in ChatGPT's in-app browser, or in Chrome with WebMCP enabled.
 2. Select **Investigate an incident**.
-3. Copy the suggested prompt from the board into your agent conversation.
-4. Keep the board visible while your agent investigates and adds panels.
+3. Copy the prompt from the board into your agent conversation.
+4. Keep the board open while your agent investigates the telemetry and adds panels.
 
-## WebMCP
+To use your own telemetry, sign in, create a project, and copy its ingest key. Then point an OTLP/HTTP exporter at Clear using the configuration below.
 
-Clear gives you and your coding agent access to the same dashboard and telemetry.
-
-- You and your agent work from the same telemetry.
-- Site tools let your agent query metrics, logs, traces, alerts, and deploys.
-- Incident tools become available when an incident is open.
-- Panels created by your agent are saved to the board.
-- Code changes and deploys still happen through your agent's existing environment.
-
-## Architecture
+## How it works
 
 ```text
 OpenTelemetry SDKs and Collectors
               |
-              | OTLP/HTTP protobuf or JSON
+              | OTLP/HTTP
               v
-        Clear Collector (Go)
+        Clear Collector
               |
-              | authenticated, project-scoped batches
               v
-        Effect API (TypeScript)
-          /               \
-         v                 v
-  PostgreSQL            ClickHouse
-  product state         telemetry
-         \                 /
-          v               v
-       React console and WebMCP site tools
+          Clear API
+          /       \
+         v         v
+  PostgreSQL    ClickHouse
+  project data  telemetry
+         \         /
+          v       v
+      Console and WebMCP tools
 ```
 
-The Go data plane uses official OpenTelemetry Collector components for OTLP parsing, compression, batching, memory limits, and transport. The TypeScript control plane uses Effect v4 contracts, schemas, layers, and services. PostgreSQL owns accounts, projects, boards, incidents, keys, and deploy events. ClickHouse owns telemetry and rollups.
+The Go collector receives and authenticates OTLP traffic, then sends project-scoped batches to the TypeScript API. The API stores product data in PostgreSQL, stores telemetry in ClickHouse, and streams live updates to the console using SSE.
 
-The hosted version runs the stateful Clear services together on one Render instance with a persistent disk. The console is published with ChatGPT Sites.
+The console exposes metrics, logs, traces, alerts, deploys, dashboards, and incidents as WebMCP tools. Incident-specific tools are available while an incident is open. Panels created by an agent are saved to the same board the user is viewing.
 
-Clear also monitors its own hosted services. The [public status page](https://clear.seufert.sh/status) shows their health, request rate, and latency using telemetry collected by Clear.
+Clear also monitors its own hosted services. The [public status page](https://clear.seufert.sh/status) is built from telemetry collected by Clear.
 
-Read [the architecture guide](docs/architecture.md) for the detailed component and trust boundaries.
+More detail is available in the [architecture guide](docs/architecture.md).
 
-## Connect OpenTelemetry
+## Send telemetry
 
-Clear uses standard OTLP. There is no proprietary Clear SDK to install.
-
-The maintained [Node example](examples/node-otel/USAGE.md) uses the official OpenTelemetry packages and emits a metric, structured log, and trace. Existing OpenTelemetry Collectors can forward all three signals without application changes.
-
-Local OTLP/HTTP configuration:
+Create a project in Clear, copy its ingest key, and configure your OpenTelemetry SDK or Collector:
 
 ```sh
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+export CLEAR_INGEST_KEY=your-ingest-key
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.clear.seufert.sh
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-export OTEL_EXPORTER_OTLP_HEADERS=x-clear-ingest-key=local-demo-ingest-key
+export OTEL_EXPORTER_OTLP_HEADERS="x-clear-ingest-key=${CLEAR_INGEST_KEY}"
 export OTEL_SERVICE_NAME=my-service
 ```
 
-Clear accepts the three stable signals at their standard paths:
+The hosted collector accepts OTLP/HTTP protobuf and JSON for all three signals:
 
 - `POST /v1/metrics`
 - `POST /v1/logs`
 - `POST /v1/traces`
 
-The hosted service supports OTLP/HTTP protobuf and JSON at `https://otlp.clear.seufert.sh`. The local development stack also supports OTLP/gRPC.
+See the [OpenTelemetry quickstart](docs/otel-quickstart.md) for language SDKs, upstream Collector configuration, and a [runnable Node example](examples/node-otel/USAGE.md).
 
-See the [OpenTelemetry quickstart](docs/otel-quickstart.md) for application and upstream Collector setup.
+## Example incident
+
+The included example reproduces a retry storm across three instrumented services:
+
+- `checkout-api` retries failed payment requests immediately
+- `payments-stub` degrades under load
+- `load-generator` drives the incident through repeatable phases
+
+At first, the incident looks like a traffic spike. Incoming checkouts and unique users remain flat while retry traffic grows, which points back to the retry loop. The services emit real metrics, logs, and traces so the same incident can be investigated through the dashboard or WebMCP.
 
 ## Run locally
 
-The local Compose stack is intended for development, not as a supported self-hosted release.
-
-Requirements:
+You will need:
 
 - Node.js 24 or newer
 - [Vite+](https://viteplus.dev/) 0.3.x
 - Docker Engine with Compose v2
 - At least 4 GB available to Docker
 
-Create local configuration:
+Create the local configuration and install dependencies:
 
 ```sh
 cp .env.example .env
 cp apps/console/.env.example apps/console/.env.local
 cp apps/checkout-web/.env.example apps/checkout-web/.env.local
-```
-
-Install and validate the TypeScript workspace:
-
-```sh
 vp install
 vp run ready
 ```
@@ -125,7 +107,7 @@ Start the console:
 vp run dev
 ```
 
-In a separate terminal, start the stateful stack and example services:
+In another terminal, start the API, databases, collector, and example services:
 
 ```sh
 docker compose -f infra/compose.yaml up --build
@@ -140,64 +122,54 @@ docker compose -f infra/compose.yaml up --build
 | Collector health  | `http://localhost:13133/healthz`                  |
 | Checkout API      | `http://localhost:4101`                           |
 
-The console starts in demo mode. The checked-in development secrets are only for local use. Replace every secret before exposing the stack to a shared machine or network.
+The checked-in secrets and Compose stack are for local development only. Replace every secret before exposing the stack to a shared machine or network.
 
-## Example incident stack
-
-Three instrumented services create the retry-amplification incident:
-
-- `checkout-api`, with an intentionally naive retry loop
-- `payments-stub`, a deterministic dependency that degrades under load
-- `load-generator`, which produces a repeatable incident
-
-The scenario first resembles a traffic surge. Upstream requests rise while incoming checkouts and unique users remain flat. Grouping by retry state reveals the amplification, then a representative trace and its correlated logs show the immediate retry loop.
-
-## Repository map
+## Project structure
 
 ```text
 apps/
-  backend/          Effect HTTP API and application services
-  collector/        Custom OpenTelemetry Collector distribution in Go
-  console/          React, TanStack, StyleX, Base UI, and WebMCP surface
-  checkout-api/     Intentionally broken, instrumented example service
-  checkout-web/     Customer-facing storefront for the example incident
-  payments-stub/    Deterministic failing dependency
+  backend/          Effect API and application services
+  collector/        Go OpenTelemetry Collector distribution
+  console/          React console and WebMCP tools
+  checkout-api/     Instrumented example service with the retry bug
+  checkout-web/     Example storefront
+  payments-stub/    Controlled upstream dependency
 packages/
-  api-contract/     Typed Effect HTTP API contract and client
-  domain/           Domain models, IDs, and errors
-  panel-dsl/        Agent-authored panel specification
-  persistence/      Drizzle PostgreSQL and ClickHouse repositories
+  api-contract/     Shared Effect API contract
+  domain/           Domain models and errors
+  panel-dsl/        Agent-authored panel definitions
+  persistence/      PostgreSQL and ClickHouse repositories
   telemetry/        Telemetry query and ingest models
   telemetry-gen/    Deterministic sandbox telemetry
 examples/
-  load-generator/   Repeatable incident controller
-  node-otel/        Runnable official OpenTelemetry Node example
-infra/              Compose, Render deployment, migrations, and runbooks
-docs/               Architecture, integration, operation, and design notes
+  load-generator/   Retry-storm scenario controller
+  node-otel/        Standalone OpenTelemetry Node example
+infra/              Local and hosted infrastructure
+docs/               Architecture and operations documentation
 ```
 
-## Hosted release boundaries
+## Hosted limits
 
-- One durable project per account and up to three active ingest keys.
-- Raw metrics, logs, and traces are retained for 24 hours. Metric rollups are retained for 7 days.
-- Hosted ingest supports OTLP/HTTP protobuf and JSON.
-- The hosted service is single-instance and does not provide high availability.
-- The local Compose topology is for development and testing. Self-hosted operation is not supported for this release.
-- The project has not completed an independent security audit or production load test.
+- One project per account and up to three active ingest keys
+- 24 hours of raw metrics, logs, and traces
+- 7 days of metric rollups
+- OTLP/HTTP protobuf and JSON ingest
+- Single-instance hosting without high availability
+- Local Compose is for development and testing, not a supported self-hosted release
+- No independent security audit or production load test has been completed
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
 - [OpenTelemetry quickstart](docs/otel-quickstart.md)
 - [Self-observability and public status](docs/self-observability.md)
-- [Connecting a real project](docs/real-mode.md)
-- [Local development stack](docs/self-hosting.md)
-- [Infrastructure notes](infra/README.md)
-- [Collector details](apps/collector/README.md)
+- [Connecting a project](docs/real-mode.md)
+- [Local development](docs/self-hosting.md)
+- [Infrastructure](infra/README.md)
+- [Collector](apps/collector/README.md)
 - [Contributing](CONTRIBUTING.md)
-- [Security policy](SECURITY.md)
+- [Security](SECURITY.md)
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
-- [OpenAPI](https://api.clear.seufert.sh/openapi.json)
 
 ## License
 
