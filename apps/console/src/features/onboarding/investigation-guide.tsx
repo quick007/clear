@@ -39,8 +39,9 @@ const stageCopy = {
       "A deploy marker landed. Watch payment attempts and checkout latency fall in real time.",
   },
   recovered: {
-    title: "Telemetry returned to baseline",
-    detail: "The alert cleared after the deploy. Review the evidence and close the incident.",
+    title: "The alert has cleared",
+    detail:
+      "Payment attempts and latency are falling after the deploy. Review the evidence before closing the incident.",
   },
   reviewed: {
     title: "Incident closed",
