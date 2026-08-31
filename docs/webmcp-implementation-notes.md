@@ -1,6 +1,6 @@
 # WebMCP implementation notes
 
-Research snapshot: 2026-08-27. The WebMCP specification is a live draft. Recheck the linked sources before changing the adapter or upgrading browser typings.
+Research snapshot: 2026-08-30. The WebMCP specification is a live draft. Recheck the linked sources before changing the adapter or upgrading browser typings.
 
 ## Implementation decision
 
@@ -14,7 +14,7 @@ The first implementation should use only the intersection currently supported by
 - Describe inputs with a JSON Schema object, then decode them again with the authoritative Effect Schema inside `execute`.
 - Return a small JSON-serializable value directly. Do not wrap results in an MCP `content` envelope.
 - Use only `readOnlyHint` and `untrustedContentHint`. No consequential, destructive, idempotent, or open-world annotation exists in the current WebMCP draft.
-- Register every tool in the top-level page. ChatGPT does not currently discover tools registered in iframes.
+- Register tools only on top-level workspace routes where they are useful. Keep the public home route tool-free. ChatGPT does not currently discover tools registered in iframes.
 - Skip the declarative form API for the submission. ChatGPT does not currently expose declarative tools as site tools.
 
 This preserves the product's dynamic incident-scoped tool surface without depending on draft-only convenience APIs.
@@ -70,6 +70,8 @@ interface ModelContext {
 Use the `webmcp-types` package recommended by Chrome for ambient browser types. At this research snapshot, the current package version is `0.1.5`. Pin it in the lockfile and recheck the declaration against the draft on upgrade.
 
 Tool names must be 1 to 128 characters and contain only ASCII letters, digits, `_`, `-`, or `.`. Chrome's security guidance recommends staying under 30 characters for tool and parameter names, under 500 characters for tool descriptions, under 150 characters for parameter descriptions, and around 1,500 characters for an individual result.
+
+Clear enforces a 2 KiB UTF-8 JSON result limit. The small allowance above Chrome's approximate character budget covers JSON structure and multibyte accounting while keeping results close to the documented target. Large responses must compact to summaries, cursors, and follow-up hints.
 
 Registration can reject with browser exceptions. Important cases include:
 
@@ -415,6 +417,15 @@ Treat these as explicit revalidation points:
 - The exact Sites server-handler API for this Vite project is not described in the public Sites page.
 - No stable Sites subject header is documented publicly at this snapshot.
 - Custom-domain and Sign in with ChatGPT availability must be verified in the account used for submission.
+
+## 2026-08-30 verification
+
+- The published WebMCP draft still points to revision `41d12f057167ccf5954dbcf49d99502cb6c84491`; no draft commits have landed since the prior snapshot.
+- Chrome's imperative API guide was last updated on 2026-08-20 and still documents `document.modelContext`, abort-signal registration lifecycle, invocation cancellation, `getTools()`, `executeTool()`, and `toolchange`.
+- `webmcp-types` 0.1.5 remains the latest published package and matches the draft producer API used by Clear.
+- OpenAI's current Site tools documentation still supports GPT-5.6 Sol and Terra, disables WebMCP for Luna, and excludes Enterprise and Edu workspaces. It still omits declarative tools and iframe discovery.
+- A live Codex browser smoke test at `https://clear.seufert.sh/board` discovered 20 session and sandbox tools and successfully invoked `get_console_overview`. The public home route correctly exposed no tools because workspace state is not active there.
+- The active draft PR `audit/judge-quality` adds top-level descriptions to every input parameter and validates the documented name and description budgets. This audit leaves those owned files untouched.
 
 ## Official sources
 
