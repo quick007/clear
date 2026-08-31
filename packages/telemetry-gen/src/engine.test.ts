@@ -13,6 +13,14 @@ const scenario = {
 };
 
 describe("telemetry generator", () => {
+  it("reports finite, non-passing ratios when the baseline has no observations", () => {
+    const report = evaluateAcceptance([], []);
+
+    expect(report.upstreamRequestRatio).toBe(0);
+    expect(report.uniqueUserRatio).toBe(0);
+    expect(report.passed).toBe(false);
+  });
+
   it.effect("makes the retry amplification reveal a measurable invariant", () =>
     Effect.gen(function* () {
       const generator = yield* makeTelemetryGenerator(scenario);

@@ -65,7 +65,7 @@ export const GroundtruthAccessLayer = Layer.effect(
               ),
             );
           const request = yield* HttpServerRequest.HttpServerRequest;
-          yield* requests.consume(record.id).pipe(
+          yield* requests.consume(record.session.id).pipe(
             Effect.tapError((error) =>
               Effect.sync(() => {
                 rateLimitFailures.set(request, error);

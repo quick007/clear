@@ -48,7 +48,7 @@ describe("IngestKeyService", () => {
       const plaintext = Redacted.value(issued.key);
 
       assert.match(plaintext, /^gtik_[A-Za-z0-9_-]{12}_[A-Za-z0-9_-]{43}$/);
-      assert.strictEqual(issued.metadata.prefix, plaintext.slice(0, 12));
+      assert.strictEqual(issued.metadata.prefix, plaintext.slice(0, 17));
 
       const beforeUse = yield* keys.list(sandboxProjectId);
       assert.strictEqual(beforeUse.length, 1);

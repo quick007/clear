@@ -9,8 +9,8 @@ import {
   AbsoluteTimeRange,
   AttributeFilter,
   AttributeKey,
+  MetricAggregateQuery,
   MetricName,
-  MetricQuery,
 } from "@groundtruth/telemetry";
 import { Context, DateTime, Effect, Layer, Option, Ref } from "effect";
 import { IncidentService } from "../incidents/IncidentService.js";
@@ -49,7 +49,7 @@ const serviceFilter = (alert: Alert) =>
       ];
 
 const queryFor = (alert: Alert, now: DateTime.Utc) =>
-  new MetricQuery({
+  new MetricAggregateQuery({
     metric: MetricName.make(alert.metricName),
     aggregation: alert.aggregation,
     range: new AbsoluteTimeRange({
@@ -59,8 +59,6 @@ const queryFor = (alert: Alert, now: DateTime.Utc) =>
       end: now,
     }),
     filters: serviceFilter(alert),
-    maxSeries: 1,
-    maxPoints: 2_000,
   });
 
 const breaches = (alert: Alert, value: number) => {
@@ -141,13 +139,21 @@ export class AlertEvaluator extends Context.Service<
         return updated.value;
       });
 
-      const noteOpenIncident = Effect.fn("AlertEvaluator.noteOpenIncident")(function* (
-        alert: Alert,
-        summary: NonEmptyText,
-      ) {
-        const current = yield* incidents.getOpenIncident(alert.projectId);
-        if (current !== null) yield* incidents.addNote(alert.projectId, current.id, summary);
-      });
+      const noteOpenIncident = Effect.fn("AlertEvaluator.noteOpenIncident")(
+        (alert: Alert, summary: NonEmptyText) =>
+          Effect.gen(function* () {
+            const current = yield* incidents.getOpenIncident(alert.projectId);
+            if (current !== null) yield* incidents.addNote(alert.projectId, current.id, summary);
+          }).pipe(
+            Effect.catch((error) =>
+              Effect.logWarning("Alert transitioned but its incident note could not be added", {
+                alertId: alert.id,
+                error,
+                projectId: alert.projectId,
+              }),
+            ),
+          ),
+      );
 
       const evaluateAlert = Effect.fn("AlertEvaluator.evaluateAlert")(function* (alert: Alert) {
         if (!alert.enabled) return "skipped" satisfies AlertEvaluationOutcome;
@@ -159,10 +165,8 @@ export class AlertEvaluator extends Context.Service<
           return "failed" satisfies AlertEvaluationOutcome;
         }
         const now = yield* DateTime.now;
-        const result = yield* telemetry
-          .queryMetrics(alert.projectId, queryFor(alert, now))
-          .pipe(Effect.catchTag("MetricNotFound", () => Effect.succeed(null)));
-        const value = result?.stats.last ?? null;
+        const result = yield* telemetry.aggregateMetric(alert.projectId, queryFor(alert, now));
+        const value = result.value;
         if (value === null) return "no-data" satisfies AlertEvaluationOutcome;
 
         if (breaches(alert, value)) {

@@ -328,6 +328,128 @@ describe("telemetry ingestion and memory store", () => {
     }).pipe(Effect.provide(IngestTest)),
   );
 
+  it.effect("paginates identical log records without dropping duplicates", () =>
+    Effect.gen(function* () {
+      const ingest = yield* CollectorIngestService;
+      const store = yield* TelemetryStore;
+      const duplicateLogs = new OtlpLogsRequest({
+        resourceLogs: [
+          {
+            resource,
+            scopeLogs: [
+              {
+                logRecords: Array.from({ length: 3 }, () => ({
+                  timeUnixNano: end,
+                  observedTimeUnixNano: end,
+                  severityNumber: 9 as const,
+                  body: { stringValue: "same log" },
+                })),
+              },
+            ],
+          },
+        ],
+      });
+      yield* ingest.enqueueLogs(projectId, duplicateLogs, testWireBytes);
+      const range = {
+        _tag: "absolute" as const,
+        start: DateTime.fromDateUnsafe(new Date("2026-08-28T02:39:50.000Z")),
+        end: DateTime.fromDateUnsafe(new Date("2026-08-28T02:40:10.000Z")),
+      };
+
+      const first = yield* store.searchLogs(projectId, new LogSearch({ range, limit: 2 }));
+      assert.strictEqual(first.records.length, 2);
+      assert(first.nextCursor !== null);
+      const second = yield* store.searchLogs(
+        projectId,
+        new LogSearch({ range, limit: 2, cursor: first.nextCursor }),
+      );
+      assert.strictEqual(second.records.length, 1);
+      assert.strictEqual(second.nextCursor, null);
+    }).pipe(Effect.provide(IngestTest)),
+  );
+
+  it.effect("bounds correlated logs in trace detail and reports truncation", () =>
+    Effect.gen(function* () {
+      const ingest = yield* CollectorIngestService;
+      const store = yield* TelemetryStore;
+      yield* ingest.enqueueTraces(projectId, traces, testWireBytes);
+      yield* ingest.enqueueLogs(
+        projectId,
+        new OtlpLogsRequest({
+          resourceLogs: [
+            {
+              resource,
+              scopeLogs: [
+                {
+                  logRecords: Array.from({ length: 201 }, (_, index) => ({
+                    timeUnixNano: String(BigInt(start) + BigInt(index)),
+                    traceId,
+                    spanId,
+                    body: { stringValue: `trace log ${index + 1}` },
+                  })),
+                },
+              ],
+            },
+          ],
+        }),
+        testWireBytes,
+      );
+
+      const detail = yield* store.getTrace(projectId, TraceId.make(traceId));
+      assert.strictEqual(detail.correlatedLogs.length, 200);
+      assert.strictEqual(detail.complete, false);
+      assert.match(detail.hint ?? "", /truncated/);
+    }).pipe(Effect.provide(IngestTest)),
+  );
+
+  it.effect("marks cyclic trace structures incomplete instead of claiming a complete tree", () =>
+    Effect.gen(function* () {
+      const ingest = yield* CollectorIngestService;
+      const store = yield* TelemetryStore;
+      const cyclicTraceId = "11111111111111111111111111111111";
+      const firstSpanId = "1111111111111111";
+      const secondSpanId = "2222222222222222";
+      yield* ingest.enqueueTraces(
+        projectId,
+        new OtlpTracesRequest({
+          resourceSpans: [
+            {
+              resource,
+              scopeSpans: [
+                {
+                  spans: [
+                    {
+                      traceId: cyclicTraceId,
+                      spanId: firstSpanId,
+                      parentSpanId: secondSpanId,
+                      name: "first",
+                      startTimeUnixNano: start,
+                      endTimeUnixNano: end,
+                    },
+                    {
+                      traceId: cyclicTraceId,
+                      spanId: secondSpanId,
+                      parentSpanId: firstSpanId,
+                      name: "second",
+                      startTimeUnixNano: start,
+                      endTimeUnixNano: end,
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+        testWireBytes,
+      );
+
+      const detail = yield* store.getTrace(projectId, TraceId.make(cyclicTraceId));
+      assert.strictEqual(detail.complete, false);
+      assert.strictEqual(detail.roots.length, 0);
+      assert.match(detail.hint ?? "", /invalid/);
+    }).pipe(Effect.provide(IngestTest)),
+  );
+
   it.effect("derives cumulative monotonic rates and handles counter resets", () =>
     Effect.gen(function* () {
       const ingest = yield* CollectorIngestService;

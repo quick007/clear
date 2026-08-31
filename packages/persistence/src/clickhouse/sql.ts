@@ -160,6 +160,7 @@ export const aggregationExpression = (
   aggregation: string,
   bucketSeconds: number,
   distinctValue = "''",
+  distinctCondition = "1",
 ) => {
   const value = `multiIf(
     value_type = 'int', toFloat64(int_value),
@@ -188,7 +189,7 @@ export const aggregationExpression = (
     case "p99":
       return `quantileTDigest(0.99)(${value})`;
     case "count-distinct":
-      return `toFloat64(uniqCombined64(${distinctValue}))`;
+      return `toFloat64(uniqCombined64If(${distinctValue}, ${distinctCondition}))`;
     default:
       return "avg(double_value)";
   }

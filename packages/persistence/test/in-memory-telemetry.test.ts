@@ -1,5 +1,10 @@
 import { ProjectId } from "@groundtruth/domain";
-import { CanonicalTelemetryBatch, LogSearch, MetricQuery } from "@groundtruth/telemetry";
+import {
+  CanonicalTelemetryBatch,
+  LogSearch,
+  MetricAggregateQuery,
+  MetricQuery,
+} from "@groundtruth/telemetry";
 import { DateTime, Effect, Ref, Schema } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 import {
@@ -217,6 +222,15 @@ describe("in-memory telemetry summaries", () => {
       },
       step: "10s",
     });
+    const aggregateQuery = Schema.decodeUnknownSync(MetricAggregateQuery)({
+      metric: "requests.cumulative",
+      aggregation: "rate",
+      range: {
+        _tag: "absolute",
+        start: new Date(baseMillis + 5_000).toISOString(),
+        end: new Date(baseMillis + 31_000).toISOString(),
+      },
+    });
 
     await Effect.runPromise(
       Effect.gen(function* () {
@@ -225,6 +239,10 @@ describe("in-memory telemetry summaries", () => {
         yield* repository.ingest(projectId, 7, counterBatch);
         const result = yield* repository.queryMetrics(projectId, query);
         expect(result.series[0]?.points.map(({ value }) => value)).toEqual([1, 0.5, 1]);
+
+        const aggregate = yield* repository.aggregateMetric(projectId, aggregateQuery);
+        expect(aggregate.matchedPoints).toBe(3);
+        expect(aggregate.value).toBeCloseTo(25 / 26, 8);
       }),
     );
   });

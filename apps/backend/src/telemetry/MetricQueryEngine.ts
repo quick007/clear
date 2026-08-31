@@ -73,6 +73,30 @@ const pointValue = (point: MetricPoint, aggregation: MetricQuery["aggregation"])
   return numeric;
 };
 
+const average = (points: ReadonlyArray<MetricPoint>) => {
+  let total = 0;
+  let weight = 0;
+  for (const point of points) {
+    if (
+      point._tag === "histogram" ||
+      point._tag === "exponential-histogram" ||
+      point._tag === "summary"
+    ) {
+      const pointWeight = Number(point.count);
+      if (point.sum === null || pointWeight === 0 || !Number.isFinite(pointWeight)) continue;
+      total += point.sum;
+      weight += pointWeight;
+      continue;
+    }
+    const value = numberValue(point);
+    if (value !== null) {
+      total += value;
+      weight += 1;
+    }
+  }
+  return weight === 0 ? null : total / weight;
+};
+
 interface WeightedValue {
   readonly value: number;
   readonly weight: number;
@@ -185,6 +209,7 @@ const aggregate = (
       }),
     ).size;
   }
+  if (aggregation === "avg") return average(points);
   if (aggregation === "p50") return weightedPercentile(points, 0.5);
   if (aggregation === "p95") return weightedPercentile(points, 0.95);
   if (aggregation === "p99") return weightedPercentile(points, 0.99);
@@ -198,9 +223,6 @@ const aggregate = (
   if (values.length === 0) return null;
   if (aggregation === "min") return Math.min(...values);
   if (aggregation === "max") return Math.max(...values);
-  if (aggregation === "avg") {
-    return values.reduce((sum, value) => sum + value, 0) / values.length;
-  }
   const sum = values.reduce((total, value) => total + value, 0);
   return aggregation === "rate" ? sum / bucketSeconds : sum;
 };

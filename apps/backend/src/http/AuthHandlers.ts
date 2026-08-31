@@ -9,7 +9,7 @@ import {
 import { DateTime, Effect, Redacted } from "effect";
 import { Cookies, HttpServerResponse } from "effect/unstable/http";
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi";
-import { AuthPrincipal, AuthService } from "../auth/AuthService.js";
+import { AuthService } from "../auth/AuthService.js";
 import { BackendConfig } from "../config/BackendConfig.js";
 import { IdentityService } from "../identity/IdentityService.js";
 import { sessionCookieName } from "./SecurityRoutes.js";
@@ -93,15 +93,7 @@ export const AuthHandlers = HttpApiBuilder.group(GroundtruthApi, "auth", (handle
             payload.displayName,
           );
           const handoff = yield* auth
-            .issueHandoff(
-              new AuthPrincipal({
-                hostedSubject: String(resolved.account.hostedSubject),
-                email: String(resolved.account.email),
-                displayName: resolved.account.displayName,
-              }),
-              payload.returnPath ?? "/",
-              payload.browserNonce,
-            )
+            .issueHandoff(resolved.account, payload.returnPath ?? "/", payload.browserNonce)
             .pipe(
               Effect.catchTag(
                 "InvalidReturnPath",
@@ -128,11 +120,6 @@ export const AuthHandlers = HttpApiBuilder.group(GroundtruthApi, "auth", (handle
                 () => new BadRequest({ message: "Handoff code is invalid or expired" }),
               ),
             );
-          if (query.returnPath !== undefined && query.returnPath !== redeemed.returnPath) {
-            return yield* new BadRequest({
-              message: "Return path does not match the handoff",
-            });
-          }
           return completeHandoffResponse(
             new URL(redeemed.returnPath, config.consoleOrigin).toString(),
             redeemed.sessionToken,

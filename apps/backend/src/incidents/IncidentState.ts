@@ -6,6 +6,7 @@ import { retryAlertId, sandboxProjectId } from "../memory/SeedIds.js";
 
 export interface ProjectIncidentState {
   readonly detail: IncidentDetail | null;
+  readonly history: ReadonlyArray<IncidentDetail>;
   readonly alerts: ReadonlyArray<Alert>;
   readonly manualAlerts: ReadonlyArray<ManualAlert>;
 }
@@ -51,7 +52,10 @@ export class IncidentState extends Context.Service<
       const now = yield* DateTime.now;
       const state = yield* Ref.make<IncidentStateMap>(
         new Map([
-          [sandboxProjectId, { detail: null, alerts: [retryAlert(now)], manualAlerts: [] }],
+          [
+            sandboxProjectId,
+            { detail: null, history: [], alerts: [retryAlert(now)], manualAlerts: [] },
+          ],
         ]),
       );
       return IncidentState.of({ state });
@@ -61,6 +65,7 @@ export class IncidentState extends Context.Service<
 
 export const emptyProjectIncidentState: ProjectIncidentState = {
   detail: null,
+  history: [],
   alerts: [],
   manualAlerts: [],
 };

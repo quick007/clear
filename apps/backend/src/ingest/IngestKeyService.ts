@@ -8,7 +8,7 @@ import {
   type ProjectId,
   QuotaExceeded,
 } from "@groundtruth/domain";
-import { IngestKeyRepository } from "@groundtruth/persistence";
+import { IngestKeyRepository, type VerifiedIngestKey } from "@groundtruth/persistence";
 import {
   Context,
   Crypto,
@@ -29,7 +29,8 @@ import { sandboxProjectId } from "../memory/SeedIds.js";
 const generatedKeyNamespace = "gtik_";
 const generatedPrefixBytes = 9;
 const generatedSecretBytes = 32;
-const visiblePrefixLength = 12;
+const legacyVisiblePrefixLength = 12;
+const generatedVisiblePrefixLength = generatedKeyNamespace.length + 12;
 const minimumKeyLength = 6;
 const maximumKeyLength = 512;
 const maximumGenerationAttempts = 5;
@@ -82,7 +83,19 @@ const persistenceUnavailable = () =>
 const hexadecimal = (bytes: Uint8Array) =>
   Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 
-const prefixOf = (key: string) => key.slice(0, visiblePrefixLength);
+const prefixOf = (key: string) =>
+  key.slice(
+    0,
+    key.startsWith(generatedKeyNamespace)
+      ? generatedVisiblePrefixLength
+      : legacyVisiblePrefixLength,
+  );
+
+const verificationPrefixes = (key: string) => {
+  const prefix = prefixOf(key);
+  const legacyPrefix = key.slice(0, legacyVisiblePrefixLength);
+  return prefix === legacyPrefix ? [prefix] : [prefix, legacyPrefix];
+};
 
 const constantTimeEqual = (left: Uint8Array, right: Uint8Array) =>
   left.length === right.length && timingSafeEqual(left, right);
@@ -370,20 +383,25 @@ export class IngestKeyService extends Context.Service<
         if (activeCount >= IngestKeyLimits.activePerProject) {
           return yield* quotaExceeded(activeCount + 1);
         }
-        const [prefixBytes, secretBytes] = yield* Effect.all([
-          crypto.randomBytes(generatedPrefixBytes),
-          crypto.randomBytes(generatedSecretBytes),
-        ]).pipe(Effect.mapError(() => unavailable("generate")));
-        const key = `${generatedKeyNamespace}${Encoding.encodeBase64Url(prefixBytes)}_${Encoding.encodeBase64Url(secretBytes)}`;
-        const metadata = yield* repository
-          .create({
-            projectId,
-            name,
-            prefix: prefixOf(key),
-            secretHash: yield* hash(key),
-          })
-          .pipe(Effect.mapError(() => unavailable("persist")));
-        return { metadata, key: Redacted.make(key) };
+        for (let attempt = 0; attempt < maximumGenerationAttempts; attempt += 1) {
+          const [prefixBytes, secretBytes] = yield* Effect.all([
+            crypto.randomBytes(generatedPrefixBytes),
+            crypto.randomBytes(generatedSecretBytes),
+          ]).pipe(Effect.mapError(() => unavailable("generate")));
+          const key = `${generatedKeyNamespace}${Encoding.encodeBase64Url(prefixBytes)}_${Encoding.encodeBase64Url(secretBytes)}`;
+          const result = yield* Effect.option(
+            repository.create({
+              projectId,
+              name,
+              prefix: prefixOf(key),
+              secretHash: yield* hash(key),
+            }),
+          );
+          if (Option.isSome(result)) {
+            return { metadata: result.value, key: Redacted.make(key) };
+          }
+        }
+        return yield* unavailable("persist");
       });
 
       const create = Effect.fn("IngestKeyService.create")(
@@ -445,9 +463,14 @@ export class IngestKeyService extends Context.Service<
             message: "Ingest key is malformed",
           });
         }
-        const result = yield* repository
-          .verifyHash(prefixOf(presentedKey), yield* hash(presentedKey))
-          .pipe(Effect.mapError(() => unavailable("persist")));
+        const secretHash = yield* hash(presentedKey);
+        let result: Option.Option<VerifiedIngestKey> = Option.none();
+        for (const prefix of verificationPrefixes(presentedKey)) {
+          result = yield* repository
+            .verifyHash(prefix, secretHash)
+            .pipe(Effect.mapError(() => unavailable("persist")));
+          if (Option.isSome(result)) break;
+        }
         if (Option.isNone(result)) {
           return yield* new IngestKeyRejected({
             reason: "unknown",

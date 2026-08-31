@@ -1,5 +1,6 @@
 import { DateTime } from "effect";
 import type { MetricQuery } from "./metrics.ts";
+import type { TimeRange } from "./primitives.ts";
 
 export const rawMetricRetentionSeconds = 24 * 60 * 60; // 24 hours
 export const maximumMetricQuerySeconds = 7 * 24 * 60 * 60; // 7 days
@@ -15,10 +16,13 @@ const relativeWindowSeconds = {
   "7d": maximumMetricQuerySeconds,
 } as const;
 
+export const metricRangeDurationSeconds = (range: TimeRange) =>
+  range._tag === "relative"
+    ? relativeWindowSeconds[range.window]
+    : (DateTime.toEpochMillis(range.end) - DateTime.toEpochMillis(range.start)) / 1_000;
+
 export const metricQueryDurationSeconds = (query: MetricQuery) =>
-  query.range._tag === "relative"
-    ? relativeWindowSeconds[query.range.window]
-    : (DateTime.toEpochMillis(query.range.end) - DateTime.toEpochMillis(query.range.start)) / 1_000;
+  metricRangeDurationSeconds(query.range);
 
 export const metricQueryUsesRollups = (query: MetricQuery) =>
   metricQueryDurationSeconds(query) > rawMetricRetentionSeconds;

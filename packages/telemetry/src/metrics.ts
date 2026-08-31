@@ -97,10 +97,13 @@ const metricQueryFields = {
   maxPoints: Schema.optional(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 2_000 }))),
 } as const;
 
-const MetricQueryStruct = Schema.Struct(metricQueryFields);
-
-const MetricQuerySchema = MetricQueryStruct.check(
-  Schema.makeFilter<typeof MetricQueryStruct.Type>((query) => {
+const distinctAggregationCheck = <
+  Query extends {
+    readonly aggregation: MetricAggregation;
+    readonly distinctKey?: AttributeKey;
+  },
+>() =>
+  Schema.makeFilter<Query>((query) => {
     if (query.aggregation === "count-distinct" && query.distinctKey === undefined) {
       return {
         path: ["distinctKey"],
@@ -114,12 +117,40 @@ const MetricQuerySchema = MetricQueryStruct.check(
       };
     }
     return undefined;
-  }),
+  });
+
+const MetricQueryStruct = Schema.Struct(metricQueryFields);
+
+const MetricQuerySchema = MetricQueryStruct.check(
+  distinctAggregationCheck<typeof MetricQueryStruct.Type>(),
 );
 
 export class MetricQuery extends Schema.Class<MetricQuery>("Groundtruth/Telemetry/MetricQuery")(
   MetricQuerySchema,
 ) {}
+
+const MetricAggregateQueryStruct = Schema.Struct({
+  metric: MetricName,
+  aggregation: MetricAggregation,
+  distinctKey: Schema.optional(AttributeKey),
+  range: TimeRange,
+  filters: Schema.optional(Schema.Array(AttributeFilter).check(Schema.isMaxLength(16))),
+});
+
+const MetricAggregateQuerySchema = MetricAggregateQueryStruct.check(
+  distinctAggregationCheck<typeof MetricAggregateQueryStruct.Type>(),
+);
+
+export class MetricAggregateQuery extends Schema.Class<MetricAggregateQuery>(
+  "Groundtruth/Telemetry/MetricAggregateQuery",
+)(MetricAggregateQuerySchema) {}
+
+export class MetricAggregateResult extends Schema.Class<MetricAggregateResult>(
+  "Groundtruth/Telemetry/MetricAggregateResult",
+)({
+  value: Schema.NullOr(Schema.Finite),
+  matchedPoints: Schema.Natural,
+}) {}
 
 export class MetricSeriesPoint extends Schema.Class<MetricSeriesPoint>(
   "Groundtruth/Telemetry/MetricSeriesPoint",

@@ -159,6 +159,46 @@ describe("OTLP normalization validation", () => {
     }).pipe(Effect.provide(IngestTest)),
   );
 
+  it.effect("rejects internally inconsistent histogram shapes", () =>
+    Effect.gen(function* () {
+      const ingest = yield* CollectorIngestService;
+      const metricPath = "resourceMetrics[0].scopeMetrics[0].metrics[0].histogram.dataPoints[0]";
+      const reject = (dataPoint: {
+        readonly count: string;
+        readonly bucketCounts: ReadonlyArray<string>;
+        readonly explicitBounds: ReadonlyArray<number>;
+      }) =>
+        Effect.flip(
+          ingest.enqueueMetrics(
+            projectId,
+            metricRequest({
+              name: "invalid.histogram",
+              histogram: { aggregationTemporality: 1, dataPoints: [dataPoint] },
+            }),
+            testWireBytes,
+          ),
+        );
+
+      const length = yield* reject({ count: "2", bucketCounts: ["2"], explicitBounds: [10] });
+      assert(length instanceof InvalidOtlpPayload);
+      assert.strictEqual(length.path, `${metricPath}.bucketCounts`);
+      const total = yield* reject({
+        count: "3",
+        bucketCounts: ["1", "1"],
+        explicitBounds: [10],
+      });
+      assert(total instanceof InvalidOtlpPayload);
+      assert.strictEqual(total.path, `${metricPath}.count`);
+      const bounds = yield* reject({
+        count: "2",
+        bucketCounts: ["1", "0", "1"],
+        explicitBounds: [10, 5],
+      });
+      assert(bounds instanceof InvalidOtlpPayload);
+      assert.strictEqual(bounds.path, `${metricPath}.explicitBounds[1]`);
+    }).pipe(Effect.provide(IngestTest)),
+  );
+
   it.effect("rejects invalid AnyValue unions and reversed spans", () =>
     Effect.gen(function* () {
       const ingest = yield* CollectorIngestService;
@@ -212,7 +252,6 @@ describe("OTLP normalization validation", () => {
         }),
         `${recordPath}.body.arrayValue.values[0]`,
       );
-
       const traceError = yield* Effect.flip(
         ingest.enqueueTraces(
           projectId,

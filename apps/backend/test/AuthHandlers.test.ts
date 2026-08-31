@@ -116,9 +116,9 @@ const handoffRequest = (browserNonce: string, authorized = true) =>
     }),
   });
 
-const callbackRequest = (code: string, browserNonce?: string) =>
+const callbackRequest = (code: string, browserNonce?: string, returnPath?: string) =>
   new Request(
-    `http://localhost:3000/v1/auth/chatgpt/callback?code=${encodeURIComponent(code)}`,
+    `http://localhost:3000/v1/auth/chatgpt/callback?code=${encodeURIComponent(code)}${returnPath === undefined ? "" : `&returnPath=${encodeURIComponent(returnPath)}`}`,
     browserNonce === undefined
       ? undefined
       : { headers: { cookie: `groundtruth_handoff_nonce=${browserNonce}` } },
@@ -211,9 +211,10 @@ describe("hosted authentication handoff", () => {
           assert.strictEqual(replay.status, 400);
 
           const completedB = yield* Effect.promise(() =>
-            handler(callbackRequest(handoffB.code, nonceB)),
+            handler(callbackRequest(handoffB.code, nonceB, "/different-path")),
           );
           assert.strictEqual(completedB.status, 303);
+          assert.strictEqual(completedB.headers.get("location"), "http://localhost:5173/projects");
         }),
       ({ dispose }) => Effect.promise(dispose),
     ),

@@ -13,8 +13,9 @@ import {
 import { AccountRepository, ProjectRepository } from "@groundtruth/persistence";
 import { PersistenceMemory } from "@groundtruth/persistence/testing";
 import { Effect, Layer } from "effect";
+import { TestClock } from "effect/testing";
 import { ManualAlertLimits, ManualAlertService } from "../src/alerts/ManualAlertService.js";
-import { sandboxProjectIdForSession } from "../src/memory/SeedIds.js";
+import { isSandboxProjectId, sandboxProjectIdForSession } from "../src/memory/SeedIds.js";
 import { IncidentState } from "../src/incidents/IncidentState.js";
 
 const FoundationTest = Layer.mergeAll(PersistenceMemory, NodeCrypto.layer, IncidentState.layer);
@@ -56,8 +57,10 @@ const createHostedProject = Effect.gen(function* () {
 describe("ManualAlertService", () => {
   it.effect("persists typed manual alerts and keeps project lookups isolated", () =>
     Effect.gen(function* () {
+      yield* TestClock.setTime(Date.parse("2026-08-28T08:00:00.000Z"));
       const alerts = yield* ManualAlertService;
       const project = yield* createHostedProject;
+      assert.strictEqual(isSandboxProjectId(project.id), false);
       const created = yield* alerts.create(project.id, input(1));
 
       assert.strictEqual(created.title, "Checkout report 1");
