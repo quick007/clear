@@ -26,7 +26,9 @@ Do not include keys, tokens, local paths, unrelated browser tabs, or unfinished 
 
 `homepage-material.png` is a deterministic crop and resize of the real homepage capture used by the thumbnail. Regenerate it from `homepage.png`; do not repaint or hand-edit the shader. The hero instead uses `homepage-background.png` at its native 1800 by 1200 size without crop, modulation, or fading. `hero-workspace.png` is a deterministic composition of `codex-workspace-reference.png` and `board-agent-pane.png`. The Clear pane is captured at its final responsive size, so the compositor does not crop or reshape it. Only the bottom of the combined workspace continues below the final hero canvas.
 
-## Final outputs
+## Final output targets
+
+The manifest declares these upload targets. A target is not evidence until its source capture and rendered output exist. In this checkout, `recovery-board.png` and `clear-deploy-recovery.png` must be captured and rendered before a final Devpost upload. Do not fabricate that recovery state or upload an older asset in its place.
 
 | File                                      | Size         | Purpose                            |
 | ----------------------------------------- | ------------ | ---------------------------------- |

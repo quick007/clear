@@ -13,18 +13,21 @@ The code is MIT licensed and can be adapted, but the maintainers are not promisi
 
 ## Start the stack
 
-Install and validate the workspace:
+Install and validate a fresh clone without creating environment files:
 
 ```sh
 vp install
 vp run ready
 ```
 
-Copy the development configuration:
+`vp run ready` runs format, lint, and type checks, then the fast workspace test suites and builds. Database integration tests are opt-in because they start PostgreSQL and ClickHouse; CI runs them in the [dedicated persistence job](../.github/workflows/ci.yml). The gate validates the repository before the services start; it does not start Docker or prove a browser-to-ingest end-to-end flow.
+
+Before starting any local service, create the required uncommitted configuration files:
 
 ```sh
 cp .env.example .env
 cp apps/console/.env.example apps/console/.env.local
+cp apps/checkout-web/.env.example apps/checkout-web/.env.local
 ```
 
 The checked-in values are safe defaults for an isolated local machine only. Replace every secret before exposing any service to another host.

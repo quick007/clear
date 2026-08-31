@@ -98,16 +98,18 @@ See the [OpenTelemetry quickstart](docs/otel-quickstart.md) for application and 
 
 ## Run locally
 
-The Compose stack is a contributor environment, not a supported self-hosted release.
+The Compose stack is a contributor environment, not a supported self-hosted release. Start from a fresh clone with Node.js 24 or newer, [Vite+](https://viteplus.dev/) 0.3.x, Docker Engine with Compose v2, and at least 4 GB available to Docker.
 
-Requirements:
+Verify the repository without configuring any environment files:
 
-- Node.js 24 or newer
-- [Vite+](https://viteplus.dev/) 0.3.x
-- Docker Engine with Compose v2
-- At least 4 GB available to Docker
+```sh
+vp install
+vp run ready
+```
 
-Create local configuration:
+`vp run ready` runs Vite+'s format, lint, and type checks, then the fast workspace test suites and every workspace build script. Database integration tests are opt-in because they start PostgreSQL and ClickHouse; CI runs them in the dedicated [persistence integration job](.github/workflows/ci.yml). It is the quickest fresh-clone check before starting services.
+
+Before starting local services, create the three uncommitted configuration files:
 
 ```sh
 cp .env.example .env
@@ -115,12 +117,7 @@ cp apps/console/.env.example apps/console/.env.local
 cp apps/checkout-web/.env.example apps/checkout-web/.env.local
 ```
 
-Install and validate the TypeScript workspace:
-
-```sh
-vp install
-vp run ready
-```
+The runtime and browser configuration remain strict. Do not skip these copies before running the console or Compose stack.
 
 Start the console:
 
@@ -193,6 +190,7 @@ media/devpost/      Reproducible Devpost source captures and outputs
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Submission guide and evidence map](docs/submission-guide.md)
 - [OpenTelemetry quickstart](docs/otel-quickstart.md)
 - [Connecting a real project](docs/real-mode.md)
 - [Local development stack](docs/self-hosting.md)
