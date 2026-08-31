@@ -64,6 +64,7 @@ const sandboxConfig = (sandboxSessionLimit: number) =>
       bootstrapProjectSlug: "local",
       bootstrapProjectName: "Local project",
       bootstrapIngestKey: undefined,
+      publicStatusEnabled: false,
       sandboxSessionLimit,
       sandboxCreationsPerMinute: 10,
       authenticatedRequestsPerMinute: 300,

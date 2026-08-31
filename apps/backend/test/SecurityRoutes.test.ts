@@ -3,6 +3,7 @@ import { Effect, Layer, Redacted } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/unstable/http";
 import { BackendConfig } from "../src/config/BackendConfig.js";
 import { SecurityRoutes, sessionCookieName } from "../src/http/SecurityRoutes.js";
+import { publicStatusRequestsPerMinute } from "../src/http/SecurityRoutes.js";
 
 const consoleOrigin = "https://clear.test";
 
@@ -22,6 +23,7 @@ const configTest = (publicRequestsPerMinute = 300) =>
       bootstrapProjectSlug: "test",
       bootstrapProjectName: "Test project",
       bootstrapIngestKey: undefined,
+      publicStatusEnabled: false,
       sandboxSessionLimit: 100,
       sandboxCreationsPerMinute: 10,
       authenticatedRequestsPerMinute: 300,
@@ -32,6 +34,7 @@ const configTest = (publicRequestsPerMinute = 300) =>
 const testRoutes = (publicRequestsPerMinute = 300) =>
   Layer.mergeAll(
     HttpRouter.add("GET", "/probe", HttpServerResponse.text("ok")),
+    HttpRouter.add("GET", "/v1/public/status", HttpServerResponse.text("operational")),
     HttpRouter.add("POST", "/probe", HttpServerResponse.text("ok")),
     HttpRouter.add(
       "POST",
@@ -166,6 +169,36 @@ describe("SecurityRoutes", () => {
           assert.strictEqual(second.status, 429);
         }),
       1,
+    ),
+  );
+
+  it.effect("isolates the public status polling budget from other public routes", () =>
+    withHandler((handler) =>
+      Effect.gen(function* () {
+        const responses = yield* Effect.forEach(
+          Array.from({ length: publicStatusRequestsPerMinute + 1 }),
+          (_, index) =>
+            Effect.promise(() =>
+              handler(
+                new Request("https://api.clear.test/v1/public/status", {
+                  headers: { "x-forwarded-for": `203.0.113.${index % 255}` },
+                }),
+              ),
+            ),
+          { concurrency: "unbounded" },
+        );
+        const probe = yield* Effect.promise(() =>
+          handler(new Request("https://api.clear.test/probe")),
+        );
+
+        assert.strictEqual(
+          responses.filter(({ status }) => status === 200).length,
+          publicStatusRequestsPerMinute,
+        );
+        const limited = responses.find(({ status }) => status === 429);
+        assert.strictEqual(limited?.headers.get("retry-after"), "60");
+        assert.strictEqual(probe.status, 200);
+      }),
     ),
   );
 

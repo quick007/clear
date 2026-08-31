@@ -21,6 +21,7 @@ const ConfigTest = Layer.succeed(
     bootstrapProjectSlug: "local",
     bootstrapProjectName: "Local project",
     bootstrapIngestKey: undefined,
+    publicStatusEnabled: false,
     sandboxSessionLimit: 100,
     sandboxCreationsPerMinute: 10,
     authenticatedRequestsPerMinute: 2,

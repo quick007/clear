@@ -17,6 +17,7 @@ describe("GroundtruthApi", () => {
     expect(endpointIds).toEqual(
       new Map([
         ["health", ["check"]],
+        ["publicStatus", ["getStatus"]],
         ["auth", ["createHandoff", "completeHandoff", "getSession", "logout"]],
         [
           "alerts",
@@ -68,6 +69,7 @@ describe("GroundtruthApi", () => {
     const spec = OpenApi.fromApi(GroundtruthApi);
     expect(spec.info.title).toBe("Clear API");
     expect(spec.paths["/health"]?.get).toBeDefined();
+    expect(spec.paths["/v1/public/status"]?.get).toBeDefined();
     expect(spec.paths["/v1/projects/{projectId}/traces/{traceId}"]?.get).toBeDefined();
     expect(spec.paths["/v1/projects/{projectId}/incidents/{incidentId}"]?.get).toBeDefined();
     expect(spec.paths["/v1/projects/{projectId}/events/stream"]?.get).toBeDefined();
@@ -82,6 +84,14 @@ describe("GroundtruthApi", () => {
     expect(spec.paths["/v1/projects/{projectId}/incidents"]?.get).toBeDefined();
     expect(spec.paths["/v1/sandbox/fix"]).toBeUndefined();
     expect(spec.paths["/internal/v1/ingest/authorize"]).toBeUndefined();
+  });
+
+  it("documents the bounded public status projection", () => {
+    const spec = OpenApi.fromApi(GroundtruthApi);
+    const status = spec.paths["/v1/public/status"]?.get;
+    expect(status?.responses["200"]).toBeDefined();
+    expect(status?.responses["503"]).toBeDefined();
+    expect(status?.security).toEqual([]);
   });
 
   it("documents the browser handoff redirect status", () => {

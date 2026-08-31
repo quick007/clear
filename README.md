@@ -1,21 +1,24 @@
+<p align="center">
+  <img src="media/devpost/outputs/clear-devpost-hero.png" alt="Clear: Let your agent see production" width="100%" />
+</p>
+
 # Clear
 
 [![CI](https://github.com/quick007/clear/actions/workflows/ci.yml/badge.svg)](https://github.com/quick007/clear/actions/workflows/ci.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-f4b968.svg)](LICENSE)
 
-**Your agent knows the code. Clear gives it the evidence.**
+Most observability dashboards have built-in agents these days, and that agent can piece together answers or make changes to the interface. But these built-in agents are isolated from your repo, skills, and context.
 
-Clear is a live OpenTelemetry workspace shared by you and the coding agent you already use. Metrics, logs, traces, deploys, alerts, and incident context stay in one place. The same investigation surface is exposed as typed WebMCP site tools, so you can steer while your agent queries evidence, tests hypotheses, and composes the views that make a diagnosis legible.
+Clear solves this by making observability visible and malleable to your coding agent. With WebMCP, humans and agents can triage issues, build dashboards, and understand incidents. Services send metrics, logs, and traces to Clear, and setting it up is as simple as pointing any OpenTelemetry client that supports HTTP exports at our endpoints.
 
 Clear stops at observability. It never checks out your repository, stores deploy credentials, or executes a fix. Your agent uses the repository and infrastructure access it already has. The result flows back into Clear as a deploy event and recovering telemetry.
-
-![Clear homepage with a translucent observability surface over its paper shader](media/devpost/outputs/clear-devpost-thumbnail.jpg)
 
 ## Try it
 
 | Surface          | URL                                                                                |
 | ---------------- | ---------------------------------------------------------------------------------- |
 | Live app         | [clear.seufert.sh](https://clear.seufert.sh)                                       |
+| Public status    | [clear.seufert.sh/status](https://clear.seufert.sh/status)                         |
 | Example checkout | [clear-checkout.seufert.chatgpt.site](https://clear-checkout.seufert.chatgpt.site) |
 | Runtime health   | [api.clear.seufert.sh/health](https://api.clear.seufert.sh/health)                 |
 | API reference    | [api.clear.seufert.sh/docs](https://api.clear.seufert.sh/docs)                     |
@@ -68,6 +71,8 @@ OpenTelemetry SDKs and Collectors
 The Go data plane uses official OpenTelemetry Collector components for OTLP parsing, compression, batching, memory limits, and transport. The TypeScript control plane uses Effect v4 contracts, schemas, layers, and services. PostgreSQL owns accounts, projects, boards, incidents, keys, and deploy events. ClickHouse owns telemetry and rollups.
 
 For the hackathon, the stateful Clear services run together on one Render instance with a persistent disk. The checkout API is a separate Render service so a code push produces a real, isolated deployment. The console and storefront are published with ChatGPT Sites.
+
+The hosted application services send their own OpenTelemetry into Clear. A bounded [public status page](https://clear.seufert.sh/status) shows three component states plus recent request rate and latency for an explicit service allowlist. It is a read-only projection of Clear's application telemetry, not a view of Render-managed metrics or logs.
 
 Read [the architecture guide](docs/architecture.md) for the detailed component and trust boundaries.
 
@@ -194,6 +199,7 @@ media/devpost/      Reproducible Devpost source captures and outputs
 
 - [Architecture](docs/architecture.md)
 - [OpenTelemetry quickstart](docs/otel-quickstart.md)
+- [Self-observability and public status](docs/self-observability.md)
 - [Connecting a real project](docs/real-mode.md)
 - [Local development stack](docs/self-hosting.md)
 - [Infrastructure notes](infra/README.md)

@@ -26,6 +26,21 @@ const requestBodyLimit = HttpMiddleware.make((httpApp) =>
 );
 
 const collectorRequestsPerMinute = 60_000;
+export const publicStatusRequestsPerMinute = 300;
+
+const requestRateLimitPolicy = (
+  method: string,
+  pathname: string,
+  publicRequestsPerMinute: number,
+) => {
+  if (pathname.startsWith("/internal/v1/telemetry/")) {
+    return { key: "collector", limit: collectorRequestsPerMinute };
+  }
+  if ((method === "GET" || method === "HEAD") && pathname === "/v1/public/status") {
+    return { key: "public-status", limit: publicStatusRequestsPerMinute };
+  }
+  return { key: "public", limit: publicRequestsPerMinute };
+};
 
 const rateLimit = (
   buckets: Ref.Ref<ReadonlyMap<string, RateLimitBucket>>,
@@ -39,12 +54,10 @@ const rateLimit = (
       }
 
       const pathname = new URL(request.url, "http://groundtruth.internal").pathname;
-      const internalTelemetry = pathname.startsWith("/internal/v1/telemetry/");
-      const requestLimit = internalTelemetry ? collectorRequestsPerMinute : publicRequestsPerMinute;
-      const key = internalTelemetry ? "collector" : "public";
+      const policy = requestRateLimitPolicy(request.method, pathname, publicRequestsPerMinute);
       const now = yield* Clock.currentTimeMillis;
       const allowed = yield* Ref.modify(buckets, (current) => {
-        const previous = current.get(key);
+        const previous = current.get(policy.key);
         const active =
           previous === undefined || now - previous.windowStartedAt >= rateLimitWindowMillis
             ? { windowStartedAt: now, count: 0 }
@@ -54,8 +67,8 @@ const rateLimit = (
             ([, bucket]) => now - bucket.windowStartedAt < rateLimitWindowMillis,
           ),
         );
-        next.set(key, { ...active, count: active.count + 1 });
-        return [active.count < requestLimit, next];
+        next.set(policy.key, { ...active, count: active.count + 1 });
+        return [active.count < policy.limit, next];
       });
 
       return allowed

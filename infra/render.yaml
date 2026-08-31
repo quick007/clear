@@ -64,6 +64,8 @@ services:
         generateValue: true
       - key: GROUNDTRUTH_DEMO_INGEST_KEY
         generateValue: true
+      - key: GROUNDTRUTH_PUBLIC_STATUS_ENABLED
+        value: "true"
       - key: SERVICE_TOKEN
         generateValue: true
       - key: CONTROL_TOKEN

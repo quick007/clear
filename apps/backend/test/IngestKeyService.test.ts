@@ -25,6 +25,7 @@ const configLayer = (bootstrapIngestKey?: string) =>
       bootstrapProjectName: "Local project",
       bootstrapIngestKey:
         bootstrapIngestKey === undefined ? undefined : Redacted.make(bootstrapIngestKey),
+      publicStatusEnabled: false,
       sandboxSessionLimit: 100,
       sandboxCreationsPerMinute: 10,
       authenticatedRequestsPerMinute: 300,

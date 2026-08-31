@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 import { LiveEvent } from "../src/model/events.ts";
 import { IngestKeySecret } from "../src/model/ingest-keys.ts";
+import { PublicStatusResponse } from "../src/model/public-status.ts";
 import { OtlpLogsPayload, OtlpLogsRequest } from "../src/otlp/logs.ts";
 import { OtlpMetricsPayload, OtlpMetricsRequest } from "../src/otlp/metrics.ts";
 import { OtlpTracesPayload, OtlpTracesRequest } from "../src/otlp/traces.ts";
@@ -82,6 +83,145 @@ describe("IngestKeySecret", () => {
 
   it("rejects prefixes without the full secret", () => {
     expect(() => Schema.decodeUnknownSync(IngestKeySecret)("gtik_abcdefghijkl")).toThrow();
+  });
+});
+
+const publicStatusFixture = {
+  schemaVersion: 1,
+  status: "operational",
+  summary: "Clear is operating normally.",
+  version: "e355fb3",
+  checkedAt: "2026-08-30T06:00:00.000Z",
+  components: [
+    {
+      key: "api",
+      name: "API",
+      status: "operational",
+      summary: "Requests are being served.",
+      observedAt: "2026-08-30T05:59:58.000Z",
+    },
+    {
+      key: "telemetry",
+      name: "Telemetry",
+      status: "operational",
+      summary: "Recent signals are available.",
+      observedAt: "2026-08-30T05:59:55.000Z",
+    },
+    {
+      key: "storage",
+      name: "Storage",
+      status: "operational",
+      summary: "Telemetry storage is responding.",
+      observedAt: "2026-08-30T05:59:58.000Z",
+    },
+  ],
+  metrics: [
+    {
+      key: "request-rate",
+      title: "Request rate",
+      description: "Recent requests per second.",
+      unit: "requests/s",
+      status: "ready",
+      series: [
+        {
+          label: "Clear API",
+          points: [{ at: "2026-08-30T05:59:50.000Z", value: 12.4 }],
+        },
+      ],
+    },
+    {
+      key: "p95-latency",
+      title: "P95 latency",
+      description: "Recent request latency at the 95th percentile.",
+      unit: "ms",
+      status: "not-observed",
+      series: [],
+    },
+  ],
+} as const;
+
+describe("PublicStatusResponse", () => {
+  it("decodes the fixed public projection and strips unknown sensitive fields", () => {
+    const status = Schema.decodeUnknownSync(PublicStatusResponse)({
+      ...publicStatusFixture,
+      projectId,
+      ownerEmail: "operator@example.com",
+      ingestKey: "secret",
+    });
+    expect(status.status).toBe("operational");
+    expect("projectId" in status).toBe(false);
+    expect("ownerEmail" in status).toBe(false);
+    expect("ingestKey" in status).toBe(false);
+  });
+
+  it("requires one entry for each public component and metric", () => {
+    expect(() =>
+      Schema.decodeUnknownSync(PublicStatusResponse)({
+        ...publicStatusFixture,
+        components: publicStatusFixture.components.slice(0, 2),
+      }),
+    ).toThrow();
+    expect(() =>
+      Schema.decodeUnknownSync(PublicStatusResponse)({
+        ...publicStatusFixture,
+        metrics: publicStatusFixture.metrics.slice(0, 1),
+      }),
+    ).toThrow();
+  });
+
+  it("rejects duplicate projection keys", () => {
+    expect(() =>
+      Schema.decodeUnknownSync(PublicStatusResponse)({
+        ...publicStatusFixture,
+        components: [
+          publicStatusFixture.components[0],
+          publicStatusFixture.components[0],
+          publicStatusFixture.components[2],
+        ],
+      }),
+    ).toThrow();
+    expect(() =>
+      Schema.decodeUnknownSync(PublicStatusResponse)({
+        ...publicStatusFixture,
+        metrics: [publicStatusFixture.metrics[0], publicStatusFixture.metrics[0]],
+      }),
+    ).toThrow();
+  });
+
+  it("caps public metric series and points", () => {
+    const point = publicStatusFixture.metrics[0].series[0]!.points[0]!;
+    expect(() =>
+      Schema.decodeUnknownSync(PublicStatusResponse)({
+        ...publicStatusFixture,
+        metrics: [
+          {
+            ...publicStatusFixture.metrics[0],
+            series: Array.from({ length: 5 }, (_, index) => ({
+              label: `service-${index}`,
+              points: [point],
+            })),
+          },
+          publicStatusFixture.metrics[1],
+        ],
+      }),
+    ).toThrow();
+    expect(() =>
+      Schema.decodeUnknownSync(PublicStatusResponse)({
+        ...publicStatusFixture,
+        metrics: [
+          {
+            ...publicStatusFixture.metrics[0],
+            series: [
+              {
+                label: "Clear API",
+                points: Array.from({ length: 65 }, () => point),
+              },
+            ],
+          },
+          publicStatusFixture.metrics[1],
+        ],
+      }),
+    ).toThrow();
   });
 });
 

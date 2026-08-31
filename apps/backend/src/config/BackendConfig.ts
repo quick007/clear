@@ -20,6 +20,7 @@ export class BackendConfig extends Context.Service<
     readonly bootstrapProjectSlug: string;
     readonly bootstrapProjectName: string;
     readonly bootstrapIngestKey: Redacted.Redacted<string> | undefined;
+    readonly publicStatusEnabled: boolean;
     readonly sandboxSessionLimit: number;
     readonly sandboxCreationsPerMinute: number;
     readonly authenticatedRequestsPerMinute: number;
@@ -72,6 +73,9 @@ export class BackendConfig extends Context.Service<
       const bootstrapIngestKeyValue = yield* Config.redacted(
         "GROUNDTRUTH_BOOTSTRAP_INGEST_KEY",
       ).pipe(Config.withDefault(Redacted.make("")));
+      const publicStatusEnabled = yield* Config.boolean("GROUNDTRUTH_PUBLIC_STATUS_ENABLED").pipe(
+        Config.withDefault(false),
+      );
       const sandboxSessionLimit = yield* Config.int("GROUNDTRUTH_SANDBOX_SESSION_LIMIT").pipe(
         Config.withDefault(25),
       );
@@ -142,6 +146,7 @@ export class BackendConfig extends Context.Service<
         bootstrapProjectName,
         bootstrapIngestKey:
           Redacted.value(bootstrapIngestKeyValue).length > 0 ? bootstrapIngestKeyValue : undefined,
+        publicStatusEnabled,
         sandboxSessionLimit,
         sandboxCreationsPerMinute,
         authenticatedRequestsPerMinute,

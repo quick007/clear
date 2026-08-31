@@ -21,6 +21,18 @@ The console, Effect API, and OTLP/HTTP receiver use active sibling domains under
 
 The runtime exposes an interactive API reference at `https://api.clear.seufert.sh/docs` and its OpenAPI document at `https://api.clear.seufert.sh/openapi.json`.
 
+The Render application processes export their own OpenTelemetry through the
+co-located Collector. This covers application telemetry produced by Clear's
+services, including backend metrics and traces. It does not ingest or expose
+Render-managed infrastructure metrics, deploy logs, billing data, or account
+metadata.
+
+The hosted Blueprint explicitly enables `GET /v1/public/status` with
+`GROUNDTRUTH_PUBLIC_STATUS_ENABLED=true`. Local and unconfigured deployments
+default to disabled. The public endpoint is read-only and returns only bounded,
+allowlisted aggregates from the bootstrap telemetry project. See
+[`docs/self-observability.md`](../docs/self-observability.md).
+
 The stateful Render service uses the `1c-2g` plan and one 10 GB disk. Nginx receives Render's public port and routes requests to the API or Collector. PostgreSQL, ClickHouse, the payments stub, and the scenario controller are not exposed as standalone public services.
 
 The checkout API uses the smallest paid Render web-service plan. It remains separate so a commit limited to `apps/checkout-api` deploys only that service and produces the real deploy shown in the recorded scenario. Both services communicate over Render's private network on non-reserved ports.

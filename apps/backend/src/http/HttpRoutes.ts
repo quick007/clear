@@ -11,6 +11,7 @@ import { IncidentHandlers } from "./IncidentHandlers.js";
 import { IngestKeyHandlers } from "./IngestKeyHandlers.js";
 import { LiveHandlers } from "./LiveHandlers.js";
 import { OverviewHandlers } from "./OverviewHandlers.js";
+import { PublicStatusHandlers } from "./PublicStatusHandlers.js";
 import { SandboxHandlers } from "./SandboxHandlers.js";
 import { SecurityRoutes } from "./SecurityRoutes.js";
 import { TelemetryHandlers } from "./TelemetryHandlers.js";
@@ -20,6 +21,7 @@ const ApiRoutes = HttpApiBuilder.layer(GroundtruthApi, {
 }).pipe(
   Layer.provide([
     HealthHandlers,
+    PublicStatusHandlers,
     AuthHandlers,
     AlertHandlers,
     OverviewHandlers,
