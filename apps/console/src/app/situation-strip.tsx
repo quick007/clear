@@ -23,7 +23,11 @@ export function SituationStrip({
     <section aria-label="Current incident" {...stylex.props(styles.strip)}>
       <div {...stylex.props(styles.alertBlock)}>
         {isClosed ? (
-          <StatusPill tone="healthy">Resolved</StatusPill>
+          firingCount > 0 ? (
+            <StatusPill tone="critical">Closed with alert firing</StatusPill>
+          ) : (
+            <StatusPill tone="healthy">Closed</StatusPill>
+          )
         ) : firingCount === 0 ? (
           <StatusPill>Investigation open</StatusPill>
         ) : (

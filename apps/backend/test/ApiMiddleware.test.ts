@@ -39,7 +39,9 @@ const sandboxes = SandboxService.of({
         ),
   resumeOrOpen: notUsed,
   trigger: notUsed,
+  recover: notUsed,
   reset: notUsed,
+  advanceActive: notUsed,
   pruneExpired: notUsed,
 });
 
@@ -56,7 +58,9 @@ const unavailableSandboxes = SandboxService.of({
     ),
   resumeOrOpen: (session, seed) => sandboxes.resumeOrOpen(session, seed),
   trigger: (sessionId) => sandboxes.trigger(sessionId),
+  recover: (sessionId) => sandboxes.recover(sessionId),
   reset: (sessionId) => sandboxes.reset(sessionId),
+  advanceActive: () => sandboxes.advanceActive(),
   pruneExpired: () => sandboxes.pruneExpired(),
 });
 

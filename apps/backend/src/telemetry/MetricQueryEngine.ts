@@ -23,6 +23,7 @@ import {
 } from "./QuerySupport.js";
 
 const stepMillis = {
+  "5s": 5 * 1_000,
   "10s": 10 * 1_000,
   "30s": 30 * 1_000,
   "1m": 60 * 1_000,

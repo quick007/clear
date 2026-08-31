@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { AppErrorBoundary } from "./app-error-boundary";
 import { colors } from "../theme/tokens.stylex";
 import { useLiveProjectUpdates } from "../data/live";
+import { useTelemetryRefresh } from "../data/telemetry-refresh";
 import {
   useIncidentQuery,
   useOverviewQuery,
@@ -17,6 +18,11 @@ import { MobileWorkspaceHeader, WorkspaceSidebar } from "./sidebar";
 import { SituationStrip } from "./situation-strip";
 import { TimelineBar } from "./timeline-bar";
 import { startGroundtruthTools, stopGroundtruthTools } from "../webmcp/bootstrap";
+import { signInHref } from "../auth-route";
+import {
+  useWorkspaceAuthenticationRequired,
+  WorkspaceFailureProvider,
+} from "./workspace-failure-context";
 
 export function AppShell() {
   const location = useLocation();
@@ -28,6 +34,14 @@ export function AppShell() {
 }
 
 function WorkspaceShell() {
+  return (
+    <WorkspaceFailureProvider>
+      <WorkspaceShellContent />
+    </WorkspaceFailureProvider>
+  );
+}
+
+function WorkspaceShellContent() {
   const location = useLocation();
   const isIncidentDetail = /^\/incidents\/[^/]+$/.test(location.pathname);
   const runtime = useRuntimeQuery();
@@ -45,6 +59,8 @@ function WorkspaceShell() {
   const incidentContextError = visibleIncidentId === null ? null : incident.error;
   const session = useSessionQuery();
   const liveUpdateStatus = useLiveProjectUpdates(projectId);
+  const authenticationRequired = useWorkspaceAuthenticationRequired();
+  useTelemetryRefresh(projectId, runtime.data?.mode ?? null, liveUpdateStatus);
   useEffect(() => {
     void startGroundtruthTools().catch((error: unknown) => {
       console.warn("Clear site tools could not start", error);
@@ -60,7 +76,14 @@ function WorkspaceShell() {
         session={session.data}
       />
       <div {...stylex.props(styles.workspace)}>
-        {liveUpdateStatus === "healthy" ? null : (
+        {authenticationRequired ? (
+          <div aria-live="polite" role="status" {...stylex.props(styles.authenticationNotice)}>
+            <span>Your session ended. Showing the last loaded data.</span>
+            <a href={signInHref(location.pathname)} {...stylex.props(styles.authenticationAction)}>
+              Log in again
+            </a>
+          </div>
+        ) : liveUpdateStatus === "healthy" ? null : (
           <p aria-live="polite" role="status" {...stylex.props(styles.liveUpdateNotice)}>
             {liveUpdateStatus === "retrying"
               ? "Live updates paused. Retrying..."
@@ -76,7 +99,7 @@ function WorkspaceShell() {
           <>
             <SituationStrip incidentDetail={incident.data} overview={overview.data} />
             <IncidentContextNotice
-              error={incidentContextError}
+              error={authenticationRequired ? null : incidentContextError}
               hasDetail={incident.data !== undefined}
               onRetry={() => void incident.refetch()}
               retrying={incident.isFetching}
@@ -128,5 +151,28 @@ const styles = stylex.create({
     top: 14,
     zIndex: 20,
     "@media (max-width: 840px)": { top: 58 },
+  },
+  authenticationNotice: {
+    alignItems: "center",
+    backgroundColor: colors.surfaceRaised,
+    borderBottomColor: colors.line,
+    borderBottomStyle: "solid",
+    borderBottomWidth: 1,
+    color: colors.textMuted,
+    display: "flex",
+    fontSize: 12,
+    gap: 16,
+    justifyContent: "space-between",
+    lineHeight: 1.45,
+    minHeight: 42,
+    paddingBlock: 8,
+    paddingInline: { default: 24, "@media (max-width: 620px)": 20 },
+  },
+  authenticationAction: {
+    color: colors.text,
+    flexShrink: 0,
+    fontWeight: 500,
+    textDecoration: "none",
+    ":hover": { textDecoration: "underline" },
   },
 });

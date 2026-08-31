@@ -36,6 +36,7 @@ export const panelPalette = {
 const seriesTones = ["orange", "blue", "red", "violet", "amber", "green", "cyan", "gray"] as const;
 
 const queryStepMilliseconds = {
+  "5s": 5 * 1_000, // 5 seconds
   "10s": 10 * 1_000, // 10 seconds
   "30s": 30 * 1_000, // 30 seconds
   "1m": 60 * 1_000, // 1 minute
@@ -217,10 +218,19 @@ const convertFilters = (filters: ReadonlyArray<MetricFilter>) =>
     return [];
   });
 
+const readableSeriesLabel = (attributes: Readonly<Record<string, unknown>>, fallback: string) => {
+  const attempt = attributes.attempt;
+  if (typeof attempt !== "string") return fallback;
+  const number = Number.parseInt(attempt, 10);
+  if (!Number.isFinite(number) || number < 1) return fallback;
+  return number === 1 ? "Original attempt" : `Retry ${number - 1}`;
+};
+
 export const materializePanelSeries = (result: MetricQueryResult, plan: PanelQueryPlan) =>
   result.series.map((series, index): PanelSeries => {
     const grouped = result.series.length > 1;
     const tone = grouped ? seriesTones[index % seriesTones.length]! : plan.tone;
+    const groupedLabel = readableSeriesLabel(series.attributes, series.label);
     return {
       attributes: series.attributes,
       axis: plan.axis,
@@ -229,8 +239,8 @@ export const materializePanelSeries = (result: MetricQueryResult, plan: PanelQue
       fillOpacity: plan.fillOpacity,
       label: grouped
         ? plan.label === `${result.query.aggregation} ${result.query.metric}`
-          ? series.label
-          : `${plan.label} · ${series.label}`
+          ? groupedLabel
+          : `${plan.label} · ${groupedLabel}`
         : plan.label,
       lineStyle: plan.lineStyle,
       points: series.points,

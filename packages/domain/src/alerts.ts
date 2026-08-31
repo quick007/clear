@@ -28,7 +28,7 @@ export class AlertRuleDefinition extends Schema.Class<AlertRuleDefinition>(
   aggregation: AlertAggregation,
   comparison: AlertComparison,
   threshold: Schema.Finite,
-  windowSeconds: Schema.Int.check(Schema.isBetween({ minimum: 10, maximum: 86_400 })),
+  windowSeconds: Schema.Int.check(Schema.isBetween({ minimum: 5, maximum: 86_400 })),
   severity: AlertSeverity,
   enabled: Schema.Boolean,
 }) {}
@@ -42,7 +42,7 @@ export class Alert extends Schema.Class<Alert>("Groundtruth/Alert")({
   aggregation: AlertAggregation,
   comparison: AlertComparison,
   threshold: Schema.Finite,
-  windowSeconds: Schema.Int.check(Schema.isBetween({ minimum: 10, maximum: 86_400 })),
+  windowSeconds: Schema.Int.check(Schema.isBetween({ minimum: 5, maximum: 86_400 })),
   severity: AlertSeverity,
   status: AlertStatus,
   summary: Schema.NullOr(NonEmptyText),

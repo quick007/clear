@@ -13,6 +13,11 @@ export class ScenarioConfig extends Schema.Class<ScenarioConfig>("ScenarioConfig
   tracesPerBucket: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }) {}
 
+export class RecoveryOrigin extends Schema.Class<RecoveryOrigin>("RecoveryOrigin")({
+  phase: Schema.Literals(["P1", "P2"]),
+  phaseBucket: Schema.Natural,
+}) {}
+
 export class ScenarioState extends Schema.Class<ScenarioState>("ScenarioState")({
   config: ScenarioConfig,
   phase: ScenarioPhase,
@@ -20,6 +25,7 @@ export class ScenarioState extends Schema.Class<ScenarioState>("ScenarioState")(
   phaseBucket: Schema.Natural,
   incidentId: Schema.NullOr(IncidentId),
   pendingAnnotations: Schema.Array(DeployAnnotation),
+  recoveryOrigin: Schema.NullOr(RecoveryOrigin),
 }) {}
 
 export class ScenarioAdvance extends Schema.Class<ScenarioAdvance>("ScenarioAdvance")({

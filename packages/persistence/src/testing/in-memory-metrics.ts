@@ -61,7 +61,9 @@ export const listMetrics = (metrics: ReadonlyArray<MetricPoint>) => {
 };
 
 const stepSeconds = (query: MetricQuery) => {
-  if (query.step !== undefined) return { "10s": 10, "30s": 30, "1m": 60, "5m": 300 }[query.step];
+  if (query.step !== undefined) {
+    return { "5s": 5, "10s": 10, "30s": 30, "1m": 60, "5m": 300 }[query.step];
+  }
   const seconds =
     query.range._tag === "absolute"
       ? (DateTime.toEpochMillis(query.range.end) - DateTime.toEpochMillis(query.range.start)) /

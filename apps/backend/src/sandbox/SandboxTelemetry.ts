@@ -105,14 +105,13 @@ const pointBase = (
   };
 };
 
-const histogramBuckets = (
-  point: Extract<GeneratedTelemetryBatch["metrics"][number], { readonly _tag: "Histogram" }>,
-) => {
-  const belowP50 = Math.round(point.count * 0.5);
-  const p50ToP95 = Math.round(point.count * 0.45);
-  const p95ToP99 = Math.round(point.count * 0.04);
-  const remainder = Math.max(0, point.count - belowP50 - p50ToP95 - p95ToP99);
-  return [belowP50, p50ToP95, p95ToP99, remainder, 0].map(BigInt);
+export const histogramBucketCounts = (count: number) => {
+  const throughP50 = Math.ceil(count * 0.5);
+  const throughP95 = Math.ceil(count * 0.95);
+  const throughP99 = Math.ceil(count * 0.99);
+  return [throughP50, throughP95 - throughP50, throughP99 - throughP95, count - throughP99, 0].map(
+    BigInt,
+  );
 };
 
 const metricPoint = (
@@ -141,7 +140,7 @@ const metricPoint = (
         minimum: point.min,
         maximum: point.max,
         explicitBounds: [point.p50, point.p95, point.p99, point.max],
-        bucketCounts: histogramBuckets(point),
+        bucketCounts: histogramBucketCounts(point.count),
       });
   }
 };

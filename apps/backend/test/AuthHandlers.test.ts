@@ -2,13 +2,15 @@ import { NodeCrypto, NodeHttpServer } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
 import {
   AuthApi,
+  CurrentSession,
   GroundtruthAccess,
   HandoffCreated,
   SessionView,
   SitesServiceAccess,
 } from "@groundtruth/api-contract";
 import { PersistenceMemory } from "@groundtruth/persistence/testing";
-import { Effect, Layer, Redacted, Schema } from "effect";
+import { SandboxSession, SessionId } from "@groundtruth/domain";
+import { DateTime, Effect, Layer, Redacted, Schema } from "effect";
 import { HttpRouter } from "effect/unstable/http";
 import { HttpApi, HttpApiBuilder } from "effect/unstable/httpapi";
 import { AuthService } from "../src/auth/AuthService.js";
@@ -47,7 +49,9 @@ const SandboxTest = Layer.succeed(
     resume: notUsed,
     resumeOrOpen: notUsed,
     trigger: notUsed,
+    recover: notUsed,
     reset: notUsed,
+    advanceActive: notUsed,
     pruneExpired: notUsed,
   }),
 );
@@ -56,6 +60,7 @@ const authRoutes = (
   cookieSecure = false,
   authenticatedRequestsPerMinute = 300,
   realAccess = false,
+  selectedSandbox?: SandboxSession,
 ) => {
   const config = Layer.succeed(
     BackendConfig,
@@ -87,9 +92,24 @@ const authRoutes = (
     Layer.provideMerge(Layer.mergeAll(services, SandboxTest)),
   );
   const sitesAccess = SitesServiceAccessLayer.pipe(Layer.provide(services));
+  const selectedAccess =
+    selectedSandbox === undefined
+      ? accessTest
+      : Layer.mergeAll(
+          SitesAccessTest,
+          Layer.succeed(
+            GroundtruthAccess,
+            GroundtruthAccess.of({
+              groundtruthSession: (httpEffect) =>
+                httpEffect.pipe(Effect.provideService(CurrentSession, selectedSandbox)),
+              groundtruthSandbox: (httpEffect) =>
+                httpEffect.pipe(Effect.provideService(CurrentSession, selectedSandbox)),
+            }),
+          ),
+        );
   const dependencies = Layer.mergeAll(
     services,
-    realAccess ? Layer.mergeAll(sitesAccess, groundtruthAccess) : accessTest,
+    realAccess ? Layer.mergeAll(sitesAccess, groundtruthAccess) : selectedAccess,
   );
   const handlers = AuthHandlers.pipe(Layer.provide(dependencies));
 
@@ -272,6 +292,56 @@ describe("hosted authentication handoff", () => {
             message: "Authenticated request rate limit exceeded. Try again in one minute.",
           });
           assert.strictEqual((yield* getSession(cookieB)).status, 200);
+        }),
+      ({ dispose }) => Effect.promise(dispose),
+    ),
+  );
+
+  it.effect("keeps hosted identity visible inside an isolated demo workspace", () =>
+    Effect.acquireUseRelease(
+      Effect.gen(function* () {
+        const now = yield* DateTime.now;
+        const sandbox = new SandboxSession({
+          id: SessionId.make("01993f71-0001-7000-8000-000000000077"),
+          seed: 77,
+          createdAt: now,
+          expiresAt: DateTime.addDuration(now, "1 hour"),
+        });
+        return HttpRouter.toWebHandler(authRoutes(false, 300, false, sandbox), {
+          disableLogger: true,
+        });
+      }),
+      ({ handler }) =>
+        Effect.gen(function* () {
+          const nonce = "d".repeat(43);
+          const handoffResponse = yield* Effect.promise(() => handler(handoffRequest(nonce)));
+          const handoff = yield* Schema.decodeUnknownEffect(HandoffCreated)(
+            yield* Effect.promise(() => handoffResponse.json()),
+          ).pipe(Effect.orDie);
+          const callback = yield* Effect.promise(() =>
+            handler(callbackRequest(handoff.code, nonce)),
+          );
+          const cookie = cookiePair(callback.headers, "groundtruth_session");
+          assert(cookie !== undefined);
+
+          const response = yield* Effect.promise(() =>
+            handler(
+              new Request("http://localhost:3000/v1/auth/session", {
+                headers: {
+                  cookie,
+                  "x-groundtruth-sandbox-session": "01993f71-0001-7000-8000-000000000077",
+                },
+              }),
+            ),
+          );
+          assert.strictEqual(response.status, 200);
+          const session = yield* Schema.decodeUnknownEffect(SessionView)(
+            yield* Effect.promise(() => response.json()),
+          ).pipe(Effect.orDie);
+          assert.strictEqual(session.session._tag, "sandbox");
+          assert.strictEqual(session.account?.hostedSubject, "chatgpt-user-1");
+          assert.strictEqual(session.projects.length, 2);
+          assert.strictEqual(session.activeProjectId, session.projects[0]?.id);
         }),
       ({ dispose }) => Effect.promise(dispose),
     ),

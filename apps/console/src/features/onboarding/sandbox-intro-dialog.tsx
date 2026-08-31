@@ -12,13 +12,13 @@ export type SandboxAgentAccess = "checking" | "failed" | "ready" | "unsupported"
 
 const steps = [
   {
-    title: "Establish the baseline",
-    detail: "See normal request volume, users, latency, and errors before anything changes.",
+    title: "Watch healthy traffic",
+    detail: "The board is already receiving fresh checkout telemetry every few seconds.",
   },
   {
-    title: "Introduce the failure",
+    title: "Start the incident",
     detail:
-      "Trigger an isolated checkout degradation. Alerts and live signals respond immediately.",
+      "Inject payment failures and watch retries, latency, and the alert threshold react over time.",
   },
   {
     title: "Investigate together",
@@ -74,14 +74,14 @@ export function SandboxIntroDialog({
                   ? "Reset the checkout investigation"
                   : state === "active"
                     ? "How this investigation works"
-                    : "Investigate a checkout failure"}
+                    : "Watch a checkout incident unfold"}
               </Dialog.Title>
               <Dialog.Description {...stylex.props(styles.description)}>
                 {state === "complete"
                   ? "Resetting clears this sandbox's panels and incident record, then returns checkout telemetry to a healthy baseline."
                   : state === "active"
                     ? "The incident is live. Follow the guide on the board to move from symptoms to an evidence-backed cause."
-                    : "An isolated checkout system is healthy now. Trigger a controlled incident, then use live OpenTelemetry evidence to explain what changed."}
+                    : "Clear will stream an isolated checkout workload into this workspace. Your project and telemetry stay untouched."}
               </Dialog.Description>
             </div>
             <Dialog.Close
@@ -146,7 +146,7 @@ function AgentAccessNotice({ access }: { access: SandboxAgentAccess }) {
     failed: {
       title: "Agent access could not start",
       detail:
-        "Try again before starting, or continue here without agent collaboration. This sandbox stays in this browser tab.",
+        "Try again before starting. You can still inspect the healthy telemetry in this browser tab.",
     },
     ready: {
       title: "Ready to investigate with your agent",
@@ -156,7 +156,7 @@ function AgentAccessNotice({ access }: { access: SandboxAgentAccess }) {
     unsupported: {
       title: "Open this page inside ChatGPT before starting",
       detail:
-        "Agent collaboration is not available in this browser. Copy the live URL and open it inside ChatGPT. A sandbox started here stays in this tab and will not carry over.",
+        "Agent collaboration is not available in this browser. Copy the live URL and open it inside ChatGPT to run the investigation.",
     },
   }[access];
 
@@ -194,9 +194,7 @@ function BaselineActions({
   if (access === "unsupported") {
     return (
       <>
-        <Button disabled={pending || blocked} onClick={onStart} tone="ghost">
-          {pending ? "Starting incident" : "Continue here without an agent"}
-        </Button>
+        <Dialog.Close render={<Button tone="ghost">Inspect healthy telemetry</Button>} />
         <CopyButton
           compact={false}
           label="Copy live URL for ChatGPT"
@@ -209,9 +207,7 @@ function BaselineActions({
   if (access === "failed") {
     return (
       <>
-        <Button disabled={pending || blocked} onClick={onStart} tone="ghost">
-          {pending ? "Starting incident" : "Continue here without an agent"}
-        </Button>
+        <Dialog.Close render={<Button tone="ghost">Inspect healthy telemetry</Button>} />
         <Button disabled={pending || blocked} onClick={onRetryAgentAccess} tone="primary">
           Try agent access again
         </Button>
@@ -233,7 +229,7 @@ function BaselineActions({
           ? "Checking agent access"
           : pending
             ? "Starting incident"
-            : "Trigger checkout incident"}
+            : "Start live incident"}
       </Button>
     </>
   );

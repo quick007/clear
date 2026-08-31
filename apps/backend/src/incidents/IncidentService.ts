@@ -25,11 +25,10 @@ import {
 } from "@groundtruth/domain";
 import { Context, Crypto, DateTime, Effect, Layer, Ref } from "effect";
 import { LiveEventBus } from "../live/LiveEventBus.js";
+import { isSandboxProjectId } from "../memory/SeedIds.js";
 import {
   appendTimeline,
   closeIncident as closeIncidentCopy,
-  markAlertFiring,
-  markAlertResolved,
   touchIncident,
 } from "./IncidentCopies.js";
 import {
@@ -186,12 +185,11 @@ export class IncidentService extends Context.Service<
             hypotheses: [],
             timeline: [],
           });
-          const alerts = project.alerts.map((alert) => markAlertFiring(alert, now));
           return [
             { detail, changed: true },
             withProjectIncidentState(all, projectId, {
               detail,
-              alerts,
+              alerts: project.alerts,
               manualAlerts: project.manualAlerts,
             }),
           ];
@@ -436,16 +434,21 @@ export class IncidentService extends Context.Service<
           if (detail.incident.status === "closed") {
             return ["closed", all];
           }
+          if (
+            isSandboxProjectId(projectId) &&
+            project.alerts.some((alert) => alert.status === "firing")
+          ) {
+            return ["firing-alert", all];
+          }
           const timelineQuota = incidentTimelineQuotaForClose(detail);
           if (timelineQuota !== null) return [timelineQuota, all];
           const incident = closeIncidentCopy(detail.incident, summary, now);
           const nextDetail = appendTimeline(detail, entry, incident);
-          const alerts = project.alerts.map((alert) => markAlertResolved(alert, now));
           return [
             nextDetail,
             withProjectIncidentState(all, projectId, {
               detail: nextDetail,
-              alerts,
+              alerts: project.alerts,
               manualAlerts: project.manualAlerts,
             }),
           ];
@@ -463,6 +466,14 @@ export class IncidentService extends Context.Service<
             from: "closed",
             to: "closed",
             message: "Incident is already closed",
+          });
+        }
+        if (outcome === "firing-alert") {
+          return yield* new InvalidStateTransition({
+            resource: "incident",
+            from: "alert firing",
+            to: "closed",
+            message: "Wait for the sandbox alert to clear before closing the incident",
           });
         }
         if (outcome instanceof QuotaExceeded) return yield* Effect.fail(outcome);

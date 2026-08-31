@@ -82,7 +82,7 @@ export function IncidentsPage() {
                 </span>
               </div>
               <span {...stylex.props(styles.time)}>
-                {incident.status === "open" ? "Opened" : "Resolved"}{" "}
+                {incident.status === "open" ? "Opened" : "Closed"}{" "}
                 {formatRelativeTime(incident.closedAt ?? incident.openedAt)}
               </span>
             </Link>

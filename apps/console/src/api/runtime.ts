@@ -49,8 +49,10 @@ const browserExplicitlyRequestedDemo = () => {
 export const getConsoleRuntime = () => {
   runtime ??= (async () => {
     try {
-      const api = await makeBrowserApiClient({ forceSandbox: browserExplicitlyRequestedDemo() });
-      const sessions = await makeToolSessionSource(api);
+      const demoRequested = browserExplicitlyRequestedDemo();
+      const api = await makeBrowserApiClient();
+      if (!demoRequested) api.access.setSandboxSessionId(null);
+      const sessions = await makeToolSessionSource(api, { demoRequested });
       return { api, sessions };
     } catch (error) {
       runtime = null;

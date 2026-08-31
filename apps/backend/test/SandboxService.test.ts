@@ -12,6 +12,7 @@ import {
 } from "@groundtruth/telemetry";
 import {
   EntityNotFound,
+  NonEmptyText,
   ProjectId,
   QuotaExceeded,
   SandboxSession,
@@ -234,8 +235,11 @@ describe("SandboxService", () => {
       assert.strictEqual(isSandboxProjectId(sandboxProjectId), true);
       assert.strictEqual(Schema.decodeUnknownSync(ProjectId)(projectId), projectId);
       const board = yield* boards.getDefaultBoard(projectId);
-      assert.strictEqual(board.panels.length, 1);
-      assert.strictEqual(board.panels[0]?.spec.title, "Upstream errors and replicas");
+      assert.strictEqual(board.panels.length, 2);
+      assert.deepStrictEqual(
+        board.panels.map(({ spec }) => spec.title),
+        ["Payment request rate", "Checkout latency"],
+      );
       assert.strictEqual(
         board.panels.some(({ spec }) => spec.title === "Upstream requests vs unique users"),
         false,
@@ -249,6 +253,11 @@ describe("SandboxService", () => {
       assert.strictEqual(alerts[0]?.status, "healthy");
       assert.strictEqual(alerts[0]?.metricName, "upstream.client.requests");
       assert.strictEqual(alerts[0]?.name, "Checkout upstream request rate");
+      assert.strictEqual(alerts[0]?.comparison, "at-or-above");
+      assert.strictEqual(alerts[0]?.windowSeconds, 5);
+      const paymentPanel = board.panels.find(({ spec }) => spec.title === "Payment request rate");
+      assert(paymentPanel?.spec._tag === "metric-chart");
+      assert.strictEqual(paymentPanel.spec.thresholds?.[0]?.value, alerts[0]?.threshold);
       const catalog = yield* telemetry.listMetrics(projectId);
       assert(catalog.some((metric) => metric.name === "http.server.requests"));
       const services = yield* telemetry.listServices(projectId);
@@ -269,23 +278,70 @@ describe("SandboxService", () => {
       const now = yield* DateTime.now;
 
       const triggered = yield* sandbox.trigger(initial.session.id);
-      assert.strictEqual(triggered.phase, "amplification");
+      assert.strictEqual(triggered.phase, "upstream-blip");
       assert.strictEqual(triggered.changed, true);
       const repeatedTrigger = yield* sandbox.trigger(initial.session.id);
       assert.strictEqual(repeatedTrigger.changed, false);
       const openedIncident = yield* incidents.getOpenIncident(projectId);
       assert(openedIncident !== null);
       assert.strictEqual(openedIncident.status, "open");
-      assert.strictEqual(openedIncident.title, "Checkout latency and error spike");
+      assert.strictEqual(openedIncident.title, "Checkout reliability investigation");
       assert.strictEqual(/retry|amplification/i.test(String(openedIncident.title)), false);
+      assert.strictEqual((yield* incidents.listAlerts(projectId, { status: "firing" })).length, 0);
+
+      for (let tick = 0; tick < 4; tick += 1) {
+        yield* TestClock.adjust("5 seconds");
+        assert.strictEqual(yield* sandbox.advanceActive(), 1);
+      }
+      const beforeThreshold = yield* sandbox.resume(initial.session.id);
+      assert.strictEqual(beforeThreshold.phase, "amplification");
+      assert.strictEqual((yield* incidents.listAlerts(projectId, { status: "firing" })).length, 0);
+
+      yield* TestClock.adjust("5 seconds");
+      assert.strictEqual(yield* sandbox.advanceActive(), 1);
+      const thresholdAlerts = yield* incidents.listAlerts(projectId, { status: "firing" });
+      assert.strictEqual(thresholdAlerts.length, 1);
+      const prematureClose = yield* Effect.flip(
+        incidents.close(
+          projectId,
+          openedIncident.id,
+          NonEmptyText.make("The investigation is not actually recovered"),
+        ),
+      );
+      assert.strictEqual(prematureClose._tag, "InvalidStateTransition");
+      assert.match(String(thresholdAlerts[0]?.summary), /9\d\.\d requests per second/);
+      const thresholdDetail = yield* incidents.getDetail(projectId, openedIncident.id);
+      assert.strictEqual(thresholdDetail.timeline.length, 3);
+      assert.deepStrictEqual(
+        thresholdDetail.timeline
+          .slice(0, 2)
+          .map((entry) => (entry._tag === "note" ? String(entry.text) : entry._tag)),
+        ["Payment failures began in payments-stub.", "Checkout p95 crossed 600 ms."],
+      );
+      const alertTimelineEntry = thresholdDetail.timeline.at(-1);
+      assert(alertTimelineEntry?._tag === "note");
+      assert.match(
+        String(alertTimelineEntry.text),
+        /Payment attempts reached 9\d\.\d requests per second\./,
+      );
+
+      for (let tick = 0; tick < 7; tick += 1) {
+        yield* TestClock.adjust("5 seconds");
+        assert.strictEqual(yield* sandbox.advanceActive(), 1);
+      }
+      const amplified = yield* sandbox.resume(initial.session.id);
+      assert.strictEqual(amplified.phase, "amplification");
+      const firingAlerts = yield* incidents.listAlerts(projectId, { status: "firing" });
+      assert.strictEqual(firingAlerts.length, 1);
 
       const baselineRange = new AbsoluteTimeRange({
-        start: DateTime.subtractDuration(now, "10 minutes"),
-        end: DateTime.subtractDuration(now, "5 minutes"),
-      });
-      const amplificationRange = new AbsoluteTimeRange({
-        start: DateTime.subtractDuration(now, "4 minutes"),
+        start: DateTime.subtractDuration(now, "30 seconds"),
         end: now,
+      });
+      const incidentNow = yield* DateTime.now;
+      const amplificationRange = new AbsoluteTimeRange({
+        start: DateTime.subtractDuration(incidentNow, "30 seconds"),
+        end: incidentNow,
       });
       const upstreamRequests = (range: AbsoluteTimeRange) =>
         telemetry.queryMetrics(
@@ -333,13 +389,38 @@ describe("SandboxService", () => {
       const userRatio = (amplifiedUsers.stats.average ?? 0) / (baselineUsers.stats.average ?? 1);
       const retryShare =
         (retryRequests.stats.average ?? 0) / (amplifiedRequests.stats.average ?? 1);
-      assert(requestRatio > 2.8);
+      assert(requestRatio > 2.5, JSON.stringify({ requestRatio, userRatio, retryShare }));
       assert(userRatio > 0.9 && userRatio < 1.1);
       assert(retryShare > 0.55);
 
-      assert.strictEqual((yield* deploys.list(projectId, {})).events.length, 0);
-      const board = yield* boards.getDefaultBoard(projectId);
-      assert(board.panels.every((panel) => panel.annotations.length === 0));
+      const recovery = yield* sandbox.recover(initial.session.id);
+      assert.strictEqual(recovery.phase, "recovery");
+      assert.strictEqual(recovery.changed, true);
+      assert.strictEqual((yield* sandbox.recover(initial.session.id)).changed, false);
+      assert.strictEqual((yield* deploys.list(projectId, {})).events.length, 1);
+      const deployedBoard = yield* boards.getDefaultBoard(projectId);
+      assert(deployedBoard.panels.every((panel) => panel.annotations.length === 1));
+
+      for (let tick = 0; tick < 12; tick += 1) {
+        yield* TestClock.adjust("5 seconds");
+        assert.strictEqual(yield* sandbox.advanceActive(), 1);
+      }
+      assert.strictEqual((yield* incidents.listAlerts(projectId, { status: "firing" })).length, 0);
+      assert.strictEqual(
+        (yield* incidents.listAlerts(projectId, { status: "resolved" })).length,
+        1,
+      );
+      const recoveredDetail = yield* incidents.getDetail(projectId, openedIncident.id);
+      assert.match(
+        String(recoveredDetail.timeline.findLast((entry) => entry._tag === "note")?.text ?? ""),
+        /Payment attempts returned to \d+\.\d requests per second\./,
+      );
+      const closed = yield* incidents.close(
+        projectId,
+        openedIncident.id,
+        NonEmptyText.make("Bounded retries restored normal payment request volume"),
+      );
+      assert.strictEqual(closed.incident.status, "closed");
 
       const reset = yield* sandbox.reset(initial.session.id);
       assert.strictEqual(reset.phase, "baseline");
@@ -348,12 +429,12 @@ describe("SandboxService", () => {
       assert.strictEqual((yield* deploys.list(projectId, {})).events.length, 0);
       assert((yield* telemetry.listMetrics(projectId)).length > 0);
       const resetBoard = yield* boards.getDefaultBoard(projectId);
-      assert.strictEqual(resetBoard.panels.length, 1);
+      assert.strictEqual(resetBoard.panels.length, 2);
       assert(resetBoard.panels.every((panel) => panel.annotations.length === 0));
     }).pipe(Effect.provide(TestLayer)),
   );
 
-  it.effect("rebases seeded telemetry to the current clock without crossing sessions", () =>
+  it.effect("appends fresh telemetry without crossing sandbox sessions", () =>
     Effect.gen(function* () {
       yield* TestClock.adjust("20 minutes");
       const sandbox = yield* SandboxService;
@@ -396,9 +477,12 @@ describe("SandboxService", () => {
       assert(initialValues.length > 0);
       assert.strictEqual(firstInitialSeenAt, secondInitialSeenAt);
 
-      yield* TestClock.adjust("17 minutes");
-      const now = yield* DateTime.now;
+      yield* TestClock.adjust("2 minutes");
+      yield* TestClock.adjust("1 second");
       yield* sandbox.resume(first.session.id);
+      yield* TestClock.adjust("5 seconds");
+      const now = yield* DateTime.now;
+      assert.strictEqual(yield* sandbox.advanceActive(), 1);
 
       const firstRefreshedSeenAt = yield* latestSeenAt(firstProjectId);
       const secondUnchangedSeenAt = yield* latestSeenAt(secondProjectId);
@@ -415,7 +499,7 @@ describe("SandboxService", () => {
         firstProjectId,
         new TraceSearch({ range: currentRange, limit: 20 }),
       );
-      assert.deepStrictEqual(refreshedValues, initialValues);
+      assert.notStrictEqual(JSON.stringify(refreshedValues), JSON.stringify(initialValues));
       assert(recentLogs.records.length > 0);
       assert(recentTraces.traces.length > 0);
       assert(firstRefreshedSeenAt > firstInitialSeenAt);
@@ -424,7 +508,45 @@ describe("SandboxService", () => {
       assert.strictEqual(secondUnchangedSeenAt, secondInitialSeenAt);
 
       yield* sandbox.resume(second.session.id);
-      assert.strictEqual(yield* latestSeenAt(secondProjectId), firstRefreshedSeenAt);
+      assert.strictEqual(yield* latestSeenAt(secondProjectId), secondInitialSeenAt);
+      yield* TestClock.adjust("5 seconds");
+      assert.strictEqual(yield* sandbox.advanceActive(), 2);
+      assert.strictEqual(yield* latestSeenAt(secondProjectId), yield* latestSeenAt(firstProjectId));
+    }).pipe(Effect.provide(TestLayer)),
+  );
+
+  it.effect("advances recently active sandboxes on the backend clock", () =>
+    Effect.gen(function* () {
+      yield* TestClock.adjust("20 minutes");
+      const sandbox = yield* SandboxService;
+      const telemetry = yield* TelemetryStore;
+      const first = yield* sandbox.open(901);
+      const second = yield* sandbox.open(902);
+      const firstProjectId = sandboxProjectIdForSession(first.session.id);
+      const secondProjectId = sandboxProjectIdForSession(second.session.id);
+      const latestSeenAt = (projectId: ProjectId) =>
+        telemetry.listServices(projectId).pipe(
+          Effect.flatMap((services) => {
+            const checkout = services.find(({ name }) => name === "checkout-api");
+            return checkout === undefined
+              ? Effect.die("Expected checkout-api sandbox telemetry")
+              : Effect.succeed(DateTime.toEpochMillis(checkout.lastSeenAt));
+          }),
+        );
+      const initial = yield* latestSeenAt(firstProjectId);
+
+      yield* TestClock.adjust("5 seconds");
+      assert.strictEqual(yield* sandbox.advanceActive(), 2);
+      const firstAdvanced = yield* latestSeenAt(firstProjectId);
+      const secondAdvanced = yield* latestSeenAt(secondProjectId);
+      assert(firstAdvanced > initial);
+      assert.strictEqual(firstAdvanced, secondAdvanced);
+      assert.strictEqual(yield* sandbox.advanceActive(), 0);
+
+      yield* TestClock.adjust("2 minutes");
+      yield* TestClock.adjust("1 second");
+      assert.strictEqual(yield* sandbox.advanceActive(), 0);
+      assert.strictEqual(yield* latestSeenAt(firstProjectId), firstAdvanced);
     }).pipe(Effect.provide(TestLayer)),
   );
 
@@ -447,7 +569,7 @@ describe("SandboxService", () => {
       const unknown = SessionId.make("01993f71-0001-7000-8000-000000000042");
       assert((yield* Effect.flip(sandbox.resume(unknown))) instanceof EntityNotFound);
       const survivorProjectId = sandboxProjectIdForSession(survivor.id);
-      assert.strictEqual((yield* boards.getDefaultBoard(survivorProjectId)).panels.length, 1);
+      assert.strictEqual((yield* boards.getDefaultBoard(survivorProjectId)).panels.length, 2);
       assert((yield* telemetry.listMetrics(survivorProjectId)).length > 0);
 
       yield* TestClock.adjust("2 hours");

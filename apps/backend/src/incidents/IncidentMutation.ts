@@ -35,4 +35,4 @@ export type HypothesisOutcome =
   | "closed";
 
 export type NoteOutcome = TimelineNote | QuotaExceeded | "missing" | "closed";
-export type CloseOutcome = IncidentDetail | QuotaExceeded | "missing" | "closed";
+export type CloseOutcome = IncidentDetail | QuotaExceeded | "missing" | "closed" | "firing-alert";

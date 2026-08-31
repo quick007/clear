@@ -31,6 +31,10 @@ export const generateAlerts = (
   bucketDurationMs: number,
 ) => {
   const upstreamRequestsPerSecond = profile.totalUpstreamRequests / (bucketDurationMs / 1_000);
+  const previousUpstreamRequestsPerSecond =
+    previousProfile === null
+      ? null
+      : previousProfile.totalUpstreamRequests / (bucketDurationMs / 1_000);
 
   switch (phase) {
     case "P0":
@@ -50,32 +54,41 @@ export const generateAlerts = (
         ),
       ];
     case "P2":
-      if (phaseBucket !== 0) return [];
       return [
-        makeAlert(
-          "AlertFired",
-          "checkout-upstream-request-rate",
-          "Payment request rate",
-          "warning",
-          "upstream.client.requests",
-          75,
-          upstreamRequestsPerSecond,
-          timestamp,
-        ),
-        makeAlert(
-          "AlertFired",
-          "checkout-latency-p95",
-          "Checkout latency p95",
-          "critical",
-          "http.server.duration",
-          500,
-          profile.latencyP95Ms,
-          timestamp,
-        ),
+        ...(upstreamRequestsPerSecond >= 90 &&
+        (previousUpstreamRequestsPerSecond === null || previousUpstreamRequestsPerSecond < 90)
+          ? [
+              makeAlert(
+                "AlertFired",
+                "checkout-upstream-request-rate",
+                "Payment request rate",
+                "critical",
+                "upstream.client.requests",
+                90,
+                upstreamRequestsPerSecond,
+                timestamp,
+              ),
+            ]
+          : []),
+        ...(profile.latencyP95Ms >= 600 &&
+        (previousProfile === null || previousProfile.latencyP95Ms < 600)
+          ? [
+              makeAlert(
+                "AlertFired",
+                "checkout-latency-p95",
+                "Checkout latency p95",
+                "warning",
+                "http.server.duration",
+                600,
+                profile.latencyP95Ms,
+                timestamp,
+              ),
+            ]
+          : []),
       ];
     case "P4":
       if (previousProfile === null) return [];
-      const previousUpstreamRequestRate =
+      const previousRecoveryRequestRate =
         previousProfile.totalUpstreamRequests / (bucketDurationMs / 1_000);
       return [
         ...(profile.upstreamErrorRate <= 0.01 && previousProfile.upstreamErrorRate > 0.01
@@ -92,7 +105,7 @@ export const generateAlerts = (
               ),
             ]
           : []),
-        ...(upstreamRequestsPerSecond <= 75 && previousUpstreamRequestRate > 75
+        ...(upstreamRequestsPerSecond < 90 && previousRecoveryRequestRate >= 90
           ? [
               makeAlert(
                 "AlertResolved",
@@ -100,13 +113,13 @@ export const generateAlerts = (
                 "Payment request rate",
                 "warning",
                 "upstream.client.requests",
-                75,
+                90,
                 upstreamRequestsPerSecond,
                 timestamp,
               ),
             ]
           : []),
-        ...(profile.latencyP95Ms <= 500 && previousProfile.latencyP95Ms > 500
+        ...(profile.latencyP95Ms <= 600 && previousProfile.latencyP95Ms > 600
           ? [
               makeAlert(
                 "AlertResolved",
@@ -114,7 +127,7 @@ export const generateAlerts = (
                 "Checkout latency p95",
                 "critical",
                 "http.server.duration",
-                500,
+                600,
                 profile.latencyP95Ms,
                 timestamp,
               ),

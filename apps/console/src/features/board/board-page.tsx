@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { useSyncExternalStore } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 
 import { errorMessage } from "../../data/format";
 import {
@@ -11,9 +11,11 @@ import {
   useOverviewQuery,
   useResetSandbox,
   useRuntimeQuery,
+  useSimulateSandboxRecovery,
   useTriggerSandboxIncident,
 } from "../../data/queries";
 import { mutationOutcomeIsUnknown } from "../../errors";
+import { useWorkspaceAuthenticationRequired } from "../../app/workspace-failure-context";
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
 import { ConsoleFailureActions } from "../../ui/console-failure-actions";
@@ -40,6 +42,8 @@ const investigationPrompts = {
   evidence:
     "The users are flat, so the extra requests have another source. Break checkout and payment calls down by attempt, add the comparison to the board, and update the hypothesis.",
   diagnosed: "",
+  recovering: "",
+  recovered: "",
   reviewed: "",
 } as const;
 
@@ -47,6 +51,7 @@ export function BoardPage() {
   const search = useSearch({ from: "/board" });
   const navigate = useNavigate({ from: "/board" });
   const runtime = useRuntimeQuery();
+  const authenticationRequired = useWorkspaceAuthenticationRequired();
   const projectId = runtime.data?.projectId ?? null;
   const board = useBoardQuery(projectId);
   const catalog = useMetricCatalogQuery(projectId);
@@ -54,7 +59,18 @@ export function BoardPage() {
   const incidents = useIncidentsQuery(projectId);
   const incident = useIncidentQuery(projectId, overview.data?.openIncident?.id ?? null);
   const triggerIncident = useTriggerSandboxIncident(projectId!);
+  const simulateRecovery = useSimulateSandboxRecovery(projectId!);
   const resetSandbox = useResetSandbox(projectId!);
+  const [evidencePanelIds, setEvidencePanelIds] = useState<ReadonlySet<string>>(() => new Set());
+  const observePanelEvidence = useCallback((panelId: string, hasEvidence: boolean) => {
+    setEvidencePanelIds((current) => {
+      if (current.has(panelId) === hasEvidence) return current;
+      const next = new Set(current);
+      if (hasEvidence) next.add(panelId);
+      else next.delete(panelId);
+      return next;
+    });
+  }, []);
   const toolStatus = useSyncExternalStore(
     subscribeGroundtruthToolStatus,
     getGroundtruthToolStatus,
@@ -84,6 +100,8 @@ export function BoardPage() {
   const triggerOutcomeUnknown =
     triggerIncident.isError && mutationOutcomeIsUnknown(triggerIncident.error);
   const resetOutcomeUnknown = resetSandbox.isError && mutationOutcomeIsUnknown(resetSandbox.error);
+  const recoveryOutcomeUnknown =
+    simulateRecovery.isError && mutationOutcomeIsUnknown(simulateRecovery.error);
   const closeGuide = () => void navigate({ replace: true, search: { guide: undefined } });
   const startIncident = () => {
     if (triggerOutcomeUnknown || triggerIncident.isPending) return;
@@ -92,6 +110,10 @@ export function BoardPage() {
   const restartWalkthrough = () => {
     if (resetOutcomeUnknown || resetSandbox.isPending) return;
     resetSandbox.mutate(undefined, { onSuccess: closeGuide });
+  };
+  const startRecovery = () => {
+    if (recoveryOutcomeUnknown || simulateRecovery.isPending) return;
+    simulateRecovery.mutate();
   };
   const triggerError = triggerIncident.isError ? (
     <MutationFailureNotice
@@ -122,7 +144,7 @@ export function BoardPage() {
             }
             if (
               overviewResult.data.openIncident ||
-              boardResult.data.panels.length !== 1 ||
+              boardResult.data.panels.length !== 2 ||
               incidentsResult.data.items.length > 0
             ) {
               return;
@@ -134,14 +156,34 @@ export function BoardPage() {
       }}
     />
   ) : null;
+  const recoveryError = simulateRecovery.isError ? (
+    <MutationFailureNotice
+      checkLabel="Check deploy state"
+      checking={overview.isFetching || board.isFetching}
+      error={simulateRecovery.error}
+      onCheckState={() => {
+        void Promise.all([overview.refetch(), board.refetch()]).then(
+          ([overviewResult, boardResult]) => {
+            if (!overviewResult.isSuccess || !boardResult.isSuccess) return;
+            if (overviewResult.data.recentDeploys.length === 0) return;
+            simulateRecovery.reset();
+          },
+        );
+      }}
+    />
+  ) : null;
   const stage = investigationStage({
     hasClosedIncident:
       incidents.data?.items.some((candidate) => candidate.status === "closed") ?? false,
     hasOpenIncident:
       overview.data?.openIncident !== null && overview.data?.openIncident !== undefined,
+    hasDeployEvent: (overview.data?.recentDeploys.length ?? 0) > 0,
+    hasFiringAlert: overview.data?.alerts.some((alert) => alert.status === "firing") ?? false,
     hypotheses: incident.data?.hypotheses ?? [],
-    panels: board.data?.panels ?? [],
+    panels:
+      board.data?.panels.filter((panel) => evidencePanelIds.has(String(panel.metadata.id))) ?? [],
   });
+  const alertFiring = overview.data?.alerts.some((alert) => alert.status === "firing") ?? false;
 
   return (
     <div {...stylex.props(styles.page)}>
@@ -187,9 +229,17 @@ export function BoardPage() {
                   onClick={() => void navigate({ search: { guide: true } })}
                   tone="primary"
                 >
-                  Start investigation
+                  Start live incident
                 </Button>
               ) : stage === "diagnosed" && overview.data.openIncident ? (
+                <Button
+                  disabled={simulateRecovery.isPending || recoveryOutcomeUnknown}
+                  onClick={startRecovery}
+                  tone="primary"
+                >
+                  {simulateRecovery.isPending ? "Deploying fix" : "Simulate fix deploy"}
+                </Button>
+              ) : stage === "recovered" && overview.data.openIncident ? (
                 <Button
                   render={
                     <Link
@@ -208,18 +258,25 @@ export function BoardPage() {
               ) : null
             }
             agentUnavailable={toolStatus === "failed" || toolStatus === "unsupported"}
+            alertFiring={alertFiring}
             onOpenGuide={() => void navigate({ search: { guide: true } })}
             prompt={investigationPrompts[stage]}
             stage={stage}
           />
-          {search.guide ? null : stage === "reviewed" ? resetError : triggerError}
+          {search.guide
+            ? null
+            : stage === "reviewed"
+              ? resetError
+              : stage === "diagnosed"
+                ? recoveryError
+                : triggerError}
         </>
       ) : null}
 
       {!boardUnavailable && !board.data && (runtime.isPending || board.isPending) ? (
         <ContentState kind="loading" title="Loading the board" />
       ) : null}
-      {boardUnavailable ? (
+      {boardUnavailable && !authenticationRequired ? (
         <ContentState
           actions={
             <ConsoleFailureActions
@@ -237,7 +294,7 @@ export function BoardPage() {
           {errorMessage(runtime.isError && !runtime.data ? runtime.error : board.error)}
         </ContentState>
       ) : null}
-      {board.data && dependencyFailure ? (
+      {board.data && dependencyFailure && !authenticationRequired ? (
         <BoardContextNotice
           catalog={catalogState}
           error={catalog.error ?? overview.error ?? incidents.error}
@@ -269,8 +326,13 @@ export function BoardPage() {
           {board.data.panels.map((panel) => (
             <LivePanel
               catalog={catalog.data ?? []}
-              fullWidth={panel.spec._tag === "metric-chart" && chartNeedsFullWidth(panel.spec)}
+              fullWidth={
+                board.data.panels.length > 2 &&
+                panel.spec._tag === "metric-chart" &&
+                chartNeedsFullWidth(panel.spec)
+              }
               key={panel.metadata.id}
+              onEvidenceChange={observePanelEvidence}
               panel={panel}
             />
           ))}

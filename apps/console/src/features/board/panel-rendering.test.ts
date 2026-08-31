@@ -189,13 +189,21 @@ describe("panel query and chart rendering", () => {
     });
     expect(percentModel).toMatchObject({
       series: [
-        { key: "series-0", stackId: "panel-left" },
-        { key: "series-1", stackId: "panel-left" },
+        { key: "ATTEMPTS:attempt=2", stackId: "panel-left" },
+        { key: "ATTEMPTS:attempt=3", stackId: "panel-left" },
       ],
     });
     expect(percentModel.rows).toMatchObject([
-      { atMs: expect.any(Number), "series-0": 0.25, "series-1": 0.75 },
-      { atMs: expect.any(Number), "series-0": 0.25, "series-1": 0.75 },
+      {
+        atMs: expect.any(Number),
+        "ATTEMPTS:attempt=2": 0.25,
+        "ATTEMPTS:attempt=3": 0.75,
+      },
+      {
+        atMs: expect.any(Number),
+        "ATTEMPTS:attempt=2": 0.25,
+        "ATTEMPTS:attempt=3": 0.75,
+      },
     ]);
 
     const legend = buildChartLegend(
@@ -238,16 +246,16 @@ describe("panel query and chart rendering", () => {
       visualization: "line",
     });
     expect(model.rows).toMatchObject([
-      { "series-0": 12, "series-1": 8 },
-      { "series-0": 14 },
-      { "series-1": 9 },
+      { "REQUESTS:requests": 12, "USERS:users": 8 },
+      { "REQUESTS:requests": 14 },
+      { "USERS:users": 9 },
     ]);
-    expect(model.rows[1]).not.toHaveProperty("series-1");
-    expect(model.rows[2]).not.toHaveProperty("series-0");
+    expect(model.rows[1]).not.toHaveProperty("USERS:users");
+    expect(model.rows[2]).not.toHaveProperty("REQUESTS:requests");
 
     expect(model.series).toMatchObject([
-      { key: "series-0", label: "requests" },
-      { key: "series-1", label: "users" },
+      { key: "REQUESTS:requests", label: "requests" },
+      { key: "USERS:users", label: "users" },
     ]);
 
     expect(model.rows[0]?.atMs).toBe(Date.parse("2026-08-28T08:00:00.000Z"));

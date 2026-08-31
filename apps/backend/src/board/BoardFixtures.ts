@@ -9,9 +9,18 @@ import {
   PanelTitle,
   type ProjectId,
 } from "@groundtruth/domain";
-import { type PanelSpec, UpstreamPressurePanel } from "@groundtruth/panel-dsl";
+import {
+  CheckoutLatencyPanel,
+  PaymentRequestRatePanel,
+  type PanelSpec,
+} from "@groundtruth/panel-dsl";
 import { type DateTime } from "effect";
-import { retriesPanelId, sandboxDashboardId, sandboxProjectId } from "../memory/SeedIds.js";
+import {
+  latencyPanelId,
+  requestsPanelId,
+  sandboxDashboardId,
+  sandboxProjectId,
+} from "../memory/SeedIds.js";
 
 const seededPanel = (
   projectId: ProjectId,
@@ -39,7 +48,7 @@ const seededPanel = (
 export const sandboxBoardForProject = (
   projectId: ProjectId,
   dashboardId: DashboardId,
-  panelId: PanelId,
+  panelIds: readonly [PanelId, PanelId],
   now: DateTime.Utc,
 ) =>
   new BoardState({
@@ -51,13 +60,21 @@ export const sandboxBoardForProject = (
       createdAt: now,
       updatedAt: now,
     }),
-    panels: [seededPanel(projectId, dashboardId, panelId, 0, UpstreamPressurePanel, now)],
+    panels: [
+      seededPanel(projectId, dashboardId, panelIds[0], 0, PaymentRequestRatePanel, now),
+      seededPanel(projectId, dashboardId, panelIds[1], 1, CheckoutLatencyPanel, now),
+    ],
     revision: 1,
     updatedAt: now,
   });
 
 export const sandboxBoard = (now: DateTime.Utc) =>
-  sandboxBoardForProject(sandboxProjectId, sandboxDashboardId, retriesPanelId, now);
+  sandboxBoardForProject(
+    sandboxProjectId,
+    sandboxDashboardId,
+    [requestsPanelId, latencyPanelId],
+    now,
+  );
 
 export const emptyDefaultBoard = (
   projectId: ProjectId,

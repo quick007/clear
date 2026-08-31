@@ -476,6 +476,25 @@ export function useTriggerSandboxIncident(projectId: ProjectId) {
   });
 }
 
+export function useSimulateSandboxRecovery(projectId: ProjectId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      runMutation("Start sandbox recovery", (runtime) =>
+        runtime.api.client.sandbox.simulateRecovery({}),
+      ),
+    onSuccess: () =>
+      refreshInBackground(async (signal) => {
+        const consoleRuntime = await getConsoleRuntime();
+        await consoleRuntime.sessions.refresh(signal);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.runtime }),
+          queryClient.invalidateQueries({ queryKey: ["groundtruth", String(projectId)] }),
+        ]);
+      }),
+  });
+}
+
 export function useResetSandbox(projectId: ProjectId) {
   const queryClient = useQueryClient();
   return useMutation({

@@ -49,17 +49,21 @@ const createSandbox = (api: BrowserApiClient) =>
     return yield* loadSession(api);
   });
 
-const bootstrapSession = (api: BrowserApiClient) =>
-  loadSession(api).pipe(Effect.catchTag("ConsoleAuthenticationRequired", () => createSandbox(api)));
+const bootstrapSession = (api: BrowserApiClient, demoRequested: boolean) => {
+  if (demoRequested && api.access.get().sandboxSessionId === null) return createSandbox(api);
+  return loadSession(api).pipe(
+    Effect.catchTag("ConsoleAuthenticationRequired", () => createSandbox(api)),
+  );
+};
 
 const loadOverview = (api: BrowserApiClient, projectId: ProjectId) =>
   apiRequest((signal) =>
     api.run(api.client.overview.getOverview({ params: { projectId } }), signal),
   );
 
-const loadSnapshot = (api: BrowserApiClient) =>
+const loadSnapshot = (api: BrowserApiClient, demoRequested: boolean) =>
   Effect.gen(function* () {
-    const session = yield* bootstrapSession(api);
+    const session = yield* bootstrapSession(api, demoRequested);
     const projectId = yield* activeProject(session);
     const overview = yield* loadOverview(api, projectId);
     return {
@@ -71,15 +75,19 @@ const loadSnapshot = (api: BrowserApiClient) =>
 
 export const makeToolSessionSource = async (
   api: BrowserApiClient,
+  options: { readonly demoRequested?: boolean } = {},
   signal?: AbortSignal,
 ): Promise<ToolSessionSource> => {
-  let snapshot = await Effect.runPromise(loadSnapshot(api), { signal });
+  const demoRequested = options.demoRequested === true;
+  let snapshot = await Effect.runPromise(loadSnapshot(api, demoRequested), { signal });
   const listeners = new Set<(next: ToolSessionSnapshot) => void>();
 
   return {
     getSnapshot: () => snapshot,
     refresh: async (refreshSignal) => {
-      snapshot = await Effect.runPromise(loadSnapshot(api), { signal: refreshSignal });
+      snapshot = await Effect.runPromise(loadSnapshot(api, demoRequested), {
+        signal: refreshSignal,
+      });
       listeners.forEach((listener) => listener(snapshot));
       return snapshot;
     },

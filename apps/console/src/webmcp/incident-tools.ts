@@ -8,9 +8,9 @@ const closeIncidentGuidance = (mode: SessionMode) =>
   mode === "sandbox"
     ? {
         description:
-          "Closes the currently open incident with an evidence-based summary. Use after reviewing the relevant evidence and establishing the root cause. The sandbox has no remediation step, so visible recovery is not required.",
+          "Closes the currently open incident with an evidence-based summary. Use after establishing the root cause, calling simulate_fix_deploy, and confirming recovery in current telemetry.",
         failureHint:
-          "Establish the root cause from the available evidence and provide a non-empty summary.",
+          "Establish the root cause, confirm visible recovery, and provide a non-empty summary.",
       }
     : {
         description:

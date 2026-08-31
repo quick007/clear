@@ -17,6 +17,18 @@ export const makeSandboxTools = (operations: GroundtruthToolOperations) =>
       failureHint: "This control is available only in sandbox mode. Reset the sandbox if needed.",
     }),
     tool({
+      name: "simulate_fix_deploy",
+      title: "Simulate fix deployment",
+      description:
+        "Records a synthetic checkout-api deploy and starts recovery telemetry in this isolated sandbox. Use only after the evidence supports retry amplification. In a real project, the user's own agent deploys through its existing repository and infrastructure access.",
+      input: NoInput,
+      readOnly: false,
+      returnsUntrustedContent: false,
+      invoke: (_, signal) => operations.simulateSandboxRecovery(signal),
+      successHint: "Watch the live request and latency signals recover, then close the incident.",
+      failureHint: "Start and investigate the sandbox incident before simulating its fix deploy.",
+    }),
+    tool({
       name: "reset_sandbox",
       title: "Reset sandbox",
       description:

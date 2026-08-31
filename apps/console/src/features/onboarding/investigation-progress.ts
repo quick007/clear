@@ -6,6 +6,8 @@ export type InvestigationStage =
   | "challenge"
   | "evidence"
   | "diagnosed"
+  | "recovering"
+  | "recovered"
   | "reviewed";
 
 export const investigationJourneyPosition = (stage: InvestigationStage) =>
@@ -15,7 +17,9 @@ export const investigationJourneyPosition = (stage: InvestigationStage) =>
     challenge: 1,
     evidence: 2,
     diagnosed: 3,
-    reviewed: 3,
+    recovering: 4,
+    recovered: 4,
+    reviewed: 4,
   })[stage];
 
 type HypothesisState = "proposed" | "testing" | "rejected" | "confirmed";
@@ -74,16 +78,21 @@ const isRetryHypothesis = (hypothesis: InvestigationHypothesis) =>
 
 export function investigationStage({
   hasClosedIncident,
+  hasDeployEvent = false,
+  hasFiringAlert = false,
   hasOpenIncident,
   hypotheses,
   panels,
 }: {
   hasClosedIncident: boolean;
+  hasDeployEvent?: boolean;
+  hasFiringAlert?: boolean;
   hasOpenIncident: boolean;
   hypotheses: ReadonlyArray<InvestigationHypothesis>;
   panels: ReadonlyArray<InvestigationPanel>;
 }): InvestigationStage {
   if (!hasOpenIncident) return hasClosedIncident ? "reviewed" : "baseline";
+  if (hasDeployEvent) return hasFiringAlert ? "recovering" : "recovered";
 
   const hasRequestsVersusUsers = panels.some(isRequestsVersusUsersPanel);
   const hasAttemptsGroupedRetries = panels.some(isAttemptsGroupedRetryPanel);

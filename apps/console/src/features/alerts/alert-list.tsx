@@ -16,6 +16,13 @@ const comparisonCopy = {
   "at-or-below": "≤",
 } as const;
 
+export const formatAlertWindow = (seconds: number) =>
+  seconds < 60
+    ? `${seconds} sec`
+    : seconds % 60 === 0
+      ? `${seconds / 60} min`
+      : `${Math.floor(seconds / 60)} min ${seconds % 60} sec`;
+
 export function AlertSection({
   children,
   description,
@@ -115,7 +122,7 @@ export function ThresholdAlertRow({
         <Detail label="Service" value={alert.serviceName ?? "All services"} />
         <Detail
           label="Condition"
-          value={`${alert.aggregation} ${comparisonCopy[alert.comparison]} ${alert.threshold} · ${Math.round(alert.windowSeconds / 60)} min`}
+          value={`${alert.aggregation} ${comparisonCopy[alert.comparison]} ${alert.threshold} · ${formatAlertWindow(alert.windowSeconds)}`}
         />
       </div>
       <div {...stylex.props(styles.rowActions)}>

@@ -51,7 +51,7 @@ export const CreateAlertRuleInput = Schema.Struct({
   ),
   comparison: Schema.Literals(["above", "at-or-above", "below", "at-or-below"]),
   threshold: Schema.Finite,
-  windowSeconds: Schema.Int.check(Schema.isBetween({ minimum: 10, maximum: 86_400 })),
+  windowSeconds: Schema.Int.check(Schema.isBetween({ minimum: 5, maximum: 86_400 })),
   severity: AlertSeverity,
   enabled: Schema.optionalKey(Schema.Boolean),
 });

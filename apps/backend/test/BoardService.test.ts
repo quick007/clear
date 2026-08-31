@@ -25,11 +25,14 @@ describe("BoardService", () => {
       const board = yield* boards.getDefaultBoard(sandboxProjectId);
 
       assert.strictEqual(board.dashboard.id, sandboxDashboardId);
-      assert.strictEqual(board.panels.length, 1);
-      assert.strictEqual(board.panels[0]?.spec.title, "Upstream errors and replicas");
+      assert.strictEqual(board.panels.length, 2);
+      assert.deepStrictEqual(
+        board.panels.map((panel) => panel.spec.title),
+        ["Payment request rate", "Checkout latency"],
+      );
       assert.deepStrictEqual(
         board.panels.map((panel) => panel.metadata.position),
-        [0],
+        [0, 1],
       );
       assert.strictEqual(board.revision, 1);
     }).pipe(Effect.provide(BoardTest)),
@@ -53,7 +56,7 @@ describe("BoardService", () => {
       assert.strictEqual(afterCreate.revision, 2);
       assert.deepStrictEqual(
         afterCreate.panels.map((panel) => panel.metadata.position),
-        [0, 1],
+        [0, 1, 2],
       );
 
       const updated = yield* boards.updatePanel(
@@ -98,10 +101,10 @@ describe("BoardService", () => {
       yield* boards.removePanel(sandboxProjectId, created.metadata.id);
       const afterRemove = yield* boards.getBoard(sandboxProjectId, sandboxDashboardId);
       assert.strictEqual(afterRemove.revision, 5);
-      assert.strictEqual(afterRemove.panels.length, 1);
+      assert.strictEqual(afterRemove.panels.length, 2);
       assert.deepStrictEqual(
         afterRemove.panels.map((panel) => panel.metadata.position),
-        [0],
+        [0, 1],
       );
     }).pipe(Effect.provide(BoardTest)),
   );

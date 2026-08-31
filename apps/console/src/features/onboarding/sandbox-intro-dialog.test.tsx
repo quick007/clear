@@ -69,16 +69,16 @@ describe("sandbox intro agent access", () => {
     const html = renderDialog("ready");
 
     expect(html).toContain("Ready to investigate with your agent");
-    expect(html).toContain("Trigger checkout incident");
+    expect(html).toContain("Start live incident");
     expect(html).not.toContain("Continue here without an agent");
   });
 
-  it("warns that an unsupported-browser sandbox will not carry into ChatGPT", () => {
+  it("keeps an unsupported browser on baseline until the workspace opens in ChatGPT", () => {
     const html = renderDialog("unsupported");
 
     expect(html).toContain("Open this page inside ChatGPT before starting");
-    expect(html).toContain("will not carry over");
-    expect(html).toContain("Continue here without an agent");
+    expect(html).toContain("Inspect healthy telemetry");
+    expect(html).not.toContain("Start live incident");
     expect(html).toContain("Copy live URL for ChatGPT");
     expect(html).toContain('data-copy-value="https://clear.example/board?guide=true"');
   });
@@ -91,11 +91,11 @@ describe("sandbox intro agent access", () => {
     expect(html).not.toContain("Continue here without an agent");
   });
 
-  it("offers retry or an explicit human-only path after startup fails", () => {
+  it("offers retry or healthy telemetry inspection after startup fails", () => {
     const html = renderDialog("failed");
 
     expect(html).toContain("Agent access could not start");
     expect(html).toContain("Try agent access again");
-    expect(html).toContain("Continue here without an agent");
+    expect(html).toContain("Inspect healthy telemetry");
   });
 });

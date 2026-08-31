@@ -45,28 +45,38 @@ export function SidebarAccountFooter({
   }
 
   const accountName = account.displayName ?? "Account";
+  const demoWorkspace = session?.session?._tag === "sandbox";
 
   return (
     <div {...stylex.props(styles.footer)}>
-      <Link onClick={onNavigate} to="/connect" {...stylex.props(styles.connect)}>
-        <Icon icon={Plug01Icon} size={16} />
-        <span>Connect data</span>
-      </Link>
-      <Button
-        large
-        render={
-          <a
-            href="/board?demo=true&guide=true"
-            onClick={onNavigate}
-            rel="noopener"
-            target="_blank"
-          />
-        }
-        tone="primary"
-      >
-        <span>See demo</span>
-        <Icon icon={ArrowRight01Icon} size={16} />
-      </Button>
+      {demoWorkspace ? (
+        <a href="/board?hosted=true" onClick={onNavigate} {...stylex.props(styles.connect)}>
+          <Icon icon={ArrowRight01Icon} size={16} />
+          <span>Return to my project</span>
+        </a>
+      ) : (
+        <>
+          <Link onClick={onNavigate} to="/connect" {...stylex.props(styles.connect)}>
+            <Icon icon={Plug01Icon} size={16} />
+            <span>Connect data</span>
+          </Link>
+          <Button
+            large
+            render={
+              <a
+                href="/board?demo=true&guide=true"
+                onClick={onNavigate}
+                rel="noopener"
+                target="_blank"
+              />
+            }
+            tone="primary"
+          >
+            <span>See demo</span>
+            <Icon icon={ArrowRight01Icon} size={16} />
+          </Button>
+        </>
+      )}
       <div {...stylex.props(styles.account)}>
         <span {...stylex.props(styles.avatar)}>{accountInitials(accountName)}</span>
         <span {...stylex.props(styles.accountCopy)}>

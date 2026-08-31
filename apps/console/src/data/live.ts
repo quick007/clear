@@ -7,9 +7,15 @@ import { useEffect, useState } from "react";
 import { getConsoleRuntime } from "../api/runtime";
 import { ConsoleUnavailable, normalizeConsoleFailure } from "../errors";
 import { queryKeys } from "./query-keys";
+import {
+  activeTelemetryQueryCount,
+  invalidateTelemetryQueries,
+  liveTelemetryRefreshMilliseconds,
+} from "./telemetry-refresh";
 
 const initialReconnectDelay = 500; // 500 milliseconds
 const maximumReconnectDelay = 15 * 1_000; // 15 seconds
+const telemetryRefreshRetryDelay = 15 * 1_000; // 15 seconds
 const noticeFailureThreshold = 3;
 const cursorStoragePrefix = "groundtruth.liveCursor.";
 
@@ -147,6 +153,36 @@ export function useLiveProjectUpdates(projectId: ProjectId | null) {
 
     const controller = new AbortController();
     const cursor = createLiveCursorState(projectId);
+    let nextTelemetryRefreshAt = 0;
+    let telemetryRefreshTimer: number | undefined;
+    let refreshWhenVisible = false;
+    const scheduleTelemetryRefresh = () => {
+      if (document.visibilityState === "hidden") {
+        refreshWhenVisible = true;
+        return Promise.resolve();
+      }
+      if (telemetryRefreshTimer !== undefined) return Promise.resolve();
+      const delay = Math.max(0, nextTelemetryRefreshAt - Date.now());
+      telemetryRefreshTimer = window.setTimeout(() => {
+        telemetryRefreshTimer = undefined;
+        nextTelemetryRefreshAt =
+          Date.now() +
+          liveTelemetryRefreshMilliseconds(activeTelemetryQueryCount(queryClient, projectId));
+        void invalidateTelemetryQueries(queryClient, projectId, true).catch(() => {
+          if (controller.signal.aborted) return;
+          nextTelemetryRefreshAt = Date.now() + telemetryRefreshRetryDelay;
+          void scheduleTelemetryRefresh();
+        });
+      }, delay);
+      return Promise.resolve();
+    };
+    const resumeVisibleRefresh = () => {
+      if (document.visibilityState === "hidden" || !refreshWhenVisible) return;
+      refreshWhenVisible = false;
+      nextTelemetryRefreshAt = 0;
+      void scheduleTelemetryRefresh();
+    };
+    document.addEventListener("visibilitychange", resumeVisibleRefresh);
 
     const reconnectSchedule = Schedule.exponential(Duration.millis(initialReconnectDelay)).pipe(
       Schedule.modifyDelay(({ duration }) =>
@@ -170,21 +206,34 @@ export function useLiveProjectUpdates(projectId: ProjectId | null) {
         }),
       );
 
+      let streamConnected = false;
       const events = Stream.unwrap(
-        Effect.suspend(() =>
-          runtime.api.client.live.stream({
+        Effect.suspend(() => {
+          streamConnected = false;
+          return runtime.api.client.live.stream({
             params: { projectId },
             query: cursor.query(),
-          }),
-        ),
+          });
+        }),
       ).pipe(
         Stream.mapError(normalizeConsoleFailure),
         Stream.concat(Stream.fail(new ConsoleUnavailable({ retryable: true }))),
         Stream.tap((event) =>
           Effect.gen(function* () {
             yield* Effect.sync(() => setStatus("healthy"));
+            const firstEventAfterConnect = !streamConnected;
+            streamConnected = true;
+            if (
+              firstEventAfterConnect &&
+              (event._tag === "Heartbeat" || event._tag === "TelemetryActivityObserved")
+            ) {
+              yield* Effect.promise(scheduleTelemetryRefresh);
+            }
             yield* commitLiveEvent(event, {
-              invalidateQueries: () => invalidateLiveQueries(queryClient, projectId),
+              invalidateQueries: () =>
+                event._tag === "TelemetryActivityObserved"
+                  ? scheduleTelemetryRefresh()
+                  : invalidateLiveQueries(queryClient, projectId),
               observe: cursor.observe,
               refreshSession: () => runtime.sessions.refresh(controller.signal),
               updateRuntimeSnapshot: () =>
@@ -222,6 +271,8 @@ export function useLiveProjectUpdates(projectId: ProjectId | null) {
     const fiber = Effect.runFork(run);
     return () => {
       controller.abort();
+      document.removeEventListener("visibilitychange", resumeVisibleRefresh);
+      if (telemetryRefreshTimer !== undefined) window.clearTimeout(telemetryRefreshTimer);
       fiber.interruptUnsafe();
     };
   }, [projectId, queryClient]);

@@ -86,7 +86,7 @@ describe("SituationStrip", () => {
     });
     const html = renderToStaticMarkup(<SituationStrip incidentDetail={incidentDetail} />);
 
-    expect(html).toContain("Resolved");
+    expect(html).toContain("Closed");
     expect(html).toContain("Checkout latency and error spike");
     expect(html).toContain("Latency recovered after the retry policy was corrected.");
   });

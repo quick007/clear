@@ -19,7 +19,8 @@ beforeEach(() => {
 describe("getConsoleRuntime", () => {
   it("retries after a transient bootstrap failure", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const api = { id: "api" };
+    const setSandboxSessionId = vi.fn();
+    const api = { id: "api", access: { setSandboxSessionId } };
     const sessions = { id: "sessions" };
     mocks.makeBrowserApiClient.mockRejectedValueOnce(new Error("temporary failure"));
     mocks.makeBrowserApiClient.mockResolvedValueOnce(api);
@@ -29,6 +30,7 @@ describe("getConsoleRuntime", () => {
     await expect(getConsoleRuntime()).resolves.toEqual({ api, sessions });
     expect(mocks.makeBrowserApiClient).toHaveBeenCalledTimes(2);
     expect(mocks.makeToolSessionSource).toHaveBeenCalledOnce();
+    expect(setSandboxSessionId).toHaveBeenCalledWith(null);
     expect(consoleError).toHaveBeenCalledWith(
       "[Clear] Console runtime failed",
       expect.objectContaining({ cause: expect.any(Error) }),

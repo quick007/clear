@@ -5,6 +5,7 @@ import { DeployAnnotation, TelemetryBatch } from "./domain/telemetry.ts";
 import {
   InvalidAdvanceCount,
   InvalidScenarioTransition,
+  RecoveryOrigin,
   ScenarioAdvance,
   ScenarioConfig,
   ScenarioState,
@@ -74,6 +75,7 @@ export const makeInitialState = (config: ScenarioConfig) =>
     phaseBucket: 0,
     incidentId: null,
     pendingAnnotations: [],
+    recoveryOrigin: null,
   });
 
 const nextState = (state: ScenarioState) => {
@@ -88,6 +90,7 @@ const nextState = (state: ScenarioState) => {
     phaseBucket: enterAmplification ? 0 : nextPhaseBucket,
     incidentId: state.incidentId,
     pendingAnnotations: [],
+    recoveryOrigin: state.recoveryOrigin,
   });
 };
 
@@ -96,12 +99,21 @@ const generateOne = (state: ScenarioState) => {
     state.config.startedAt + state.sequence * state.config.bucketDurationMs,
   );
   const bucketEnd = timestamp(bucketStart + state.config.bucketDurationMs);
-  const profile = makeBucketProfile(state.config, state.phase, state.phaseBucket);
+  const profile = makeBucketProfile(
+    state.config,
+    state.phase,
+    state.phaseBucket,
+    state.recoveryOrigin,
+  );
   const previousProfile =
     state.phaseBucket > 0
-      ? makeBucketProfile(state.config, state.phase, state.phaseBucket - 1)
-      : state.phase === "P4"
-        ? makeBucketProfile(state.config, "P2", 0)
+      ? makeBucketProfile(state.config, state.phase, state.phaseBucket - 1, state.recoveryOrigin)
+      : state.phase === "P4" && state.recoveryOrigin !== null
+        ? makeBucketProfile(
+            state.config,
+            state.recoveryOrigin.phase,
+            state.recoveryOrigin.phaseBucket,
+          )
         : null;
   const traces = generateTraces(state.config, state.phase, state.phaseBucket, bucketStart, profile);
   const batch = new TelemetryBatch({
@@ -161,6 +173,7 @@ const makeIncidentState = (state: ScenarioState) =>
       `inc_${deterministicHex(state.config.seed, state.sequence, "incident", 12)}`,
     ),
     pendingAnnotations: state.pendingAnnotations,
+    recoveryOrigin: null,
   });
 
 export const triggerIncident = (state: ScenarioState) => {
@@ -177,7 +190,11 @@ export const triggerIncident = (state: ScenarioState) => {
   return Effect.succeed(makeIncidentState(state));
 };
 
-const makeRecoveryState = (state: ScenarioState, options: DeployOptions) => {
+const makeRecoveryState = (
+  state: ScenarioState,
+  originPhase: "P1" | "P2",
+  options: DeployOptions,
+) => {
   const deploy = new DeployAnnotation({
     service: "checkout-api",
     sha: sha(options.sha ?? deterministicHex(state.config.seed, state.sequence, "fix-deploy", 12)),
@@ -194,6 +211,10 @@ const makeRecoveryState = (state: ScenarioState, options: DeployOptions) => {
     phaseBucket: 0,
     incidentId: state.incidentId,
     pendingAnnotations: [deploy],
+    recoveryOrigin: new RecoveryOrigin({
+      phase: originPhase,
+      phaseBucket: Math.max(0, state.phaseBucket - 1),
+    }),
   });
 };
 
@@ -208,7 +229,7 @@ const simulateFixDeploy = (state: ScenarioState, input: unknown = {}) =>
     }
 
     const options = yield* Schema.decodeUnknownEffect(DeployOptions)(input);
-    return makeRecoveryState(state, options);
+    return makeRecoveryState(state, state.phase, options);
   });
 
 const makeTelemetryGeneratorRuntime = (options: unknown = {}) =>
@@ -249,7 +270,7 @@ const makeTelemetryGeneratorRuntime = (options: unknown = {}) =>
             if (current.phase !== "P1" && current.phase !== "P2") {
               return [simulateFixDeploy(current, options), current] as const;
             }
-            const next = makeRecoveryState(current, options);
+            const next = makeRecoveryState(current, current.phase, options);
             return [Effect.succeed(next), next] as const;
           }),
         ),
@@ -275,6 +296,7 @@ export const makeTelemetryGenerator = (options: unknown = {}) =>
       next: generator.next,
       advance: generator.advance,
       triggerIncident: generator.triggerIncident,
+      simulateFixDeploy: generator.simulateFixDeploy,
       reset: generator.reset,
     })),
   );

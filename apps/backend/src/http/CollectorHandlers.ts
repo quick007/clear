@@ -7,7 +7,7 @@ import {
   TelemetryActivityObserved,
 } from "@groundtruth/api-contract";
 import { IngestKeyRejected, type ProjectId } from "@groundtruth/domain";
-import { TelemetryUnavailable } from "@groundtruth/telemetry";
+import { SignalActivity, TelemetryUnavailable } from "@groundtruth/telemetry";
 import { DateTime, Effect } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { IngestKeyService } from "../ingest/IngestKeyService.js";
@@ -79,6 +79,23 @@ export const CollectorHandlers = HttpApiBuilder.group(
           return unavailable("telemetry", error.message);
         }),
       );
+      const items =
+        signal === "metrics" ? batch.metrics : signal === "logs" ? batch.logs : batch.spans;
+      if (items.length > 0) {
+        const activity = new SignalActivity({
+          signal,
+          services: Array.from(new Set(items.map((item) => item.serviceName))),
+          itemCount: items.length,
+          observedAt: batch.receivedAt,
+        });
+        yield* events.publish(
+          new TelemetryActivityObserved({
+            projectId,
+            occurredAt: batch.receivedAt,
+            activity,
+          }),
+        );
+      }
       return new TelemetryAccepted({
         projectId,
         signal,

@@ -93,7 +93,7 @@ export const QueryWindow = Schema.Literals(["15m", "1h", "3h", "6h", "12h", "24h
 );
 export type QueryWindow = typeof QueryWindow.Type;
 
-export const QueryStep = Schema.Literals(["auto", "10s", "30s", "1m", "5m", "15m"]).pipe(
+export const QueryStep = Schema.Literals(["auto", "5s", "10s", "30s", "1m", "5m", "15m"]).pipe(
   Schema.annotate({
     identifier: "QueryStep",
     description: "The target resolution for server-side downsampling.",

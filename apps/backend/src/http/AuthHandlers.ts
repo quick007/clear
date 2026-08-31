@@ -145,10 +145,21 @@ export const AuthHandlers = HttpApiBuilder.group(GroundtruthApi, "auth", (handle
           const session = yield* CurrentSession;
           if (session._tag === "sandbox") {
             const project = yield* identity.projectForSandboxSession(session);
+            const token = request.cookies[sessionCookieName];
+            const hosted =
+              token === undefined
+                ? null
+                : yield* auth.authenticate(token).pipe(
+                    Effect.flatMap((record) => identity.sessionView(record)),
+                    Effect.catchTags({
+                      ServiceUnavailable: () => Effect.succeed(null),
+                      SessionNotFound: () => Effect.succeed(null),
+                    }),
+                  );
             return new SessionView({
               session,
-              account: null,
-              projects: [project],
+              account: hosted?.account ?? null,
+              projects: [project, ...(hosted?.projects ?? [])],
               activeProjectId: project.id,
             });
           }

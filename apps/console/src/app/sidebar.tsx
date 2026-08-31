@@ -84,7 +84,6 @@ function SidebarContent({
   overviewState,
   session,
 }: WorkspaceNavigationProps & { readonly onNavigate?: () => void }) {
-  const account = session?.account;
   const firingCount = overview?.alerts.filter((alert) => alert.status === "firing").length ?? 0;
   const projectName =
     overviewState === "error"
@@ -95,9 +94,11 @@ function SidebarContent({
       ? "Project unavailable"
       : overviewState === "loading"
         ? "Loading signals"
-        : overview?.services.length
-          ? serviceSummary(overview)
-          : "No signals yet";
+        : session?.session._tag === "sandbox"
+          ? "Demo workspace · live telemetry"
+          : overview?.services.length
+            ? serviceSummary(overview)
+            : "No signals yet";
 
   return (
     <div {...stylex.props(styles.sidebarContent)}>
@@ -116,9 +117,7 @@ function SidebarContent({
           <span {...stylex.props(styles.projectMark)}>{projectName[0]?.toUpperCase() ?? "C"}</span>
           <span {...stylex.props(styles.projectCopy)}>
             <strong {...stylex.props(styles.projectName)}>{projectName}</strong>
-            <span {...stylex.props(styles.projectSummary)}>
-              {account ? projectSummary : `Sandbox · ${projectSummary}`}
-            </span>
+            <span {...stylex.props(styles.projectSummary)}>{projectSummary}</span>
           </span>
         </div>
       </div>
@@ -169,12 +168,14 @@ function SidebarContent({
           onNavigate={onNavigate}
           to="/incidents"
         />
-        <SidebarNavLink
-          icon={Settings01Icon}
-          label="Settings"
-          onNavigate={onNavigate}
-          to="/settings/project"
-        />
+        {session?.session._tag === "sandbox" ? null : (
+          <SidebarNavLink
+            icon={Settings01Icon}
+            label="Settings"
+            onNavigate={onNavigate}
+            to="/settings/project"
+          />
+        )}
       </nav>
 
       <SidebarAccountFooter onNavigate={onNavigate} session={session} />

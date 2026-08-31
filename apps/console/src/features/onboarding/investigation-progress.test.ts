@@ -24,7 +24,9 @@ describe("sandbox investigation progress", () => {
     expect(investigationJourneyPosition("challenge")).toBe(1);
     expect(investigationJourneyPosition("evidence")).toBe(2);
     expect(investigationJourneyPosition("diagnosed")).toBe(3);
-    expect(investigationJourneyPosition("reviewed")).toBe(3);
+    expect(investigationJourneyPosition("recovering")).toBe(4);
+    expect(investigationJourneyPosition("recovered")).toBe(4);
+    expect(investigationJourneyPosition("reviewed")).toBe(4);
   });
 
   it("starts from a healthy baseline and keeps closed investigations distinct", () => {
@@ -138,5 +140,17 @@ describe("sandbox investigation progress", () => {
         panels: [attemptsGroupedRetries],
       }),
     ).toBe("diagnosed");
+  });
+
+  it("distinguishes an active recovery from cleared telemetry", () => {
+    const shared = {
+      hasClosedIncident: false,
+      hasDeployEvent: true,
+      hasOpenIncident: true,
+      hypotheses: [],
+      panels: [unrelatedPanel],
+    };
+    expect(investigationStage({ ...shared, hasFiringAlert: true })).toBe("recovering");
+    expect(investigationStage({ ...shared, hasFiringAlert: false })).toBe("recovered");
   });
 });

@@ -50,6 +50,18 @@ describe("makeToolSessionSource", () => {
     expect(setSandboxSessionId).toHaveBeenCalledWith("01890f6e-7c00-7000-8000-000000000002");
   });
 
+  it("creates an isolated demo even when the browser has a hosted session", async () => {
+    const getSession = vi.fn(() => Effect.succeed(sandboxSession));
+    const { api, createSession, setSandboxSessionId } = makeApi(getSession);
+
+    const source = await makeToolSessionSource(api, { demoRequested: true });
+
+    expect(source.getSnapshot()).toMatchObject({ mode: "sandbox", projectId });
+    expect(createSession).toHaveBeenCalledOnce();
+    expect(setSandboxSessionId).toHaveBeenCalledOnce();
+    expect(getSession).toHaveBeenCalledOnce();
+  });
+
   it("surfaces availability failures without replacing the session", async () => {
     const getSession = vi.fn(() => Effect.fail(new ConsoleUnavailable({ retryable: true })));
     const { api, createSession } = makeApi(getSession);

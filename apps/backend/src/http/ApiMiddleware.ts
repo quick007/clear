@@ -21,14 +21,16 @@ const unauthorized = (message: string) => new Unauthorized({ message });
 const unavailable = (service: string, message: string) =>
   new ServiceUnavailable({ service, message });
 
+const decodeSandboxSessionId = (credential: Redacted.Redacted) =>
+  Schema.decodeUnknownEffect(SessionId)(Redacted.value(credential)).pipe(
+    Effect.mapError(() => unauthorized("Sandbox session is missing or malformed")),
+  );
+
 export const resumeSandboxSession = Effect.fn("ApiMiddleware.resumeSandboxSession")(function* (
   sandboxes: SandboxService["Service"],
   credential: Redacted.Redacted,
 ) {
-  const rawSessionId = Redacted.value(credential);
-  const sessionId = yield* Schema.decodeUnknownEffect(SessionId)(rawSessionId).pipe(
-    Effect.mapError(() => unauthorized("Sandbox session is missing or malformed")),
-  );
+  const sessionId = yield* decodeSandboxSessionId(credential);
   const state = yield* sandboxes.resume(sessionId).pipe(
     Effect.catchTags({
       EntityNotFound: () => unauthorized("Sandbox session is invalid or expired"),
@@ -73,7 +75,12 @@ export const GroundtruthAccessLayer = Layer.effect(
             ),
           );
           const view = yield* identity.sessionView(record);
-          return yield* httpEffect.pipe(Effect.provideService(CurrentSession, view.session));
+          const sandboxCredential = request.headers["x-groundtruth-sandbox-session"];
+          const session =
+            sandboxCredential === undefined
+              ? view.session
+              : yield* resumeSandboxSession(sandboxes, Redacted.make(sandboxCredential));
+          return yield* httpEffect.pipe(Effect.provideService(CurrentSession, session));
         }),
       groundtruthSandbox: (httpEffect, { credential }) =>
         Effect.gen(function* () {
@@ -82,8 +89,9 @@ export const GroundtruthAccessLayer = Layer.effect(
           if (priorRateLimitFailure !== undefined) {
             return yield* priorRateLimitFailure;
           }
+          const sessionId = yield* decodeSandboxSessionId(credential);
+          yield* requests.consume(String(sessionId));
           const session = yield* resumeSandboxSession(sandboxes, credential);
-          yield* requests.consume(String(session.id));
           return yield* httpEffect.pipe(Effect.provideService(CurrentSession, session));
         }),
     });

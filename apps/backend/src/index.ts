@@ -28,6 +28,7 @@ import { CollectorQuotaService } from "./telemetry/CollectorQuotaService.js";
 import { TelemetryStore } from "./telemetry/TelemetryStore.js";
 
 const sandboxPruneInterval = "10 minutes"; // 10 minutes
+const sandboxTickInterval = "5 seconds"; // 5 seconds
 const collectorQuotaPruneInterval = "1 minute"; // 1 minute
 
 const PersistenceReady = Layer.effectDiscard(
@@ -85,7 +86,11 @@ const SandboxMaintenanceLive = Layer.effectDiscard(
     const prune = sandboxes
       .pruneExpired()
       .pipe(Effect.catch((error) => Effect.logWarning("Sandbox cleanup failed", { error })));
+    const tick = sandboxes
+      .advanceActive()
+      .pipe(Effect.catch((error) => Effect.logWarning("Sandbox telemetry tick failed", { error })));
     yield* prune.pipe(Effect.repeat(Schedule.spaced(sandboxPruneInterval)), Effect.forkScoped);
+    yield* tick.pipe(Effect.repeat(Schedule.spaced(sandboxTickInterval)), Effect.forkScoped);
   }),
 ).pipe(Layer.provideMerge(SandboxServicesLive));
 

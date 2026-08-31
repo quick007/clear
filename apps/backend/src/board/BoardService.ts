@@ -152,7 +152,10 @@ export class BoardService extends Context.Service<
         replace = false,
       ) {
         const dashboardId = DashboardIdSchema.make(yield* nextUuid);
-        const panelId = PanelId.make(yield* nextUuid);
+        const panelIds = yield* Effect.all([
+          nextUuid.pipe(Effect.map((id) => PanelId.make(id))),
+          nextUuid.pipe(Effect.map((id) => PanelId.make(id))),
+        ]);
         const now = yield* DateTime.now;
         return yield* Ref.modify(state, (memory) => {
           const currentId = memory.defaultByProject.get(projectId);
@@ -163,7 +166,7 @@ export class BoardService extends Context.Service<
           if (current !== undefined && !replace) {
             return [current, memory];
           }
-          const board = sandboxBoardForProject(projectId, dashboardId, panelId, now);
+          const board = sandboxBoardForProject(projectId, dashboardId, panelIds, now);
           const defaultByProject = new Map(memory.defaultByProject);
           defaultByProject.set(projectId, dashboardId);
           return [board, { ...withBoard(memory, projectId, board), defaultByProject }];

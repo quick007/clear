@@ -41,15 +41,6 @@ export const markAlertFiring = (alert: Alert, now: DateTime.Utc) =>
     updatedAt: now,
   });
 
-export const markAlertResolved = (alert: Alert, now: DateTime.Utc) =>
-  copyAlert(alert, {
-    status: "resolved",
-    summary: "Telemetry returned to the expected range",
-    firingSince: alert.firingSince,
-    resolvedAt: now,
-    updatedAt: now,
-  });
-
 export const touchIncident = (incident: Incident, now: DateTime.Utc) =>
   new Incident({
     id: incident.id,

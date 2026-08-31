@@ -15,18 +15,14 @@ const decodePanel = Schema.decodeUnknownEffect(PanelSpec);
 const decodePanelResult = Schema.decodeUnknownResult(PanelSpec);
 
 describe("PanelSpec", () => {
-  it("decodes all three golden investigation panels", async () => {
+  it("decodes all five golden investigation panels", async () => {
     const decoded = await Effect.runPromise(
       Effect.forEach(GoldenPanels, (panel) => decodePanel(panel)),
     );
 
-    expect(decoded).toHaveLength(3);
-    expect(decoded.map((panel) => panel._tag)).toEqual([
-      "metric-chart",
-      "metric-chart",
-      "metric-chart",
-    ]);
-    expect(decoded[0]).toEqual(RequestsVsUsersPanel);
+    expect(decoded).toHaveLength(5);
+    expect(decoded.every((panel) => panel._tag === "metric-chart")).toBe(true);
+    expect(decoded).toEqual(GoldenPanels);
   });
 
   it("keeps retry amplification on upstream attempts, not incoming requests", () => {
@@ -36,7 +32,7 @@ describe("PanelSpec", () => {
     ]);
     expect(RetryAmplificationPanel.queries[0]).toMatchObject({
       metric: "upstream.client.requests",
-      groupBy: { attributes: ["attempt", "retry"] },
+      groupBy: { attributes: ["attempt"] },
     });
     expect(UpstreamPressurePanel.queries[0]).toMatchObject({
       metric: "upstream.client.requests",
@@ -246,7 +242,7 @@ describe("PanelSpec JSON Schema", () => {
     const digest = createHash("sha256").update(JSON.stringify(PanelSpecJsonSchema)).digest("hex");
 
     expect(digest).toMatchInlineSnapshot(
-      `"123023a8edfa05cd63ed08716d110d27cb4d33e33e9adc1e86b15f5fdda430d2"`,
+      `"589ec3609c2d5f1948bf361624266cc09c5a071bac3e8eb630a9b08b00da5f2f"`,
     );
   });
 });

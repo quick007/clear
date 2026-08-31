@@ -130,10 +130,8 @@ describe.sequential("browser API client", () => {
     });
     await expect(requests[2]?.clone().json()).resolves.toEqual({ name: "primary-exporter" });
 
-    expectedCredentials = "omit";
     const demoApi = await makeBrowserApiClient({
       baseUrl: "https://api.groundtruth.test",
-      forceSandbox: true,
       sessionStorage,
     });
     await demoApi.run(demoApi.client.overview.listServices({ params: { projectId } }));

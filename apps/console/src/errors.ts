@@ -13,6 +13,8 @@ export class ConsoleAuthenticationRequired extends Schema.TaggedError<ConsoleAut
   {},
 ) {}
 
+export const isConsoleAuthenticationRequired = Schema.is(ConsoleAuthenticationRequired);
+
 export class ConsoleAccessDenied extends Schema.TaggedError<ConsoleAccessDenied>()(
   "ConsoleAccessDenied",
   {},

@@ -7,7 +7,7 @@ import type {
 } from "@groundtruth/panel-dsl";
 import type { MetricCatalogEntry } from "@groundtruth/telemetry";
 import * as stylex from "@stylexjs/stylex";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 
 import { epochMilliseconds, errorMessage, formatEpochShortTime } from "../../data/format";
 import { panelQueryDiagnosis, type PanelSeries, usePanelSeries } from "../../data/panels";
@@ -22,16 +22,20 @@ import { hasRenderableChartPoints } from "./panel-layout";
 import { buildChartLegend } from "./panel-legend";
 import { PanelCard } from "./panel-card";
 import { buildPanelTableRows, tableCellValue } from "./panel-table";
+import { useWorkspaceAuthenticationRequired } from "../../app/workspace-failure-context";
 
 export function LivePanel({
   catalog,
   fullWidth,
+  onEvidenceChange,
   panel,
 }: {
   catalog: ReadonlyArray<MetricCatalogEntry>;
   fullWidth: boolean;
+  onEvidenceChange?: (panelId: string, hasEvidence: boolean) => void;
   panel: PanelView;
 }) {
+  const authenticationRequired = useWorkspaceAuthenticationRequired();
   const data = usePanelSeries(panel);
   const complete = data.missingQueries.length === 0;
   const unitResolution = resolvePanelUnits(panel, catalog);
@@ -45,12 +49,24 @@ export function LivePanel({
       : data.results.length === 1
         ? latest
         : undefined;
+  const hasEvidence =
+    complete &&
+    !data.error &&
+    !data.pending &&
+    data.issue === null &&
+    data.results.some((series) => series.points.length > 0);
+  useEffect(() => {
+    onEvidenceChange?.(String(panel.metadata.id), hasEvidence);
+    return () => onEvidenceChange?.(String(panel.metadata.id), false);
+  }, [hasEvidence, onEvidenceChange, panel.metadata.id]);
   const footer = data.issue
     ? "This panel needs an updated query"
     : !complete
       ? `Missing ${missingQueryLabels(data.missingQueries)}`
       : data.error
-        ? errorMessage(data.error)
+        ? authenticationRequired
+          ? undefined
+          : errorMessage(data.error)
         : (unitResolution.error ?? data.hints[0] ?? panel.annotations.at(-1)?.label);
 
   return (
@@ -103,6 +119,7 @@ function PanelContent({
   unitError: string | null;
   units: Readonly<Partial<Record<"left" | "right", string>>>;
 }) {
+  const authenticationRequired = useWorkspaceAuthenticationRequired();
   if (data.pending) return <ContentState kind="loading" title="Loading panel data" />;
   if (data.issue) {
     return (
@@ -121,6 +138,9 @@ function PanelContent({
     );
   }
   if (data.missingQueries.length > 0) {
+    if (authenticationRequired) {
+      return <div aria-hidden {...stylex.props(styles.authenticationPlaceholder)} />;
+    }
     return (
       <ContentState
         actions={
@@ -228,9 +248,10 @@ function PanelDataFrame({
   children: ReactNode;
   data: ReturnType<typeof usePanelSeries>;
 }) {
+  const authenticationRequired = useWorkspaceAuthenticationRequired();
   return (
     <div {...stylex.props(styles.panelDataFrame)}>
-      {data.error ? (
+      {data.error && !authenticationRequired ? (
         <div role="status" {...stylex.props(styles.staleNotice)}>
           <span>Showing the last complete data.</span>
           <ConsoleFailureActions
@@ -412,6 +433,7 @@ const cellColorStyles = stylex.create({
 });
 
 const styles = stylex.create({
+  authenticationPlaceholder: { minHeight: 230 },
   panelDataFrame: { height: "100%", position: "relative" },
   staleNotice: {
     alignItems: "center",

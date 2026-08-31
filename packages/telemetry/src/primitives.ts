@@ -134,7 +134,7 @@ export type SignalKind = typeof SignalKind.Type;
 export const TelemetryWindow = Schema.Literals(["5m", "15m", "1h", "3h", "6h", "12h", "24h", "7d"]);
 export type TelemetryWindow = typeof TelemetryWindow.Type;
 
-export const QueryStep = Schema.Literals(["10s", "30s", "1m", "5m"]);
+export const QueryStep = Schema.Literals(["5s", "10s", "30s", "1m", "5m"]);
 export type QueryStep = typeof QueryStep.Type;
 
 export class RelativeTimeRange extends Schema.TaggedClass<RelativeTimeRange>(

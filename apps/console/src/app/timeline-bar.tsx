@@ -24,6 +24,7 @@ export function TimelineBar({
   const incident = incidentDetail?.incident ?? overview?.openIncident;
   if (!incident) return null;
   const isClosed = incident.status === "closed";
+  const alertStillFiring = overview?.alerts.some((alert) => alert.status === "firing") ?? false;
 
   const entries = [
     { detail: "Incident opened", icon: Clock01Icon, time: incident.openedAt },
@@ -47,11 +48,13 @@ export function TimelineBar({
         {...stylex.props(styles.trigger)}
       >
         <span {...stylex.props(styles.triggerTitle)}>
-          {isClosed ? "Resolved incident timeline" : "Incident timeline"}
+          {isClosed ? "Closed incident timeline" : "Incident timeline"}
           <span {...stylex.props(styles.entryCount)}>{entries.length} events</span>
         </span>
         <span {...stylex.props(styles.latest)}>
-          <span {...stylex.props(styles.latestDot, isClosed && styles.resolvedDot)} />
+          <span
+            {...stylex.props(styles.latestDot, isClosed && !alertStillFiring && styles.resolvedDot)}
+          />
           {isClosed ? `Summary: ${incident.summary ?? latest.detail}` : `Latest: ${latest.detail}`}
         </span>
         <span {...stylex.props(styles.chevron, open && styles.chevronOpen)}>

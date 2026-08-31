@@ -10,6 +10,7 @@ import { formatDateTime64, projectParameters } from "./sql.ts";
 export const metricStepPlan = (query: MetricQuery) => {
   if (query.step !== undefined) {
     return {
+      "5s": { sql: "5 SECOND", seconds: 5 },
       "10s": { sql: "10 SECOND", seconds: 10 },
       "30s": { sql: "30 SECOND", seconds: 30 },
       "1m": { sql: "1 MINUTE", seconds: 60 },

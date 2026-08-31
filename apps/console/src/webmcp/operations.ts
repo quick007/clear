@@ -239,6 +239,11 @@ export const makeToolOperations = (api: BrowserApiClient, sessions: ToolSessionS
       await sessions.refresh(signal);
       return result;
     },
+    simulateSandboxRecovery: async (signal?: AbortSignal) => {
+      const result = await api.run(api.client.sandbox.simulateRecovery({}), signal);
+      await sessions.refresh(signal);
+      return result;
+    },
     resetSandbox: async (signal?: AbortSignal) => {
       const result = await api.run(api.client.sandbox.reset({}), signal);
       await sessions.refresh(signal);

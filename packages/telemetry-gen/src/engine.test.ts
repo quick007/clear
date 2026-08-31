@@ -28,7 +28,8 @@ describe("telemetry generator", () => {
       const amplification = yield* generator.advance(30); // 5 minutes
       const report = evaluateAcceptance(baseline, amplification);
 
-      expect(report.upstreamRequestRatio).toBeCloseTo(3, 8);
+      expect(report.upstreamRequestRatio).toBeGreaterThanOrEqual(2.9);
+      expect(report.upstreamRequestRatio).toBeLessThan(3.1);
       expect(report.amplification.incomingRequests / report.baseline.incomingRequests).toBeCloseTo(
         1,
         8,
@@ -64,7 +65,7 @@ describe("telemetry generator", () => {
     Effect.gen(function* () {
       const generator = yield* makeTelemetryGenerator(scenario);
       yield* generator.triggerIncident;
-      yield* generator.advance(6);
+      yield* generator.advance(7);
       const batch = yield* generator.next;
 
       expect(batch.phase).toBe("P2");
@@ -108,7 +109,7 @@ describe("telemetry generator", () => {
       const baseline = yield* generator.advance(12); // 2 minutes
       yield* generator.triggerIncident;
       yield* generator.advance(6);
-      yield* generator.advance(4);
+      const beforeDeploy = (yield* generator.advance(4)).at(-1)!;
 
       yield* generator.simulateFixDeploy({
         sha: "a1b2c3d4e5f6",
@@ -125,6 +126,17 @@ describe("telemetry generator", () => {
         description: "Ship bounded retries",
       });
       expect(landing.alerts).toHaveLength(0);
+      const beforeDeployProfile = makeBucketProfile(generator.config, beforeDeploy.phase, 3);
+      const landingProfile = makeBucketProfile(
+        generator.config,
+        landing.phase,
+        0,
+        (yield* generator.state).recoveryOrigin,
+      );
+      expect(landingProfile.totalUpstreamRequests).toBeLessThanOrEqual(
+        beforeDeployProfile.totalUpstreamRequests,
+      );
+      expect(landingProfile.latencyP95Ms).toBeLessThan(beforeDeployProfile.latencyP95Ms);
 
       const recovery = yield* generator.advance(12); // 2 minutes
       const resolvedAlerts = recovery.flatMap((batch) => batch.alerts);

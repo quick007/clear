@@ -1,61 +1,54 @@
-import { SandboxPhase, SandboxState, type ServiceUnavailable } from "@groundtruth/api-contract";
 import {
-  Alert,
+  RecordDeployEventRequest,
+  type SandboxState,
+  type ServiceUnavailable,
+} from "@groundtruth/api-contract";
+import {
   AlertId,
-  AlertName,
   EntityNotFound,
   IncidentTitle,
+  NonEmptyText,
   type ProjectId,
   QuotaExceeded,
   SandboxSession,
   ServiceName,
   SessionId,
+  Sha,
 } from "@groundtruth/domain";
 import type { TelemetryUnavailable } from "@groundtruth/telemetry";
-import { Context, Crypto, DateTime, Effect, Layer, Ref, Schema, Semaphore } from "effect";
+import { Context, Crypto, DateTime, Effect, Layer, Ref, Semaphore } from "effect";
 import { BoardService } from "../board/BoardService.js";
 import { BackendConfig } from "../config/BackendConfig.js";
 import { DeployService } from "../deploys/DeployService.js";
 import { IncidentService } from "../incidents/IncidentService.js";
 import { IncidentState } from "../incidents/IncidentState.js";
+import { LiveEventBus } from "../live/LiveEventBus.js";
 import { sandboxProjectIdForSession } from "../memory/SeedIds.js";
 import { TelemetryStore } from "../telemetry/TelemetryStore.js";
 import {
+  advanceSandboxRuntime,
   makeSandboxRuntime,
+  recoverSandboxRuntime,
+  sandboxBucketMilliseconds,
+  sandboxRuntimePhase,
   type SandboxRuntime,
   triggerSandboxRuntime,
 } from "./SandboxRuntime.js";
+import {
+  SandboxRecord,
+  type SandboxStore,
+  sandboxStateView,
+  type StoredSandbox,
+} from "./SandboxRecord.js";
+import { seedSandboxIncidentProject } from "./SandboxAlertState.js";
 import { leastRecentlyUsedIdleSession } from "./SandboxCapacityPolicy.js";
+import { publishSandboxProgress } from "./SandboxProgress.js";
 import { canonicalSandboxBatch } from "./SandboxTelemetry.js";
 
 const sandboxTtlMilliseconds = 2 * 60 * 60 * 1_000; // 2 hours
-const sandboxBucketMilliseconds = 10 * 1_000; // 10 seconds
+const sandboxActiveWindowMilliseconds = 2 * 60 * 1_000; // 2 minutes
 
-class SandboxRecord extends Schema.Class<SandboxRecord>("Groundtruth/Backend/SandboxRecord")({
-  session: SandboxSession,
-  phase: SandboxPhase,
-}) {}
-
-interface StoredSandbox {
-  readonly record: SandboxRecord;
-  readonly runtime: SandboxRuntime;
-  readonly materializedAt: number;
-  readonly lastActiveAt: number;
-}
-
-type SandboxStore = ReadonlyMap<SessionId, StoredSandbox>;
-
-const incidentTitle = IncidentTitle.make("Checkout latency and error spike");
-const alertName = AlertName.make("Checkout upstream request rate");
-const checkoutService = ServiceName.make("checkout-api");
-
-const stateView = (record: SandboxRecord, changed: boolean, occurredAt: DateTime.Utc) =>
-  new SandboxState({
-    session: record.session,
-    phase: record.phase,
-    changed,
-    occurredAt,
-  });
+const incidentTitle = IncidentTitle.make("Checkout reliability investigation");
 
 const seedFromSessionId = (sessionId: SessionId) =>
   Number.parseInt(String(sessionId).replaceAll("-", "").slice(-8), 16);
@@ -78,7 +71,9 @@ export class SandboxService extends Context.Service<
       seed?: number,
     ): Effect.Effect<SandboxState, SandboxAdmissionError>;
     trigger(sessionId: SessionId): Effect.Effect<SandboxState, SessionLookupError>;
+    recover(sessionId: SessionId): Effect.Effect<SandboxState, SessionLookupError>;
     reset(sessionId: SessionId): Effect.Effect<SandboxState, SessionLookupError>;
+    advanceActive(): Effect.Effect<number, SandboxUnavailable>;
     pruneExpired(): Effect.Effect<number, SandboxUnavailable>;
   }
 >()("groundtruth/backend/sandbox/SandboxService") {
@@ -91,6 +86,7 @@ export class SandboxService extends Context.Service<
       const deploys = yield* DeployService;
       const incidentService = yield* IncidentService;
       const incidentState = yield* IncidentState;
+      const events = yield* LiveEventBus;
       const telemetry = yield* TelemetryStore;
       const transitions = yield* Semaphore.make(1);
       const store = yield* Ref.make<SandboxStore>(new Map());
@@ -126,69 +122,70 @@ export class SandboxService extends Context.Service<
         now: DateTime.Utc,
       ) {
         const id = AlertId.make(yield* crypto.randomUUIDv7.pipe(Effect.orDie));
-        yield* Ref.update(incidentState.state, (all) => {
-          const existing = all.get(projectId);
-          if (existing !== undefined) {
-            return all;
-          }
-          const alert = new Alert({
-            id,
-            projectId,
-            name: alertName,
-            serviceName: checkoutService,
-            metricName: "upstream.client.requests",
-            aggregation: "rate",
-            comparison: "above",
-            threshold: 90,
-            windowSeconds: 60,
-            severity: "critical",
-            status: "healthy",
-            summary: null,
-            enabled: true,
-            firingSince: null,
-            resolvedAt: null,
-            createdAt: now,
-            updatedAt: now,
-          });
-          const next = new Map(all);
-          next.set(projectId, {
-            detail: null,
-            alerts: [alert],
-            manualAlerts: [],
-          });
-          return next;
-        });
+        yield* seedSandboxIncidentProject(incidentState, projectId, id, now);
       });
 
       const replaceRuntime = Effect.fn("SandboxService.replaceRuntime")(function* (
         projectId: ProjectId,
         runtime: SandboxRuntime,
-        materializedAt: number,
       ) {
-        const latest = runtime.batches.at(-1);
-        const offsetMilliseconds = latest === undefined ? 0 : materializedAt - latest.bucketEnd;
         const batches = yield* Effect.forEach(runtime.batches, (batch) =>
           crypto.randomUUIDv7.pipe(
             Effect.orDie,
-            Effect.map((id) => canonicalSandboxBatch(batch, id, offsetMilliseconds)),
+            Effect.map((id) => canonicalSandboxBatch(batch, id, 0)),
           ),
         );
         yield* telemetry.replace(projectId, batches);
       });
 
-      const refreshStored = Effect.fn("SandboxService.refreshStored")(function* (
+      const appendRuntime = Effect.fn("SandboxService.appendRuntime")(function* (
+        projectId: ProjectId,
+        batches: SandboxRuntime["batches"],
+        timestampOffsetMilliseconds: number,
+      ) {
+        yield* Effect.forEach(
+          batches,
+          (batch) =>
+            crypto.randomUUIDv7.pipe(
+              Effect.orDie,
+              Effect.map((id) => canonicalSandboxBatch(batch, id, timestampOffsetMilliseconds)),
+              Effect.flatMap((canonical) => telemetry.ingest(projectId, canonical)),
+            ),
+          { discard: true },
+        );
+      });
+
+      const advanceStored = Effect.fn("SandboxService.advanceStored")(function* (
         projectId: ProjectId,
         stored: StoredSandbox,
         now: DateTime.Utc,
       ) {
         const anchor = materializationAnchor(now);
+        let runtime = stored.runtime;
+        let record = stored.record;
         if (anchor > stored.materializedAt) {
-          yield* replaceRuntime(projectId, stored.runtime, anchor);
+          const advanced = yield* advanceSandboxRuntime(runtime, 1).pipe(Effect.orDie);
+          runtime = advanced.runtime;
+          const phase = yield* sandboxRuntimePhase(runtime);
+          record = new SandboxRecord({ session: stored.record.session, phase });
+          const latest = advanced.advancedBatches.at(-1);
+          const timestampOffsetMilliseconds = latest === undefined ? 0 : anchor - latest.bucketEnd;
+          yield* appendRuntime(projectId, advanced.advancedBatches, timestampOffsetMilliseconds);
+          yield* publishSandboxProgress(
+            crypto,
+            incidentState,
+            incidentService,
+            events,
+            projectId,
+            advanced.advancedBatches,
+            timestampOffsetMilliseconds,
+          );
         }
         const refreshed = {
           ...stored,
-          materializedAt: Math.max(anchor, stored.materializedAt),
-          lastActiveAt: DateTime.toEpochMillis(now),
+          record,
+          runtime,
+          materializedAt: anchor > stored.materializedAt ? anchor : stored.materializedAt,
         };
         yield* setStored(stored.record.session.id, refreshed);
         return refreshed;
@@ -274,9 +271,9 @@ export class SandboxService extends Context.Service<
         const active = yield* Ref.get(store);
         const existing = active.get(session.id);
         if (existing !== undefined) {
-          const projectId = sandboxProjectIdForSession(session.id);
-          const refreshed = yield* refreshStored(projectId, existing, now);
-          return stateView(refreshed.record, false, now);
+          const touched = { ...existing, lastActiveAt: DateTime.toEpochMillis(now) };
+          yield* setStored(session.id, touched);
+          return sandboxStateView(touched.record, false, now);
         }
         if (active.size >= config.sandboxSessionLimit) {
           const eviction = leastRecentlyUsedIdleSession(active, now);
@@ -298,14 +295,14 @@ export class SandboxService extends Context.Service<
         const anchor = materializationAnchor(now);
         yield* boards.ensureSandboxBoard(projectId);
         yield* seedIncidentProject(projectId, now);
-        yield* replaceRuntime(projectId, runtime, anchor);
+        yield* replaceRuntime(projectId, runtime);
         yield* setStored(session.id, {
           record,
           runtime,
           materializedAt: anchor,
           lastActiveAt: DateTime.toEpochMillis(now),
         });
-        return stateView(record, true, now);
+        return sandboxStateView(record, true, now);
       });
 
       const ensure = Effect.fn("SandboxService.ensure")((session: SandboxSession) =>
@@ -334,9 +331,9 @@ export class SandboxService extends Context.Service<
         transitions.withPermit(
           Effect.gen(function* () {
             const { now, stored } = yield* requireActive(sessionId);
-            const projectId = sandboxProjectIdForSession(sessionId);
-            const refreshed = yield* refreshStored(projectId, stored, now);
-            return stateView(refreshed.record, false, now);
+            const touched = { ...stored, lastActiveAt: DateTime.toEpochMillis(now) };
+            yield* setStored(sessionId, touched);
+            return sandboxStateView(touched.record, false, now);
           }),
         ),
       );
@@ -349,32 +346,79 @@ export class SandboxService extends Context.Service<
       const trigger = Effect.fn("SandboxService.trigger")((sessionId: SessionId) =>
         transitions.withPermit(
           Effect.gen(function* () {
-            const { now, stored: current } = yield* requireActive(sessionId);
+            const { now, stored } = yield* requireActive(sessionId);
             const projectId = sandboxProjectIdForSession(sessionId);
+            const current = { ...stored, lastActiveAt: DateTime.toEpochMillis(now) };
+            yield* setStored(sessionId, current);
             if (current.record.phase !== "baseline") {
-              const refreshed = yield* refreshStored(projectId, current, now);
               if (current.record.phase !== "recovery") {
                 yield* seedIncidentProject(projectId, now);
                 yield* incidentService.ensureIncident(projectId, incidentTitle);
               }
-              return stateView(refreshed.record, false, now);
+              return sandboxStateView(current.record, false, now);
             }
             const runtime = yield* triggerSandboxRuntime(current.runtime).pipe(Effect.orDie);
             const record = new SandboxRecord({
               session: current.record.session,
-              phase: "amplification",
+              phase: "upstream-blip",
             });
             yield* seedIncidentProject(projectId, now);
             yield* incidentService.ensureIncident(projectId, incidentTitle);
-            const anchor = materializationAnchor(now);
-            yield* replaceRuntime(projectId, runtime, anchor);
             yield* setStored(sessionId, {
               record,
               runtime,
-              materializedAt: anchor,
+              materializedAt: current.materializedAt,
               lastActiveAt: DateTime.toEpochMillis(now),
             });
-            return stateView(record, true, now);
+            return sandboxStateView(record, true, now);
+          }),
+        ),
+      );
+
+      const recover = Effect.fn("SandboxService.recover")((sessionId: SessionId) =>
+        transitions.withPermit(
+          Effect.gen(function* () {
+            const { now, stored } = yield* requireActive(sessionId);
+            const projectId = sandboxProjectIdForSession(sessionId);
+            if (stored.record.phase === "baseline") {
+              return yield* new EntityNotFound({
+                entity: "incident",
+                id: sessionId,
+                message: "No active sandbox incident is available to recover",
+              });
+            }
+            const touched = { ...stored, lastActiveAt: DateTime.toEpochMillis(now) };
+            if (stored.record.phase === "recovery") {
+              yield* setStored(sessionId, touched);
+              return sandboxStateView(touched.record, false, now);
+            }
+            const firingAlerts = yield* incidentService.listAlerts(projectId, {
+              status: "firing",
+            });
+            if (firingAlerts.length === 0) {
+              return yield* new EntityNotFound({
+                entity: "alert",
+                id: sessionId,
+                message: "Wait for the sandbox alert to fire before starting recovery",
+              });
+            }
+            const runtime = yield* recoverSandboxRuntime(stored.runtime).pipe(Effect.orDie);
+            const record = new SandboxRecord({ session: stored.record.session, phase: "recovery" });
+            yield* deploys.record(
+              projectId,
+              new RecordDeployEventRequest({
+                service: ServiceName.make("checkout-api"),
+                sha: Sha.make("c1ea7f1"),
+                description: NonEmptyText.make("Bound retries with backoff, jitter, and a budget"),
+                deployedAt: now,
+              }),
+            );
+            yield* setStored(sessionId, {
+              ...touched,
+              record,
+              runtime,
+            });
+            return sandboxStateView(record, true, now);
           }),
         ),
       );
@@ -395,14 +439,36 @@ export class SandboxService extends Context.Service<
             yield* boards.ensureSandboxBoard(projectId, true);
             yield* seedIncidentProject(projectId, now);
             const anchor = materializationAnchor(now);
-            yield* replaceRuntime(projectId, runtime, anchor);
+            yield* replaceRuntime(projectId, runtime);
             yield* setStored(sessionId, {
               record,
               runtime,
               materializedAt: anchor,
               lastActiveAt: DateTime.toEpochMillis(now),
             });
-            return stateView(record, current.record.phase !== "baseline", now);
+            return sandboxStateView(record, current.record.phase !== "baseline", now);
+          }),
+        ),
+      );
+
+      const advanceActive = Effect.fn("SandboxService.advanceActive")(() =>
+        transitions.withPermit(
+          Effect.gen(function* () {
+            const now = yield* DateTime.now;
+            const nowMilliseconds = DateTime.toEpochMillis(now);
+            const anchor = materializationAnchor(now);
+            const current = yield* Ref.get(store);
+            let advanced = 0;
+            for (const [sessionId, stored] of current) {
+              const expired =
+                DateTime.toEpochMillis(stored.record.session.expiresAt) <= nowMilliseconds;
+              const inactive =
+                nowMilliseconds - stored.lastActiveAt > sandboxActiveWindowMilliseconds;
+              if (expired || inactive || anchor <= stored.materializedAt) continue;
+              yield* advanceStored(sandboxProjectIdForSession(sessionId), stored, now);
+              advanced += 1;
+            }
+            return advanced;
           }),
         ),
       );
@@ -422,7 +488,9 @@ export class SandboxService extends Context.Service<
         resume,
         resumeOrOpen,
         trigger,
+        recover,
         reset,
+        advanceActive,
         pruneExpired,
       });
     }),

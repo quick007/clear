@@ -21,7 +21,7 @@ catalog:
   webmcp-types: ^0.1.5
   "@paper-design/shaders-react": 0.0.80
   sharp: 0.35.2
-  recharts: 3.10.1
+  echarts: ^6.1.0
 
 overrides:
   vite@*: "catalog:"

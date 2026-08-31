@@ -71,7 +71,11 @@ export function buildMetricChartModel({
   const totals = stacking === "percent" ? percentTotals(series) : new Map<string, number>();
   const rowsByTime = new Map<number, MetricChartRow>();
   const descriptors = series.map((item, index) => {
-    const key = `series-${index}`;
+    const attributes = Object.entries(item.attributes)
+      .toSorted(([left], [right]) => left.localeCompare(right))
+      .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+      .join(",");
+    const key = `${item.queryRef}:${attributes || item.label}`;
     for (const point of item.points) {
       const atMs = alignedBucketTimestamp(point.at, item.bucketDurationMs);
       const row = rowsByTime.get(atMs) ?? { atMs };

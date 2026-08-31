@@ -168,7 +168,7 @@ describe("GroundtruthToolRegistry", () => {
     const inputSchema = schemaJson(QueryMetricsInput);
     expect(inputSchema).toMatchObject({
       properties: {
-        step: { type: "string", enum: ["10s", "30s", "1m", "5m"] },
+        step: { type: "string", enum: ["5s", "10s", "30s", "1m", "5m"] },
       },
     });
     expect(() =>
@@ -363,11 +363,9 @@ describe("GroundtruthToolRegistry", () => {
     });
 
     await registry.start();
+    expect(modelContext.tools.get("close_incident")?.description).toContain("simulate_fix_deploy");
     expect(modelContext.tools.get("close_incident")?.description).toContain(
-      "sandbox has no remediation step",
-    );
-    expect(modelContext.tools.get("close_incident")?.description).toContain(
-      "visible recovery is not required",
+      "confirming recovery in current telemetry",
     );
 
     await sessions.set({ projectId, mode: "hosted", incident: openIncident });

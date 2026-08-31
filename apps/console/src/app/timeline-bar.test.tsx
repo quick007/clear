@@ -35,7 +35,7 @@ describe("TimelineBar", () => {
   it("keeps the resolved state and final summary visible", () => {
     const html = renderToStaticMarkup(<TimelineBar incidentDetail={closedIncident} />);
 
-    expect(html).toContain("Resolved incident timeline");
+    expect(html).toContain("Closed incident timeline");
     expect(html).toContain("Summary: Latency recovered after the retry policy was corrected.");
     expect(html).toContain('data-style="latestDot resolvedDot"');
   });

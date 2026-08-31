@@ -34,7 +34,9 @@ export const formatRelativeTime = (value: DateTime.Utc | null) => {
 };
 
 export const formatOpenDuration = (value: DateTime.Utc) => {
-  const minutes = Math.max(1, Math.floor((Date.now() - epochMilliseconds(value)) / 60_000));
+  const elapsed = Date.now() - epochMilliseconds(value);
+  if (elapsed < 60_000) return "less than 1 min";
+  const minutes = Math.floor(elapsed / 60_000);
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
   return `${hours} hr ${minutes % 60} min`;

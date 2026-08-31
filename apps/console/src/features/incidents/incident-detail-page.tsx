@@ -12,7 +12,12 @@ import {
   formatRelativeTime,
   formatShortTime,
 } from "../../data/format";
-import { useCloseIncident, useIncidentQuery, useRuntimeQuery } from "../../data/queries";
+import {
+  useCloseIncident,
+  useIncidentQuery,
+  useOverviewQuery,
+  useRuntimeQuery,
+} from "../../data/queries";
 import { mutationOutcomeIsUnknown } from "../../errors";
 import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
@@ -23,13 +28,16 @@ import { ContentState, Page } from "../../ui/page";
 import { StaleDataNotice } from "../../ui/stale-data-notice";
 import { StatusPill } from "../../ui/status";
 import { HypothesisList } from "../../app/situation-strip";
+import { useWorkspaceAuthenticationRequired } from "../../app/workspace-failure-context";
 
 export function IncidentDetailPage() {
   const { incidentId } = useParams({ from: "/incidents/$incidentId" });
   const navigate = useNavigate({ from: "/incidents/$incidentId" });
   const runtime = useRuntimeQuery();
+  const authenticationRequired = useWorkspaceAuthenticationRequired();
   const projectId = runtime.data?.projectId ?? null;
   const incident = useIncidentQuery(projectId, incidentId);
+  const overview = useOverviewQuery(projectId);
   const incidentLoading =
     (runtime.isPending && !runtime.data) || (incident.isPending && !incident.data);
   const incidentUnavailable = !runtime.data || !projectId || !incident.data;
@@ -71,6 +79,9 @@ export function IncidentDetailPage() {
 
   const detail = incident.data;
   const isOpen = detail.incident.status === "open";
+  const sandboxAlertFiring =
+    runtime.data.mode === "sandbox" &&
+    overview.data?.alerts.some((alert) => alert.status === "firing") === true;
   const timeline = [...detail.timeline].sort(
     (left, right) => epochMilliseconds(left.occurredAt) - epochMilliseconds(right.occurredAt),
   );
@@ -82,7 +93,7 @@ export function IncidentDetailPage() {
       </Link>
       <StaleDataNotice
         copy="Showing the last loaded investigation."
-        error={staleFailure}
+        error={authenticationRequired ? null : staleFailure}
         notFound={{ href: "/incidents", label: "Back to incidents" }}
         onRetry={retryFailedQueries}
         retrying={runtime.isFetching || incident.isFetching}
@@ -94,23 +105,27 @@ export function IncidentDetailPage() {
           <div>
             <h1 {...stylex.props(styles.incidentTitle)}>{detail.incident.title}</h1>
             <p {...stylex.props(styles.incidentMeta)}>
-              {isOpen ? "Opened" : "Resolved"}{" "}
+              {isOpen ? "Opened" : "Closed"}{" "}
               {formatRelativeTime(detail.incident.closedAt ?? detail.incident.openedAt)}
             </p>
           </div>
         </div>
-        {isOpen ? (
+        {isOpen && !sandboxAlertFiring ? (
           <CloseIncidentDialog
             incidentId={detail.incident.id}
             onClosed={() => void navigate({ search: { guide: undefined }, to: "/board" })}
             projectId={projectId}
           />
+        ) : isOpen ? (
+          <span role="status" {...stylex.props(styles.closeBlocked)}>
+            Waiting for the alert to clear
+          </span>
         ) : null}
       </header>
 
       {detail.incident.summary ? (
         <section {...stylex.props(styles.summary)}>
-          <h2 {...stylex.props(styles.summaryTitle)}>Resolution</h2>
+          <h2 {...stylex.props(styles.summaryTitle)}>Summary</h2>
           <p {...stylex.props(styles.summaryCopy)}>{detail.incident.summary}</p>
         </section>
       ) : null}
@@ -297,6 +312,7 @@ const styles = stylex.create({
   },
   incidentTitle: { fontSize: 24, fontWeight: 500, letterSpacing: "-0.025em", marginBlock: 0 },
   incidentMeta: { color: colors.textSubtle, fontSize: 11, marginBlock: 5 },
+  closeBlocked: { color: colors.textSubtle, fontSize: 11, paddingBlock: space.x2 },
   summary: {
     backgroundColor: colors.greenWash,
     borderColor: "rgba(52, 211, 153, 0.22)",
