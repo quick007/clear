@@ -14,9 +14,16 @@ export const isSafeReturnPath = (value: string) =>
   !value.includes("\\") &&
   !hasControlCharacter(value);
 
+export const hostedReturnPath = (returnPath: string) => {
+  const localPath = isSafeReturnPath(returnPath) ? returnPath : "/board";
+  const url = new URL(localPath, "https://clear.invalid");
+  url.searchParams.set("hosted", "true");
+  return `${url.pathname}${url.search}${url.hash}`;
+};
+
 export const signInHref = (returnPath: string) => {
   const search = new URLSearchParams({
-    returnPath: isSafeReturnPath(returnPath) ? returnPath : "/board",
+    returnPath: hostedReturnPath(returnPath),
   });
   return `${signInPath}?${search}`;
 };

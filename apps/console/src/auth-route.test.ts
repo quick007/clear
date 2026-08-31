@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { isSafeReturnPath, signInHref, signInPath } from "./auth-route";
+import { hostedReturnPath, isSafeReturnPath, signInHref, signInPath } from "./auth-route";
 
 describe("Clear sign-in route", () => {
   it("builds the public sign-in URL with an encoded local return path", () => {
     expect(signInPath).toBe("/sign-in");
     expect(signInHref("/incidents/incident-1?tab=timeline")).toBe(
-      "/sign-in?returnPath=%2Fincidents%2Fincident-1%3Ftab%3Dtimeline",
+      "/sign-in?returnPath=%2Fincidents%2Fincident-1%3Ftab%3Dtimeline%26hosted%3Dtrue",
+    );
+    expect(hostedReturnPath("/incidents/incident-1?tab=timeline#summary")).toBe(
+      "/incidents/incident-1?tab=timeline&hosted=true#summary",
     );
   });
 
@@ -14,7 +17,7 @@ describe("Clear sign-in route", () => {
     "falls back to the board for the unsafe return path %s",
     (returnPath) => {
       expect(isSafeReturnPath(returnPath)).toBe(false);
-      expect(signInHref(returnPath)).toBe("/sign-in?returnPath=%2Fboard");
+      expect(signInHref(returnPath)).toBe("/sign-in?returnPath=%2Fboard%3Fhosted%3Dtrue");
     },
   );
 });

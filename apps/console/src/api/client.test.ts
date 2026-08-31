@@ -26,10 +26,11 @@ describe.sequential("browser API client", () => {
   it("uses the generated contract client with credentials and access middleware", async () => {
     const alertId = Schema.decodeUnknownSync(AlertId)("01890f6e-7c00-7000-8000-000000000003");
     const requests: Array<Request> = [];
+    let expectedCredentials: RequestCredentials = "include";
     const fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const request = new Request(input, init);
       requests.push(request);
-      expect(init?.credentials).toBe("include");
+      expect(init?.credentials).toBe(expectedCredentials);
       expect(new Headers(init?.headers).get("x-groundtruth-sandbox-session")).toBe("sandbox-1");
       if (request.method === "DELETE") return new Response(null, { status: 204 });
       if (request.method === "POST") {
@@ -128,6 +129,16 @@ describe.sequential("browser API client", () => {
       enabled: true,
     });
     await expect(requests[2]?.clone().json()).resolves.toEqual({ name: "primary-exporter" });
+
+    expectedCredentials = "omit";
+    const demoApi = await makeBrowserApiClient({
+      baseUrl: "https://api.groundtruth.test",
+      forceSandbox: true,
+      sessionStorage,
+    });
+    await demoApi.run(demoApi.client.overview.listServices({ params: { projectId } }));
+
+    expect(fetch).toHaveBeenCalledTimes(5);
   });
 
   it("persists and clears the per-tab sandbox session", async () => {

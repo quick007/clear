@@ -118,7 +118,7 @@ describe("recoveryActionForConsoleFailure", () => {
       }),
     ).toEqual({
       _tag: "Link",
-      href: "/sign-in?returnPath=%2Fincidents%2Fincident-1%3Ftab%3Dtimeline",
+      href: "/sign-in?returnPath=%2Fincidents%2Fincident-1%3Ftab%3Dtimeline%26hosted%3Dtrue",
       label: "Log in again",
     });
   });
@@ -130,7 +130,7 @@ describe("recoveryActionForConsoleFailure", () => {
       }),
     ).toEqual({
       _tag: "Link",
-      href: "/sign-in?returnPath=%2Fconnect",
+      href: "/sign-in?returnPath=%2Fconnect%3Fhosted%3Dtrue",
       label: "Log in to create a project",
     });
   });

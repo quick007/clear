@@ -55,7 +55,11 @@ const persistSandboxSessionId = (storage: SessionStorage | null, sessionId: stri
 };
 
 export const makeBrowserApiClient = async (
-  options: { readonly baseUrl?: string; readonly sessionStorage?: SessionStorage | null } = {},
+  options: {
+    readonly baseUrl?: string;
+    readonly forceSandbox?: boolean;
+    readonly sessionStorage?: SessionStorage | null;
+  } = {},
 ): Promise<BrowserApiClient> => {
   const sessionStorage =
     options.sessionStorage === undefined ? browserSessionStorage() : options.sessionStorage;
@@ -74,7 +78,7 @@ export const makeBrowserApiClient = async (
 
   const clientLayer = Layer.mergeAll(FetchHttpClient.layer, accessLayer);
   const requestInitLayer = Layer.succeed(FetchHttpClient.RequestInit, {
-    credentials: "include",
+    credentials: options.forceSandbox === true ? "omit" : "include",
   });
   const baseUrl =
     options.baseUrl ??

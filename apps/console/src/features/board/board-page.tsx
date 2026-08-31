@@ -68,7 +68,10 @@ export function BoardPage() {
         : toolStatus === "failed"
           ? "failed"
           : "checking";
-  const shareUrl = new URL("/board?guide=true", window.location.origin).toString();
+  const shareUrl = new URL(
+    `/board?guide=true${runtime.data?.mode === "sandbox" ? "&demo=true" : ""}`,
+    window.location.origin,
+  ).toString();
   const boardUnavailable = (runtime.isError && !runtime.data) || (board.isError && !board.data);
   const boardFailure = runtime.isError && !runtime.data ? runtime.error : board.error;
   const catalogState = dependencyState(catalog.isError, catalog.data !== undefined);

@@ -1,5 +1,10 @@
 import type { SessionView } from "@groundtruth/api-contract";
-import { Chart01Icon, Logout01Icon, Plug01Icon } from "@hugeicons/core-free-icons";
+import {
+  ArrowRight01Icon,
+  Chart01Icon,
+  Logout01Icon,
+  Plug01Icon,
+} from "@hugeicons/core-free-icons";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 
@@ -7,6 +12,7 @@ import { signInHref } from "../auth-route";
 import { useLogoutMutation } from "../data/queries";
 import { mutationOutcomeIsUnknown } from "../errors";
 import { colors, radii, space } from "../theme/tokens.stylex";
+import { Button } from "../ui/button";
 import { Icon } from "../ui/icon";
 import { MutationFailureNotice } from "../ui/mutation-failure-notice";
 import { accountInitials } from "./sidebar-format";
@@ -38,7 +44,7 @@ export function SidebarAccountFooter({
     );
   }
 
-  const accountName = account.displayName ?? account.email ?? "Account";
+  const accountName = account.displayName ?? "Account";
 
   return (
     <div {...stylex.props(styles.footer)}>
@@ -46,11 +52,25 @@ export function SidebarAccountFooter({
         <Icon icon={Plug01Icon} size={16} />
         <span>Connect data</span>
       </Link>
+      <Button
+        large
+        render={
+          <a
+            href="/board?demo=true&guide=true"
+            onClick={onNavigate}
+            rel="noopener"
+            target="_blank"
+          />
+        }
+        tone="primary"
+      >
+        <span>See demo</span>
+        <Icon icon={ArrowRight01Icon} size={16} />
+      </Button>
       <div {...stylex.props(styles.account)}>
         <span {...stylex.props(styles.avatar)}>{accountInitials(accountName)}</span>
         <span {...stylex.props(styles.accountCopy)}>
           <strong {...stylex.props(styles.accountName)}>{accountName}</strong>
-          <span {...stylex.props(styles.accountDetail)}>{account.email}</span>
         </span>
         <button
           aria-label="Sign out"

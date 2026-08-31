@@ -38,7 +38,9 @@ describe("Sites authentication Worker", () => {
     expect(response.status).toBe(303);
     const location = response.headers.get("location");
     expect(location).toContain("/signin-with-chatgpt?return_to=");
-    expect(decodeURIComponent(location ?? "")).toContain("/sign-in?returnPath=%2Fboard");
+    expect(decodeURIComponent(location ?? "")).toContain(
+      "/sign-in?returnPath=%2Fboard%3Fhosted%3Dtrue",
+    );
     expect(response.headers.get("cache-control")).toBe("no-store, private");
   });
 
