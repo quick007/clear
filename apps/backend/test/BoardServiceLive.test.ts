@@ -28,7 +28,7 @@ import { TestClock } from "effect/testing";
 import { BoardService } from "../src/board/BoardService.js";
 import { BoardServiceLive } from "../src/board/BoardServiceLive.js";
 import { LiveEventBus } from "../src/live/LiveEventBus.js";
-import { sandboxProjectIdForSession } from "../src/memory/SeedIds.js";
+import { isSandboxProjectId, sandboxProjectIdForSession } from "../src/memory/SeedIds.js";
 
 const FoundationTest = Layer.mergeAll(PersistenceMemory, LiveEventBus.layer, NodeCrypto.layer);
 const BoardTest = Layer.merge(FoundationTest, BoardServiceLive.pipe(Layer.provide(FoundationTest)));
@@ -72,6 +72,26 @@ const rebuildBoardService = Effect.gen(function* () {
 });
 
 describe("BoardServiceLive", () => {
+  it.effect("atomically converges concurrent default-board creation", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        yield* TestClock.setTime(Date.parse("2026-08-28T08:00:00.000Z"));
+        const repository = yield* DashboardRepository;
+        const boards = yield* rebuildBoardService;
+        const project = yield* createHostedProject;
+        assert.strictEqual(isSandboxProjectId(project.id), false);
+
+        const results = yield* Effect.all(
+          Array.from({ length: 10 }, () => boards.getDefaultBoard(project.id)),
+          { concurrency: "unbounded" },
+        );
+
+        assert.strictEqual(new Set(results.map(({ dashboard }) => dashboard.id)).size, 1);
+        assert.strictEqual((yield* repository.list(project.id)).length, 1);
+      }).pipe(Effect.provide(BoardTest)),
+    ),
+  );
+
   it.effect("persists hosted board mutations and reconstructs them after a layer rebuild", () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -174,6 +194,7 @@ describe("BoardServiceLive", () => {
   it.effect("publishes panel and aggregate board revisions for hosted boards", () =>
     Effect.scoped(
       Effect.gen(function* () {
+        yield* TestClock.setTime(Date.parse("2026-08-28T08:00:00.000Z"));
         const boards = yield* BoardService;
         const events = yield* LiveEventBus;
         const project = yield* createHostedProject;

@@ -23,7 +23,7 @@ The runtime exposes an interactive API reference at `https://api.clear.seufert.s
 
 The stateful Render service uses the `1c-2g` plan and one 10 GB disk. Nginx receives Render's public port and routes requests to the API or Collector. PostgreSQL, ClickHouse, the payments stub, and the scenario controller are not exposed as standalone public services.
 
-The checkout API uses the smallest paid Render web-service plan. It remains separate so a commit limited to `apps/checkout-api` deploys only that service and produces the real deploy shown in the recorded scenario. Both services communicate over Render's private network on non-reserved ports.
+The checkout API uses Render's free web-service plan. It remains separate so a commit limited to `apps/checkout-api` deploys only that service and produces the real deploy shown in the recorded scenario. The stateful runtime periodically checks its readiness to reduce cold starts during the guided flow. Both services communicate over Render's private network on non-reserved ports.
 
 ## Hosted limits
 

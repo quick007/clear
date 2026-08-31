@@ -5,6 +5,7 @@ import {
   EmailAddress,
   HostedSubject,
   IncidentTitle,
+  NonEmptyText,
   ProjectName,
   ProjectSlug,
   ServiceName as DomainServiceName,
@@ -13,6 +14,7 @@ import {
   AccountRepository,
   AlertRepository,
   IncidentRepository,
+  IncidentHistoryLimits,
   ProjectRepository,
 } from "@groundtruth/persistence";
 import { PersistenceMemory } from "@groundtruth/persistence/testing";
@@ -202,6 +204,69 @@ describe("AlertEvaluator", () => {
           resolvedDetail.timeline.map(({ _tag }) => _tag),
           ["incident-status", "note", "note"],
         );
+      }).pipe(Effect.provide(EvaluatorTest)),
+    ),
+  );
+
+  it.effect("keeps a committed alert transition when incident history is full", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        yield* TestClock.setTime(Date.parse("2026-08-28T08:00:00.000Z"));
+        const evaluator = yield* AlertEvaluator;
+        const alerts = yield* AlertRepository;
+        const incidents = yield* IncidentService;
+        const { alert, project } = yield* createHostedAlert;
+        const incident = yield* incidents.openIncident(
+          project.id,
+          IncidentTitle.make("Investigate saturated incident history"),
+        );
+        yield* Effect.forEach(
+          Array.from(
+            { length: IncidentHistoryLimits.timelineEntriesBeforeClose - 1 },
+            (_, index) => index,
+          ),
+          (index) =>
+            incidents.addNote(
+              project.id,
+              incident.incident.id,
+              NonEmptyText.make(`Existing note ${index + 1}`),
+            ),
+          { discard: true },
+        );
+        yield* ingestValue(project.id, 150, "01993f71-0001-7000-8000-000000000089");
+
+        const report = yield* evaluator.evaluateProject(project.id);
+        assert.strictEqual(report.transitioned, 1);
+        assert.strictEqual(report.failed, 0);
+        const firing = yield* alerts.findById(project.id, alert.id);
+        assert(Option.isSome(firing));
+        assert.strictEqual(firing.value.status, "firing");
+        assert.strictEqual(
+          (yield* incidents.getDetail(project.id, incident.incident.id)).timeline.length,
+          IncidentHistoryLimits.timelineEntriesBeforeClose,
+        );
+      }).pipe(Effect.provide(EvaluatorTest)),
+    ),
+  );
+
+  it.effect("evaluates the declared window instead of only the newest chart bucket", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const evaluator = yield* AlertEvaluator;
+        const alerts = yield* AlertRepository;
+        yield* TestClock.setTime(Date.parse("2026-08-28T07:59:10.000Z"));
+        const { alert, project } = yield* createHostedAlert;
+        yield* ingestValue(project.id, 200, "01993f71-0001-7000-8000-000000000091");
+        yield* TestClock.setTime(Date.parse("2026-08-28T07:59:50.000Z"));
+        yield* ingestValue(project.id, 50, "01993f71-0001-7000-8000-000000000092");
+        yield* TestClock.setTime(Date.parse("2026-08-28T08:00:00.000Z"));
+
+        const report = yield* evaluator.evaluateProject(project.id);
+        assert.strictEqual(report.transitioned, 1);
+        const firing = yield* alerts.findById(project.id, alert.id);
+        assert(Option.isSome(firing));
+        assert.strictEqual(firing.value.status, "firing");
+        assert.match(firing.value.summary ?? "", /125/);
       }).pipe(Effect.provide(EvaluatorTest)),
     ),
   );

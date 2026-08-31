@@ -46,17 +46,20 @@ import type {
   NoteOutcome,
 } from "./IncidentMutation.js";
 import {
+  type AlertFilter,
+  findProjectIncident,
+  getProjectOpenIncident,
+  listProjectAlerts,
+  listProjectIncidents,
+} from "./IncidentQueries.js";
+import {
   emptyProjectIncidentState,
   IncidentState,
   type ProjectIncidentState,
   withProjectIncidentState,
 } from "./IncidentState.js";
 
-export interface AlertFilter {
-  readonly status?: string | undefined;
-  readonly severity?: string | undefined;
-  readonly service?: string | undefined;
-}
+export type { AlertFilter } from "./IncidentQueries.js";
 
 export class IncidentService extends Context.Service<
   IncidentService,
@@ -116,35 +119,27 @@ export class IncidentService extends Context.Service<
         projectId: ProjectId,
         filter: AlertFilter,
       ) {
-        const project = (yield* Ref.get(store.state)).get(projectId) ?? emptyProjectIncidentState;
-        return project.alerts.filter(
-          (alert) =>
-            (filter.status === undefined || alert.status === filter.status) &&
-            (filter.severity === undefined || alert.severity === filter.severity) &&
-            (filter.service === undefined || alert.serviceName === filter.service),
-        );
+        return listProjectAlerts(yield* Ref.get(store.state), projectId, filter);
       });
 
       const getOpenIncident = Effect.fn("IncidentService.getOpenIncident")(function* (
         projectId: ProjectId,
       ) {
-        const detail = (yield* Ref.get(store.state)).get(projectId)?.detail;
-        return detail?.incident.status === "open" ? detail.incident : null;
+        return getProjectOpenIncident(yield* Ref.get(store.state), projectId);
       });
 
       const listIncidents = Effect.fn("IncidentService.listIncidents")(function* (
         projectId: ProjectId,
       ) {
-        const detail = (yield* Ref.get(store.state)).get(projectId)?.detail;
-        return detail === undefined || detail === null ? [] : [detail.incident];
+        return listProjectIncidents(yield* Ref.get(store.state), projectId);
       });
 
       const getDetail = Effect.fn("IncidentService.getDetail")(function* (
         projectId: ProjectId,
         incidentId: IncidentId,
       ) {
-        const detail = (yield* Ref.get(store.state)).get(projectId)?.detail;
-        if (detail === undefined || detail === null || detail.incident.id !== incidentId) {
+        const detail = findProjectIncident(yield* Ref.get(store.state), projectId, incidentId);
+        if (detail === undefined) {
           return yield* new EntityNotFound({
             entity: "incident",
             id: incidentId,
@@ -187,10 +182,13 @@ export class IncidentService extends Context.Service<
             timeline: [],
           });
           const alerts = project.alerts.map((alert) => markAlertFiring(alert, now));
+          const history =
+            project.detail === null ? project.history : [...project.history, project.detail];
           return [
             { detail, changed: true },
             withProjectIncidentState(all, projectId, {
               detail,
+              history,
               alerts,
               manualAlerts: project.manualAlerts,
             }),
@@ -445,6 +443,7 @@ export class IncidentService extends Context.Service<
             nextDetail,
             withProjectIncidentState(all, projectId, {
               detail: nextDetail,
+              history: project.history,
               alerts,
               manualAlerts: project.manualAlerts,
             }),

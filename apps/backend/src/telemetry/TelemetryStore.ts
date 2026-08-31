@@ -1,16 +1,13 @@
-import {
-  InvalidCursor,
-  type ProjectId,
-  ServiceMetadata,
-  ServiceName as DomainServiceName,
-  SignalPresence,
-} from "@groundtruth/domain";
+import { InvalidCursor, type ProjectId, type ServiceMetadata } from "@groundtruth/domain";
 import {
   type CanonicalTelemetryBatch,
+  aggregateMetricPoints,
   type LogRecord,
   type LogSearch,
   type LogSearchPage,
   type MetricCatalogEntry,
+  type MetricAggregateQuery,
+  type MetricAggregateResult,
   type MetricNotFound,
   type MetricPoint,
   type MetricQuery,
@@ -38,7 +35,7 @@ import {
   ProjectRepository,
   TelemetryRepository,
 } from "@groundtruth/persistence";
-import { Context, DateTime, Effect, Layer, Option, Ref } from "effect";
+import { Clock, Context, Effect, Layer, Option, Ref, Result } from "effect";
 import { isSandboxProjectId } from "../memory/SeedIds.js";
 import {
   discoveredServiceNames,
@@ -46,6 +43,7 @@ import {
 } from "../board/StandardServiceOverview.js";
 import { listMetricCatalog, queryMetricPoints } from "./MetricQueryEngine.js";
 import { getTraceDetail, searchLogRecords, searchTraceRecords } from "./SearchEngine.js";
+import { listServicesFromTelemetry, signalHealthFromActivities } from "./TelemetryViews.js";
 
 interface ProjectTelemetry {
   readonly batches: ReadonlyArray<CanonicalTelemetryBatch>;
@@ -101,87 +99,6 @@ const appendBatch = (
 
 const fromBatches = (batches: ReadonlyArray<CanonicalTelemetryBatch>) =>
   batches.reduce(appendBatch, emptyProject);
-
-interface ServiceSeen {
-  readonly first: bigint;
-  readonly last: bigint;
-  readonly metrics: boolean;
-  readonly logs: boolean;
-  readonly traces: boolean;
-}
-
-const listServices = (projectId: ProjectId, telemetry: ProjectTelemetry) => {
-  const services = new Map<string, ServiceSeen>();
-  const observe = (name: string, at: bigint, signal: SignalKind) => {
-    const current = services.get(name);
-    services.set(name, {
-      first: current === undefined || at < current.first ? at : current.first,
-      last: current === undefined || at > current.last ? at : current.last,
-      metrics: current?.metrics === true || signal === "metrics",
-      logs: current?.logs === true || signal === "logs",
-      traces: current?.traces === true || signal === "traces",
-    });
-  };
-  for (const point of telemetry.metrics)
-    observe(String(point.serviceName), point.timeUnixNano, "metrics");
-  for (const record of telemetry.logs)
-    observe(String(record.serviceName), record.timeUnixNano, "logs");
-  for (const span of telemetry.spans)
-    observe(String(span.serviceName), span.startTimeUnixNano, "traces");
-  return Array.from(services.entries())
-    .map(
-      ([name, seen]) =>
-        new ServiceMetadata({
-          projectId,
-          name: DomainServiceName.make(name),
-          signals: new SignalPresence({
-            metrics: seen.metrics,
-            logs: seen.logs,
-            traces: seen.traces,
-          }),
-          firstSeenAt: DateTime.fromDateUnsafe(new Date(Number(seen.first / 1_000_000n))),
-          lastSeenAt: DateTime.fromDateUnsafe(new Date(Number(seen.last / 1_000_000n))),
-        }),
-    )
-    .sort((left, right) => String(left.name).localeCompare(String(right.name)));
-};
-
-const signalHealthFromActivities = (activities: ReadonlyArray<SignalActivity>) =>
-  Effect.gen(function* () {
-    const now = yield* DateTime.now;
-    const delayedAfter = 5 * 60 * 1_000; // 5 minutes
-    return (["metrics", "logs", "traces"] as const).map((signal) => {
-      const matching = activities.filter((activity) => activity.signal === signal);
-      const first = matching.reduce<SignalActivity | undefined>(
-        (earliest, activity) =>
-          earliest === undefined ||
-          DateTime.toEpochMillis(activity.observedAt) < DateTime.toEpochMillis(earliest.observedAt)
-            ? activity
-            : earliest,
-        undefined,
-      );
-      const last = matching.reduce<SignalActivity | undefined>(
-        (latest, activity) =>
-          latest === undefined ||
-          DateTime.toEpochMillis(activity.observedAt) > DateTime.toEpochMillis(latest.observedAt)
-            ? activity
-            : latest,
-        undefined,
-      );
-      return new SignalHealth({
-        signal,
-        status:
-          last === undefined
-            ? "inactive"
-            : DateTime.toEpochMillis(now) - DateTime.toEpochMillis(last.observedAt) > delayedAfter
-              ? "delayed"
-              : "healthy",
-        firstSeenAt: first?.observedAt ?? null,
-        lastSeenAt: last?.observedAt ?? null,
-        services: Array.from(new Set(matching.flatMap((activity) => activity.services))),
-      });
-    });
-  });
 
 const signalHealth = (telemetry: ProjectTelemetry) =>
   signalHealthFromActivities(telemetry.activities);
@@ -245,6 +162,10 @@ export class TelemetryStore extends Context.Service<
     listMetrics(
       projectId: ProjectId,
     ): Effect.Effect<ReadonlyArray<MetricCatalogEntry>, TelemetryUnavailable>;
+    aggregateMetric(
+      projectId: ProjectId,
+      query: MetricAggregateQuery,
+    ): Effect.Effect<MetricAggregateResult, TelemetryUnavailable>;
     queryMetrics(
       projectId: ProjectId,
       query: MetricQuery,
@@ -301,6 +222,23 @@ export class TelemetryStore extends Context.Service<
           });
         });
       });
+      const aggregateMetric = Effect.fn("TelemetryStore.aggregateMetric")(function* (
+        projectId: ProjectId,
+        query: MetricAggregateQuery,
+      ) {
+        const telemetry = yield* get(projectId);
+        const result = aggregateMetricPoints(
+          telemetry.metrics,
+          query,
+          yield* Clock.currentTimeMillis,
+        );
+        if (Result.isSuccess(result)) return result.success;
+        return yield* new TelemetryUnavailable({
+          operation: "aggregate in-memory metric points",
+          retryable: false,
+          message: result.failure.reason,
+        });
+      });
 
       return TelemetryStore.of({
         ingest,
@@ -309,6 +247,7 @@ export class TelemetryStore extends Context.Service<
         recordActivity,
         listMetrics: (projectId) =>
           get(projectId).pipe(Effect.map((telemetry) => listMetricCatalog(telemetry.metrics))),
+        aggregateMetric,
         queryMetrics: (projectId, query) =>
           get(projectId).pipe(
             Effect.flatMap((telemetry) => queryMetricPoints(telemetry.metrics, query)),
@@ -326,7 +265,9 @@ export class TelemetryStore extends Context.Service<
             Effect.flatMap((telemetry) => getTraceDetail(telemetry.spans, telemetry.logs, traceId)),
           ),
         listServices: (projectId) =>
-          get(projectId).pipe(Effect.map((telemetry) => listServices(projectId, telemetry))),
+          get(projectId).pipe(
+            Effect.map((telemetry) => listServicesFromTelemetry(projectId, telemetry)),
+          ),
         signalHealth: (projectId) => get(projectId).pipe(Effect.flatMap(signalHealth)),
       });
     }),
@@ -414,6 +355,12 @@ export class TelemetryStore extends Context.Service<
         isSandboxProjectId(projectId)
           ? memory.listMetrics(projectId)
           : repository.listMetrics(projectId).pipe(Effect.mapError(persistenceUnavailable));
+      const aggregateMetric = (projectId: ProjectId, query: MetricAggregateQuery) =>
+        isSandboxProjectId(projectId)
+          ? memory.aggregateMetric(projectId, query)
+          : repository
+              .aggregateMetric(projectId, query)
+              .pipe(Effect.mapError(persistenceUnavailable));
       const queryMetrics = (projectId: ProjectId, query: MetricQuery) => {
         const sandbox = isSandboxProjectId(projectId);
         return validateMetricQuery(query, !sandbox).pipe(
@@ -475,6 +422,7 @@ export class TelemetryStore extends Context.Service<
         clear,
         recordActivity,
         listMetrics,
+        aggregateMetric,
         queryMetrics,
         searchLogs,
         searchTraces,

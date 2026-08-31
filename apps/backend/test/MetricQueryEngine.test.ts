@@ -80,6 +80,26 @@ describe("MetricQueryEngine", () => {
     }),
   );
 
+  it.effect("weights merged histogram averages by observation count", () =>
+    Effect.gen(function* () {
+      const result = yield* queryMetricPoints(
+        [histogram(100n, 5_000, 100, [100n, 0n]), histogram(1n, 1_000, 1_000, [0n, 1n])],
+        new MetricQuery({
+          metric: metricName,
+          aggregation: "avg",
+          range: {
+            _tag: "absolute",
+            start: DateTime.fromDateUnsafe(new Date("2026-08-28T02:39:50.000Z")),
+            end: DateTime.fromDateUnsafe(new Date("2026-08-28T02:40:10.000Z")),
+          },
+          step: "10s",
+        }),
+      );
+
+      assert.strictEqual(result.series[0]?.points[0]?.value, 6_000 / 101);
+    }),
+  );
+
   it.effect("anchors metric buckets independently of request timing", () =>
     Effect.gen(function* () {
       const queryAt = (millisecondOffset: number) =>

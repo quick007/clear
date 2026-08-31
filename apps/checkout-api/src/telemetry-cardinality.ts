@@ -18,4 +18,6 @@ const hash = (value: string) => {
 export const metricUserId = (userId: string) =>
   `user-bucket-${String(hash(userId) % userBuckets).padStart(4, "0")}`;
 
+export const isSampledTelemetryId = (value: string) => hash(value) < 4_294_967_296 / 50;
+
 export const maximumUserMetricCardinality = userBuckets;

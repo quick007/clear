@@ -14,6 +14,13 @@ import {
 } from "./histogram-percentile.ts";
 import { buildMetricQueryResult, type MetricQueryRow } from "./metric-query-result.ts";
 import { metricStepPlan, queryMetricRollups } from "./metric-rollup-queries.ts";
+import {
+  isInitialCumulativePoint,
+  numericMetricValue,
+  rateContribution,
+  rateWindow,
+  rateWindowDefinition,
+} from "./metric-sql.ts";
 import { clickhouseAttempt } from "./operation.ts";
 import {
   aggregationExpression,
@@ -50,9 +57,8 @@ interface MetricAttributeRow {
 export const listMetrics = (client: ClickHouseClient, projectId: ProjectId) =>
   clickhouseAttempt("list metrics", async (signal) => {
     const parameters = projectParameters(projectId);
-    const [catalogResult, attributeResult] = await Promise.all([
-      client.query({
-        query: `SELECT
+    const catalogResult = await client.query({
+      query: `SELECT
           metric_name,
           any(metric_description) AS description,
           any(metric_unit) AS unit,
@@ -68,12 +74,13 @@ export const listMetrics = (client: ClickHouseClient, projectId: ProjectId) =>
         GROUP BY metric_name
         ORDER BY metric_name
         LIMIT 500`,
-        format: "JSONStringsEachRow",
-        query_params: parameters,
-        abort_signal: signal,
-      }),
-      client.query({
-        query: `SELECT metric_name, attribute_key, toJSONString(groupUniqArray(8)(attribute_value)) AS examples
+      format: "JSONStringsEachRow",
+      query_params: parameters,
+      abort_signal: signal,
+    });
+    const catalog = await catalogResult.json<MetricCatalogRow>();
+    const attributeResult = await client.query({
+      query: `SELECT metric_name, attribute_key, toJSONString(groupUniqArray(8)(attribute_value)) AS examples
         FROM
         (
           SELECT
@@ -86,15 +93,11 @@ export const listMetrics = (client: ClickHouseClient, projectId: ProjectId) =>
         GROUP BY metric_name, attribute_key
         ORDER BY metric_name, attribute_key
         LIMIT 5000`,
-        format: "JSONStringsEachRow",
-        query_params: parameters,
-        abort_signal: signal,
-      }),
-    ]);
-    const [catalog, attributes] = await Promise.all([
-      catalogResult.json<MetricCatalogRow>(),
-      attributeResult.json<MetricAttributeRow>(),
-    ]);
+      format: "JSONStringsEachRow",
+      query_params: parameters,
+      abort_signal: signal,
+    });
+    const attributes = await attributeResult.json<MetricAttributeRow>();
     const attributesByMetric = new Map<string, Array<MetricAttribute>>();
     for (const row of attributes) {
       const entry = Schema.decodeUnknownSync(MetricAttribute)({
@@ -151,28 +154,6 @@ const isPercentileAggregation = (
 const percentileQueryError = (operation: string, message: string) =>
   persistenceError("clickhouse", operation, new Error(message), false);
 
-const numericMetricValue = `multiIf(
-  value_type = 'int', toFloat64(int_value),
-  value_type = 'double', double_value,
-  count > 0 AND has_sum, sum / count,
-  0
-)`;
-
-const rateContribution = `multiIf(
-  metric_type = 'sum' AND aggregation_temporality = 'cumulative' AND stream_position = 1, 0,
-  metric_type = 'sum' AND aggregation_temporality = 'cumulative'
-    AND (start_time_unix_nano != previous_start_time_unix_nano
-      OR (is_monotonic AND metric_value < previous_metric_value)), metric_value,
-  metric_type = 'sum' AND aggregation_temporality = 'cumulative',
-    metric_value - previous_metric_value,
-  value_type = 'none' AND has_sum, sum,
-  metric_value
-)`;
-
-const rateWindow = `row_number() OVER metric_stream AS stream_position,
-  lag(metric_value, 1, 0) OVER metric_stream AS previous_metric_value,
-  lag(start_time_unix_nano, 1, 0) OVER metric_stream AS previous_start_time_unix_nano`;
-
 export const queryMetrics = (client: ClickHouseClient, projectId: ProjectId, query: MetricQuery) =>
   Effect.gen(function* () {
     if (metricQueryUsesRollups(query)) {
@@ -203,22 +184,12 @@ export const queryMetrics = (client: ClickHouseClient, projectId: ProjectId, que
             query.aggregation,
             step.seconds,
             "attributes[{distinctKey:String}]",
+            "mapContains(attributes, {distinctKey:String})",
           );
     const rateWindowColumns = query.aggregation === "rate" ? `, ${rateWindow}` : "";
-    const rateWindowDefinition =
-      query.aggregation === "rate"
-        ? `WINDOW metric_stream AS (
-          PARTITION BY service_name, resource_attributes_json, scope_name, scope_version,
-            scope_attributes_json, attributes_json
-          ORDER BY time_unix_nano
-        )`
-        : "";
+    const windowDefinition = query.aggregation === "rate" ? rateWindowDefinition : "";
     const rateHaving =
-      query.aggregation === "rate"
-        ? `HAVING countIf(NOT (
-          metric_type = 'sum' AND aggregation_temporality = 'cumulative' AND stream_position = 1
-        )) > 0`
-        : "";
+      query.aggregation === "rate" ? `HAVING countIf(NOT ${isInitialCumulativePoint}) > 0` : "";
     let rows: ReadonlyArray<MetricQueryRow>;
 
     if (isPercentileAggregation(query.aggregation)) {
@@ -407,7 +378,7 @@ export const queryMetrics = (client: ClickHouseClient, projectId: ProjectId, que
             FROM groundtruth.metric_points
             WHERE project_id = {projectId:UUID}
               AND metric_name = {metricName:String}
-            ${rateWindowDefinition}
+            ${windowDefinition}
           )
           WHERE ${range.where}
             AND ${filters.where}

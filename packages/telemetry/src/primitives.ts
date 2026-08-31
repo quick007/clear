@@ -178,10 +178,30 @@ export const AttributeFilterOperator = Schema.Literals([
 ]);
 export type AttributeFilterOperator = typeof AttributeFilterOperator.Type;
 
-export class AttributeFilter extends Schema.Class<AttributeFilter>(
-  "Groundtruth/Telemetry/AttributeFilter",
-)({
+const AttributeFilterFields = Schema.Struct({
   key: AttributeKey,
   operator: AttributeFilterOperator,
   value: Schema.NullOr(AttributeValue),
-}) {}
+});
+
+const ValidAttributeFilter = AttributeFilterFields.check(
+  Schema.makeFilter<typeof AttributeFilterFields.Type>((filter) => {
+    if (filter.operator === "exists" && filter.value !== null) {
+      return {
+        path: ["value"],
+        issue: "exists filters must use a null value",
+      };
+    }
+    if (filter.operator !== "exists" && filter.value === null) {
+      return {
+        path: ["value"],
+        issue: `${filter.operator} filters must provide a value`,
+      };
+    }
+    return undefined;
+  }),
+);
+
+export class AttributeFilter extends Schema.Class<AttributeFilter>(
+  "Groundtruth/Telemetry/AttributeFilter",
+)(ValidAttributeFilter) {}

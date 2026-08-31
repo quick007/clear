@@ -83,7 +83,7 @@ Every telemetry table begins its sorting key with `project_id` and has an expiry
 
 ## Console and WebMCP
 
-`apps/console` is a React application built with Vite+, TanStack Router and Query, StyleX, Base UI, Hugeicons, and ECharts. The deployment includes a thin server worker for trusted ChatGPT Sites identity handoff and health checks. It is not an application proxy.
+`apps/console` is a React application built with Vite+, TanStack Router and Query, StyleX, Base UI, Hugeicons, and Recharts. The deployment includes a thin server worker for trusted ChatGPT Sites identity handoff and health checks. It is not an application proxy.
 
 The public homepage offers **Demo incident** and **Log in to create a project**. The application shell uses a sidebar for Board, Explore, Alerts, Incidents, and Settings. Explore combines Metrics, Logs, and Traces under shared service, environment, and time context. The website hides healthy connection chrome and all WebMCP implementation details.
 

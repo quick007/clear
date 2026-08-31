@@ -24,7 +24,7 @@ import {
   searchLogs,
   traceCursorFor,
 } from "./in-memory-query-support.ts";
-import { listMetrics, queryMetrics } from "./in-memory-metrics.ts";
+import { aggregateMetric, listMetrics, queryMetrics } from "./in-memory-metrics.ts";
 import {
   listServicesFromBatches,
   listSignalActivityFromBatches,
@@ -242,6 +242,15 @@ export const makeInMemoryTelemetryRepository = (
     Effect.gen(function* () {
       const now = yield* Clock.currentTimeMillis;
       return queryMetrics(projectSignals(yield* Ref.get(state), projectId).metrics, query, now);
+    }),
+  aggregateMetric: (projectId, query) =>
+    Effect.gen(function* () {
+      const now = yield* Clock.currentTimeMillis;
+      return yield* aggregateMetric(
+        projectSignals(yield* Ref.get(state), projectId).metrics,
+        query,
+        now,
+      );
     }),
   searchLogs: (projectId, search) =>
     Effect.gen(function* () {

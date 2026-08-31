@@ -155,6 +155,7 @@ export class SandboxService extends Context.Service<
             detail: null,
             alerts: [alert],
             manualAlerts: [],
+            history: [],
           });
           return next;
         });

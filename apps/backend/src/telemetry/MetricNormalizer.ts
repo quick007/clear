@@ -69,6 +69,79 @@ const temporality = (value: 0 | 1 | 2 | undefined): MetricTemporality => {
   return "unspecified";
 };
 
+const invalid = (path: string, message: string) => new InvalidOtlpPayload({ path, message });
+
+const validateExtrema = (minimum: number | undefined, maximum: number | undefined, path: string) =>
+  minimum !== undefined && maximum !== undefined && minimum > maximum
+    ? Effect.fail(invalid(`${path}.max`, "Histogram maximum must not be below its minimum"))
+    : Effect.void;
+
+const validateExplicitHistogram = (
+  count: bigint,
+  bucketCounts: ReadonlyArray<bigint>,
+  explicitBounds: ReadonlyArray<number>,
+  path: string,
+) =>
+  Effect.gen(function* () {
+    for (let index = 1; index < explicitBounds.length; index += 1) {
+      if (explicitBounds[index]! <= explicitBounds[index - 1]!) {
+        return yield* invalid(
+          `${path}.explicitBounds[${index}]`,
+          "Histogram bounds must be strictly increasing",
+        );
+      }
+    }
+    if (bucketCounts.length === 0 && explicitBounds.length === 0) return;
+    if (bucketCounts.length !== explicitBounds.length + 1) {
+      return yield* invalid(
+        `${path}.bucketCounts`,
+        "Histogram bucket count length must be one greater than its explicit bounds length",
+      );
+    }
+    if (bucketCounts.reduce((total, value) => total + value, 0n) !== count) {
+      return yield* invalid(
+        `${path}.count`,
+        "Histogram count must equal the sum of its bucket counts",
+      );
+    }
+  });
+
+const validateExponentialHistogram = (
+  point: NonNullable<NonNullable<OtlpMetric["exponentialHistogram"]>["dataPoints"]>[number],
+  count: bigint,
+  zeroCount: bigint,
+  positive: ReadonlyArray<bigint>,
+  negative: ReadonlyArray<bigint>,
+  path: string,
+) =>
+  Effect.gen(function* () {
+    const scale = point.scale ?? 0;
+    if (scale < -10 || scale > 20) {
+      return yield* invalid(
+        `${path}.scale`,
+        "Exponential histogram scale must be between -10 and 20",
+      );
+    }
+    if ((point.zeroThreshold ?? 0) < 0) {
+      return yield* invalid(
+        `${path}.zeroThreshold`,
+        "Exponential histogram zero threshold must not be negative",
+      );
+    }
+    const represented = positive.length > 0 || negative.length > 0 || point.zeroCount !== undefined;
+    if (
+      represented &&
+      positive.reduce((total, value) => total + value, zeroCount) +
+        negative.reduce((total, value) => total + value, 0n) !==
+        count
+    ) {
+      return yield* invalid(
+        `${path}.count`,
+        "Exponential histogram count must equal its positive, negative, and zero bucket counts",
+      );
+    }
+  });
+
 const metricName = (value: string | undefined, path: string) =>
   Effect.gen(function* () {
     const normalized = value?.trim() ?? "";
@@ -173,6 +246,13 @@ export const normalizeMetrics = (request: OtlpMetricsRequest) =>
           if (metric.histogram !== undefined) {
             for (const [pointIndex, point] of (metric.histogram.dataPoints ?? []).entries()) {
               const pointPath = `${path}.histogram.dataPoints[${pointIndex}]`;
+              const count = yield* unsignedInt64(point.count, `${pointPath}.count`);
+              const bucketCounts = yield* Effect.forEach(point.bucketCounts ?? [], (count, index) =>
+                unsignedInt64(count, `${pointPath}.bucketCounts[${index}]`),
+              );
+              const explicitBounds = point.explicitBounds ?? [];
+              yield* validateExplicitHistogram(count, bucketCounts, explicitBounds, pointPath);
+              yield* validateExtrema(point.min, point.max, pointPath);
               normalized.push(
                 new HistogramPoint({
                   ...shared,
@@ -185,14 +265,12 @@ export const normalizeMetrics = (request: OtlpMetricsRequest) =>
                   exemplars: yield* exemplars(point.exemplars, `${pointPath}.exemplars`),
                   flags: yield* otelFlags(point.flags, `${pointPath}.flags`),
                   temporality: temporality(metric.histogram.aggregationTemporality),
-                  count: yield* unsignedInt64(point.count, `${pointPath}.count`),
+                  count,
                   sum: point.sum ?? null,
                   minimum: point.min ?? null,
                   maximum: point.max ?? null,
-                  explicitBounds: point.explicitBounds ?? [],
-                  bucketCounts: yield* Effect.forEach(point.bucketCounts ?? [], (count, index) =>
-                    unsignedInt64(count, `${pointPath}.bucketCounts[${index}]`),
-                  ),
+                  explicitBounds,
+                  bucketCounts,
                 }),
               );
             }
@@ -204,6 +282,27 @@ export const normalizeMetrics = (request: OtlpMetricsRequest) =>
               metric.exponentialHistogram.dataPoints ?? []
             ).entries()) {
               const pointPath = `${path}.exponentialHistogram.dataPoints[${pointIndex}]`;
+              const count = yield* unsignedInt64(point.count, `${pointPath}.count`);
+              const zeroCount = yield* unsignedInt64(point.zeroCount, `${pointPath}.zeroCount`);
+              const positive = yield* Effect.forEach(
+                point.positive?.bucketCounts ?? [],
+                (count, index) =>
+                  unsignedInt64(count, `${pointPath}.positive.bucketCounts[${index}]`),
+              );
+              const negative = yield* Effect.forEach(
+                point.negative?.bucketCounts ?? [],
+                (count, index) =>
+                  unsignedInt64(count, `${pointPath}.negative.bucketCounts[${index}]`),
+              );
+              yield* validateExponentialHistogram(
+                point,
+                count,
+                zeroCount,
+                positive,
+                negative,
+                pointPath,
+              );
+              yield* validateExtrema(point.min, point.max, pointPath);
               normalized.push(
                 new ExponentialHistogramPoint({
                   ...shared,
@@ -216,28 +315,20 @@ export const normalizeMetrics = (request: OtlpMetricsRequest) =>
                   exemplars: yield* exemplars(point.exemplars, `${pointPath}.exemplars`),
                   flags: yield* otelFlags(point.flags, `${pointPath}.flags`),
                   temporality: temporality(metric.exponentialHistogram.aggregationTemporality),
-                  count: yield* unsignedInt64(point.count, `${pointPath}.count`),
+                  count,
                   sum: point.sum ?? null,
                   minimum: point.min ?? null,
                   maximum: point.max ?? null,
                   scale: point.scale ?? 0,
-                  zeroCount: yield* unsignedInt64(point.zeroCount, `${pointPath}.zeroCount`),
+                  zeroCount,
                   zeroThreshold: point.zeroThreshold ?? 0,
                   positive: new ExponentialBuckets({
                     offset: point.positive?.offset ?? 0,
-                    bucketCounts: yield* Effect.forEach(
-                      point.positive?.bucketCounts ?? [],
-                      (count, index) =>
-                        unsignedInt64(count, `${pointPath}.positive.bucketCounts[${index}]`),
-                    ),
+                    bucketCounts: positive,
                   }),
                   negative: new ExponentialBuckets({
                     offset: point.negative?.offset ?? 0,
-                    bucketCounts: yield* Effect.forEach(
-                      point.negative?.bucketCounts ?? [],
-                      (count, index) =>
-                        unsignedInt64(count, `${pointPath}.negative.bucketCounts[${index}]`),
-                    ),
+                    bucketCounts: negative,
                   }),
                 }),
               );

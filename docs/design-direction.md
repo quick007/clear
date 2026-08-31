@@ -27,7 +27,7 @@ The interface should be:
 - StyleX for component styling and design tokens.
 - Hugeicons free icons, using `@hugeicons/react` and the free icon set.
 - Tailwind color values may be copied into StyleX variables. Do not install or use Tailwind.
-- ECharts for data visualization, with a custom theme and React-rendered overlays where practical.
+- Recharts for data visualization, with Clear-owned styling and React-rendered overlays where practical.
 - IBM Plex Sans for interface text and IBM Plex Mono for numbers, identifiers, tool names, durations, and query fragments.
 - Dark mode is the primary shipped theme. Tokens must still be structured through `stylex.defineVars` so a light theme can be added without rewriting components.
 - No Radix packages, Lucide icons, Tailwind classes, CSS modules, styled-components, or scattered inline style objects.
@@ -241,7 +241,7 @@ Every metric panel should offer a thin baseline reference derived from a stable 
 - Axis and legend labels must be at least 12px.
 - Use a maximum of five distinguishable series in one panel.
 - Render legends as interactive series toggles.
-- Prefer a React tooltip or carefully themed ECharts tooltip that matches Base UI surfaces.
+- Prefer a React tooltip or carefully themed Recharts tooltip that matches Base UI surfaces.
 - Do not replay series animation on every live update.
 - Keep the last visible data during a disconnect and mark it stale rather than replacing it with an empty chart.
 
@@ -376,7 +376,7 @@ The 1024px to 1440px range is a primary environment because the ChatGPT desktop 
 - No tool-call feed, tool-count badge, registration token, or other WebMCP implementation detail in the product UI.
 - No Lucide, Radix, emoji icons, or hand-typed chevrons.
 - No Tailwind classes or Tailwind runtime dependency.
-- No ECharts default theme, legend, tooltip, or full-series update animation.
+- No Recharts default presentation, legend, tooltip, or full-series update animation.
 - No rainbow chart palette.
 - No dual y-axis comparison as the default reveal visualization.
 - No hover-only critical action.
@@ -385,72 +385,15 @@ The 1024px to 1440px range is a primary environment because the ChatGPT desktop 
 - No auto-scrolling the board while the user is actively inspecting older content.
 - No celebratory recovery animation. The telemetry itself is the payoff.
 
-## Visual QA checklist
+## Visual QA rubric
 
-### Composition
+This is a reusable design-review rubric, not a release-status checklist. It records the standards a reviewer should assess against a concrete viewport, browser, and scenario. Verification evidence belongs with the relevant test, capture, or release check.
 
-- [ ] At 1728 by 960, the active incident, focal chart, and retry chart are legible in one viewport.
-- [ ] At 1440 by 900, the focal evidence remains readable without competing side chrome.
-- [ ] At 1280 by 800, no essential control overlaps, clips, or falls into an accidental horizontal scroll area.
-- [ ] At 1024 by 768, the timeline sheet does not destroy the board's readable width.
-- [ ] At 390 by 844, the board, incident context, and timeline are all reachable without miniature desktop chrome.
-- [ ] Default panel layouts have visible hierarchy, including at least one focal region and supporting evidence.
-- [ ] The board has breathing room at its edges and between regions.
-- [ ] Suggested prompts never obscure a populated board.
-
-### Visual system
-
-- [ ] All component styling comes from StyleX and shared variables.
-- [ ] No Tailwind class or dependency is present.
-- [ ] All icons come from Hugeicons free and share a consistent style.
-- [ ] Base UI primitives are wrapped consistently and no Radix package is present.
-- [ ] Text is never smaller than 12px.
-- [ ] Changing numeric values use mono tabular numerals.
-- [ ] Amber is used deliberately and is not the default fill for every button.
-- [ ] No gradients, glows, glass panels, or card-soup composition appear inside the product workspace. The homepage uses only its single restrained atmospheric treatment.
-- [ ] Focus rings remain visible against every surface.
-
-### Charts
-
-- [ ] Every baseline shown has a truthful source and an accessible explanation.
-- [ ] Axis labels and legends remain readable in a 50% video downscale.
-- [ ] The upstream-requests-versus-users reveal reads without relying on a dual-axis trick.
-- [ ] Retry growth reads distinctly from first attempts.
-- [ ] Deploy markers align across affected panels.
-- [ ] Live updates do not replay full chart animations.
-- [ ] Five-series and long-label stress cases remain understandable.
-- [ ] Tooltips stay within the viewport and are keyboard reachable.
-
-### Product states
-
-- [ ] Board, panel, logs, traces, alert, and timeline surfaces have designed loading states.
-- [ ] The same surfaces have empty, error, stale, and disconnected states where applicable.
-- [ ] A missing metrics signal does not imply that logs and traces are also missing.
-- [ ] Previously loaded data remains visible during a live-stream disconnect.
-- [ ] Long service names, metric names, hypotheses, and translated text do not break layout.
-- [ ] Sandbox expiry and reset remain calm and recoverable.
-
-### Interaction and accessibility
-
-- [ ] The entire sidebar, context header, situation strip, and timeline work with a keyboard.
-- [ ] Popovers restore focus to their trigger on close.
-- [ ] Dialogs trap focus and close safely with Escape when appropriate.
-- [ ] Status never relies on color alone.
-- [ ] All icon-only controls have visible tooltips and accessible names.
-- [ ] Motion reduces correctly under `prefers-reduced-motion`.
-- [ ] 200% browser zoom remains usable without hiding primary actions.
-- [ ] Touch targets meet the 40px minimum on narrow screens.
-
-### Scripted-video frame
-
-- [ ] The initial traffic-surge hypothesis is visible at the same time as the relevant board context.
-- [ ] The agent-created comparison panel enters the visible stage without exposing tool plumbing.
-- [ ] The request increase and flat-user signal are readable without narration.
-- [ ] The retry amplification panel reads in under two seconds.
-- [ ] The deploy marker is visible across relevant panels.
-- [ ] Recovery reads from the settling data without a separate success overlay.
-- [ ] Tool registration and unregistration are visible in the recorded agent interaction, never as website chrome.
-- [ ] No sandbox or scenario-control chrome makes the product look like a toy in the shot.
+- **Composition:** At desktop and narrow widths, the active incident, focal evidence, retry evidence, and timeline remain reachable without clipped controls, accidental horizontal scrolling, or competing chrome. Suggested prompts never cover a populated board.
+- **Visual system:** StyleX variables, Base UI wrappers, and Hugeicons preserve a consistent, accessible interface. Text stays at least 12px, changing values use tabular mono numerals, amber remains deliberate, and focus stays visible. The workspace has no gradients, glow, glass panels, or card-soup composition.
+- **Charts:** Baselines have a truthful source and accessible explanation. The requests-versus-users and retry evidence remain legible after video downscaling without a dual-axis trick. Deploy markers, long labels, tooltips, and live updates remain intelligible and accessible.
+- **Product states and accessibility:** Loading, empty, error, stale, disconnected, expiry, and reset states remain calm and recoverable. Keyboard navigation, focus restoration, dialog behavior, non-color status signals, reduced motion, zoom, and narrow touch targets require deliberate verification.
+- **Recorded incident:** The traffic-surge hypothesis, decisive comparison, retry evidence, deploy marker, and recovery must be understandable without a tool feed on the website. Site-tool registration belongs only in the recorded agent interaction.
 
 ## Acceptance statement
 

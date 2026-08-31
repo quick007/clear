@@ -2,6 +2,7 @@ export * from "./activity.ts";
 export * from "./errors.ts";
 export * from "./ingest.ts";
 export * from "./logs.ts";
+export * from "./metric-aggregation.ts";
 export * from "./metrics.ts";
 export * from "./primitives.ts";
 export * from "./query-policy.ts";

@@ -46,7 +46,7 @@ export function MobileWorkspaceHeader({
     <header {...stylex.props(styles.mobileHeader)}>
       <Link
         aria-label="Open the board"
-        search={{ guide: undefined }}
+        search={{ demo: undefined, guide: undefined }}
         to="/board"
         {...stylex.props(styles.mobileBrand)}
       >
@@ -105,7 +105,7 @@ function SidebarContent({
         <Link
           aria-label="Open the board"
           onClick={onNavigate}
-          search={{ guide: undefined }}
+          search={{ demo: undefined, guide: undefined }}
           to="/board"
           {...stylex.props(styles.brand)}
         >
@@ -127,7 +127,7 @@ function SidebarContent({
         <Link
           activeProps={stylex.props(navigationStyles.linkActive)}
           onClick={onNavigate}
-          search={{ guide: undefined }}
+          search={{ demo: undefined, guide: undefined }}
           to="/board"
           {...stylex.props(navigationStyles.link)}
         >

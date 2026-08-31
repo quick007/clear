@@ -102,7 +102,9 @@ export function IncidentDetailPage() {
         {isOpen ? (
           <CloseIncidentDialog
             incidentId={detail.incident.id}
-            onClosed={() => void navigate({ search: { guide: undefined }, to: "/board" })}
+            onClosed={() =>
+              void navigate({ search: { demo: undefined, guide: undefined }, to: "/board" })
+            }
             projectId={projectId}
           />
         ) : null}

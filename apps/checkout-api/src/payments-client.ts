@@ -4,7 +4,7 @@ import { CheckoutConfig } from "./config.js";
 import { PaymentAuthorizationRequest, PaymentAuthorizationResponse } from "./contracts.js";
 import { PaymentUnavailable } from "./errors.js";
 import { upstreamDuration, upstreamRequests } from "./metrics.js";
-import { metricUserId } from "./telemetry-cardinality.js";
+import { isSampledTelemetryId, metricUserId } from "./telemetry-cardinality.js";
 
 const recordAttempt = (
   request: PaymentAuthorizationRequest,
@@ -122,13 +122,15 @@ export class PaymentsClient extends Context.Service<
                       finishedAt - startedAt,
                       error.status === undefined ? "unavailable" : String(error.status),
                     );
-                    yield* Effect.logWarning("Payments attempt failed").pipe(
-                      Effect.annotateLogs({
-                        attempt: request.attempt,
-                        reason: error.reason,
-                        requestId: request.requestId,
-                      }),
-                    );
+                    if (isSampledTelemetryId(request.requestId)) {
+                      yield* Effect.logWarning("Payments attempt failed").pipe(
+                        Effect.annotateLogs({
+                          attempt: request.attempt,
+                          reason: error.reason,
+                          requestId: request.requestId,
+                        }),
+                      );
+                    }
                     return yield* error;
                   }),
                 onSuccess: (response) =>

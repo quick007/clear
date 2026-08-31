@@ -1,5 +1,5 @@
 import { ServiceUnavailable } from "@groundtruth/api-contract";
-import { DisplayName, EmailAddress, HostedSubject, SessionId } from "@groundtruth/domain";
+import { type Account, HostedSession, SessionId } from "@groundtruth/domain";
 import {
   AuthHandoffRepository,
   HostedSessionRepository,
@@ -25,23 +25,6 @@ import { BackendConfig } from "../config/BackendConfig.js";
 const handoffTtlMillis = 30_000; // 30 seconds
 const sessionTtlMillis = 7 * 24 * 60 * 60 * 1_000; // 7 days
 const authPurgeInterval = "1 day"; // 1 day
-
-export class AuthPrincipal extends Schema.Class<AuthPrincipal>(
-  "groundtruth/backend/auth/AuthPrincipal",
-)({
-  hostedSubject: Schema.NonEmptyString,
-  email: Schema.NonEmptyString,
-  displayName: Schema.NullOr(Schema.String),
-}) {}
-
-export class SessionRecord extends Schema.Class<SessionRecord>(
-  "groundtruth/backend/auth/SessionRecord",
-)({
-  id: Schema.NonEmptyString,
-  principal: AuthPrincipal,
-  createdAt: Schema.Int,
-  expiresAt: Schema.Int,
-}) {}
 
 export class InvalidServiceCredential extends Schema.TaggedError<InvalidServiceCredential>()(
   "InvalidServiceCredential",
@@ -80,14 +63,14 @@ export class InvalidReturnPath extends Schema.TaggedError<InvalidReturnPath>()(
 ) {}
 
 interface HandoffRecord {
-  readonly principal: AuthPrincipal;
+  readonly account: Account;
   readonly returnPath: string;
   readonly expiresAt: number;
 }
 
 interface AuthState {
   readonly handoffs: ReadonlyMap<string, HandoffRecord>;
-  readonly sessions: ReadonlyMap<string, SessionRecord>;
+  readonly sessions: ReadonlyMap<string, AuthSessionRecord>;
 }
 
 export interface IssuedHandoff {
@@ -96,10 +79,9 @@ export interface IssuedHandoff {
   readonly expiresAt: number;
 }
 
-export interface RedeemedHandoff {
+export interface RedeemedHandoff extends AuthSessionRecord {
   readonly returnPath: string;
   readonly sessionToken: string;
-  readonly session: SessionRecord;
 }
 
 const randomToken = Effect.sync(() => randomBytes(32).toString("base64url"));
@@ -119,24 +101,22 @@ const authUnavailable = () =>
     message: "Authentication service is unavailable",
   });
 
-const validReturnPath = (returnPath: string) =>
-  returnPath.startsWith("/") && !returnPath.startsWith("//") && !returnPath.includes("\\");
-
-const toSessionRecord = ({ account, session }: AuthSessionRecord) =>
-  new SessionRecord({
-    id: String(session.id),
-    principal: new AuthPrincipal({
-      hostedSubject: String(account.hostedSubject),
-      email: String(account.email),
-      displayName: account.displayName,
-    }),
-    createdAt: DateTime.toEpochMillis(session.createdAt),
-    expiresAt: DateTime.toEpochMillis(session.expiresAt),
-  });
+const validReturnPath = (returnPath: string, consoleOrigin: string) => {
+  if (!returnPath.startsWith("/")) return false;
+  try {
+    return new URL(returnPath, consoleOrigin).origin === new URL(consoleOrigin).origin;
+  } catch {
+    return false;
+  }
+};
 
 const withoutExpired = (state: AuthState, now: number): AuthState => ({
   handoffs: new Map(Array.from(state.handoffs).filter(([, handoff]) => handoff.expiresAt > now)),
-  sessions: new Map(Array.from(state.sessions).filter(([, session]) => session.expiresAt > now)),
+  sessions: new Map(
+    Array.from(state.sessions).filter(
+      ([, record]) => DateTime.toEpochMillis(record.session.expiresAt) > now,
+    ),
+  ),
 });
 
 export class AuthService extends Context.Service<
@@ -148,7 +128,7 @@ export class AuthService extends Context.Service<
       credential: Redacted.Redacted<string>,
     ): Effect.Effect<void, AdminLoginDisabled | InvalidAdminCredential>;
     issueHandoff(
-      principal: AuthPrincipal,
+      account: Account,
       returnPath: string,
       browserNonce?: Redacted.Redacted<string>,
     ): Effect.Effect<IssuedHandoff, InvalidReturnPath | ServiceUnavailable>;
@@ -158,7 +138,7 @@ export class AuthService extends Context.Service<
     ): Effect.Effect<RedeemedHandoff, InvalidHandoffCode | ServiceUnavailable>;
     authenticate(
       sessionToken: string,
-    ): Effect.Effect<SessionRecord, SessionNotFound | ServiceUnavailable>;
+    ): Effect.Effect<AuthSessionRecord, SessionNotFound | ServiceUnavailable>;
     logout(sessionToken: string): Effect.Effect<void, ServiceUnavailable>;
     readonly purgeExpired: Effect.Effect<AuthPurgeResult, ServiceUnavailable>;
   }
@@ -203,11 +183,11 @@ export class AuthService extends Context.Service<
       });
 
       const issueHandoff = Effect.fn("AuthService.issueHandoff")(function* (
-        principal: AuthPrincipal,
+        account: Account,
         returnPath: string,
         suppliedBrowserNonce?: Redacted.Redacted<string>,
       ) {
-        if (!validReturnPath(returnPath)) {
+        if (!validReturnPath(returnPath, config.consoleOrigin)) {
           return yield* new InvalidReturnPath();
         }
         const [code, generatedBrowserNonce] = yield* Effect.all([randomToken, randomToken]);
@@ -221,7 +201,7 @@ export class AuthService extends Context.Service<
           const active = withoutExpired(current, now);
           const handoffs = new Map(active.handoffs);
           handoffs.set(handoffDigest(code, browserNonce), {
-            principal,
+            account,
             returnPath,
             expiresAt,
           });
@@ -235,7 +215,9 @@ export class AuthService extends Context.Service<
         browserNonce: Redacted.Redacted<string>,
       ) {
         const now = yield* Clock.currentTimeMillis;
-        const handoff = yield* Ref.modify(state, (current) => {
+        const sessionToken = yield* randomToken;
+        const sessionId = SessionId.make(yield* crypto.randomUUIDv7.pipe(Effect.orDie));
+        const redeemed = yield* Ref.modify(state, (current) => {
           const active = withoutExpired(current, now);
           const handoffs = new Map(active.handoffs);
           const codeHash = handoffDigest(code, Redacted.value(browserNonce));
@@ -244,25 +226,25 @@ export class AuthService extends Context.Service<
             return [undefined, active];
           }
           handoffs.delete(codeHash);
-          return [found, { ...active, handoffs }];
+          const session = new HostedSession({
+            id: sessionId,
+            userId: found.account.id,
+            createdAt: DateTime.fromDateUnsafe(new Date(now)),
+            lastSeenAt: DateTime.fromDateUnsafe(new Date(now)),
+            expiresAt: DateTime.fromDateUnsafe(new Date(now + sessionTtlMillis)),
+          });
+          const sessions = new Map(active.sessions);
+          const record = { account: found.account, session };
+          sessions.set(digestHex(sessionToken), record);
+          return [
+            { returnPath: found.returnPath, sessionToken, ...record },
+            { handoffs, sessions },
+          ];
         });
-        if (handoff === undefined) {
+        if (redeemed === undefined) {
           return yield* new InvalidHandoffCode();
         }
-
-        const sessionToken = yield* randomToken;
-        const session = new SessionRecord({
-          id: yield* crypto.randomUUIDv7.pipe(Effect.orDie),
-          principal: handoff.principal,
-          createdAt: now,
-          expiresAt: now + sessionTtlMillis,
-        });
-        yield* Ref.update(state, (current) => {
-          const sessions = new Map(current.sessions);
-          sessions.set(digestHex(sessionToken), session);
-          return { ...current, sessions };
-        });
-        return { returnPath: handoff.returnPath, sessionToken, session };
+        return redeemed;
       });
 
       const authenticate = Effect.fn("AuthService.authenticate")(function* (sessionToken: string) {
@@ -342,11 +324,11 @@ export class AuthService extends Context.Service<
       });
 
       const issueHandoff = Effect.fn("AuthService.issueHandoff")(function* (
-        principal: AuthPrincipal,
+        account: Account,
         returnPath: string,
         suppliedBrowserNonce?: Redacted.Redacted<string>,
       ) {
-        if (!validReturnPath(returnPath)) {
+        if (!validReturnPath(returnPath, config.consoleOrigin)) {
           return yield* new InvalidReturnPath();
         }
         const [code, generatedBrowserNonce] = yield* Effect.all([randomToken, randomToken]);
@@ -361,10 +343,9 @@ export class AuthService extends Context.Service<
         yield* handoffs
           .issue({
             codeHash: handoffDigest(code, browserNonce),
-            hostedSubject: HostedSubject.make(principal.hostedSubject),
-            email: EmailAddress.make(principal.email),
-            displayName:
-              principal.displayName === null ? null : DisplayName.make(principal.displayName),
+            hostedSubject: account.hostedSubject,
+            email: account.email,
+            displayName: account.displayName,
             returnPath,
             createdAt,
             expiresAt,
@@ -402,7 +383,8 @@ export class AuthService extends Context.Service<
         return {
           returnPath: result.value.returnPath,
           sessionToken,
-          session: toSessionRecord(result.value),
+          account: result.value.account,
+          session: result.value.session,
         };
       });
 
@@ -413,7 +395,7 @@ export class AuthService extends Context.Service<
         if (Option.isNone(result)) {
           return yield* new SessionNotFound();
         }
-        return toSessionRecord(result.value);
+        return result.value;
       });
 
       const logout = Effect.fn("AuthService.logout")((sessionToken: string) =>

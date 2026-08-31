@@ -1,5 +1,7 @@
 import {
+  aggregateMetricPoints,
   MetricAttribute,
+  type MetricAggregateQuery,
   MetricCatalogEntry,
   type MetricPoint,
   type MetricQuery,
@@ -9,7 +11,8 @@ import {
   MetricSeriesPoint,
   type SumPoint,
 } from "@groundtruth/telemetry";
-import { DateTime, Schema } from "effect";
+import { DateTime, Effect, Result, Schema } from "effect";
+import { persistenceError } from "../errors.ts";
 import {
   inRange,
   matchesFilters,
@@ -100,7 +103,12 @@ const percentile = (values: ReadonlyArray<number>, fraction: number) => {
 const aggregateBucket = (bucket: MetricBucket, query: MetricQuery) => {
   if (query.aggregation === "count-distinct") {
     const key = query.distinctKey!;
-    return new Set(bucket.points.map((point) => valueText(recordQueryAttributes(point)[key]))).size;
+    return new Set(
+      bucket.points.flatMap((point) => {
+        const attributes = recordQueryAttributes(point);
+        return Object.hasOwn(attributes, key) ? [valueText(attributes[key])] : [];
+      }),
+    ).size;
   }
   const contributions = bucket.points.map(metricContribution);
   const values = contributions.map(({ value }) => value);
@@ -233,4 +241,22 @@ export const queryMetrics = (
     partial,
     hint: partial ? "The in-memory result was truncated by query bounds." : null,
   });
+};
+
+export const aggregateMetric = (
+  metrics: ReadonlyArray<MetricPoint>,
+  query: MetricAggregateQuery,
+  nowMillis: number,
+) => {
+  const aggregate = aggregateMetricPoints(metrics, query, nowMillis);
+  return Result.isSuccess(aggregate)
+    ? Effect.succeed(aggregate.success)
+    : Effect.fail(
+        persistenceError(
+          "clickhouse",
+          "aggregate metric points",
+          new Error(aggregate.failure.reason),
+          false,
+        ),
+      );
 };

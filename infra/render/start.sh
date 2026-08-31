@@ -137,6 +137,7 @@ start_application_services() {
   wait_for_command "OpenTelemetry Collector" curl --fail --silent http://127.0.0.1:13133/healthz
 
   PORT=4102 \
+    NODE_OPTIONS=--max-old-space-size=96 \
     OTEL_SERVICE_NAME=payments-stub \
     CONTROL_TOKEN="$PAYMENTS_CONTROL_TOKEN" \
     su-exec clear:clear node apps/payments-stub/dist/main.mjs &
@@ -144,6 +145,7 @@ start_application_services() {
   wait_for_command "Payments service" curl --fail --silent http://127.0.0.1:4102/readyz
 
   PORT=4103 \
+    NODE_OPTIONS=--max-old-space-size=128 \
     OTEL_SERVICE_NAME=load-generator \
     CHECKOUT_BASE_URL="$checkout_service_url" \
     PAYMENTS_BASE_URL=http://127.0.0.1:4102 \

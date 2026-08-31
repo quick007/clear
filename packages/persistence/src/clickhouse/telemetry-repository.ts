@@ -3,6 +3,8 @@ import type {
   CanonicalTelemetryBatch,
   LogSearch,
   LogSearchPage,
+  MetricAggregateQuery,
+  MetricAggregateResult,
   MetricCatalogEntry,
   MetricQuery,
   MetricQueryResult,
@@ -18,6 +20,7 @@ import { ClickHouse } from "./client.ts";
 import { listServices, listSignalActivity } from "./activity-queries.ts";
 import { ingestTelemetry } from "./ingest.ts";
 import { searchLogs } from "./log-queries.ts";
+import { aggregateMetric } from "./metric-aggregate.ts";
 import { listMetrics, queryMetrics } from "./metric-queries.ts";
 import { clickhouseAttempt } from "./operation.ts";
 import { projectParameters } from "./sql.ts";
@@ -42,6 +45,10 @@ export interface TelemetryRepositoryShape {
     projectId: ProjectId,
     query: MetricQuery,
   ) => Effect.Effect<MetricQueryResult, PersistenceError>;
+  readonly aggregateMetric: (
+    projectId: ProjectId,
+    query: MetricAggregateQuery,
+  ) => Effect.Effect<MetricAggregateResult, PersistenceError>;
   readonly searchLogs: (
     projectId: ProjectId,
     search: LogSearch,
@@ -127,6 +134,7 @@ export const TelemetryRepositoryLive = Layer.effect(
       listServices: (projectId) => listServices(client, projectId),
       listSignalActivity: (projectId) => listSignalActivity(client, projectId),
       queryMetrics: (projectId, query) => queryMetrics(client, projectId, query),
+      aggregateMetric: (projectId, query) => aggregateMetric(client, projectId, query),
       searchLogs: (projectId, search) => searchLogs(client, projectId, search),
       searchTraces: (projectId, search) => searchTraces(client, projectId, search),
       getTrace: (projectId, traceId) => getTrace(client, projectId, traceId),

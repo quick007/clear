@@ -26,6 +26,9 @@ import {
   timeBounds,
 } from "./QuerySupport.js";
 
+const maximumTraceSpans = 5_000;
+const maximumCorrelatedLogs = 200;
+
 const within = (at: bigint, bounds: { readonly start: number; readonly end: number }) => {
   const millis = nanosToMillis(at);
   return millis >= bounds.start && millis <= bounds.end;
@@ -44,6 +47,7 @@ const searchableLog = (record: LogRecord) =>
 const decimalString = Schema.String.check(Schema.isPattern(/^(?:0|[1-9][0-9]*)$/));
 const LogCursorValue = Schema.Struct({
   _tag: Schema.Literals(["logs"]),
+  recordIndex: decimalString,
   timeUnixNano: decimalString,
   observedTimeUnixNano: decimalString,
   traceId: Schema.String,
@@ -86,8 +90,9 @@ const compareText = (left: string, right: string) => (left < right ? -1 : left >
 const compareDecimal = (left: string, right: string) =>
   BigInt(left) < BigInt(right) ? -1 : BigInt(left) > BigInt(right) ? 1 : 0;
 
-const logCursorFor = (record: LogRecord): LogCursorValue => ({
+const logCursorFor = (record: LogRecord, recordIndex: number): LogCursorValue => ({
   _tag: "logs",
+  recordIndex: String(recordIndex),
   timeUnixNano: String(record.timeUnixNano),
   observedTimeUnixNano: String(record.observedTimeUnixNano),
   traceId: String(record.traceId ?? ""),
@@ -102,7 +107,8 @@ const compareLogCursors = (left: LogCursorValue, right: LogCursorValue) =>
   compareText(left.traceId, right.traceId) ||
   compareText(left.spanId, right.spanId) ||
   compareText(left.serviceName, right.serviceName) ||
-  compareText(left.bodyHash, right.bodyHash);
+  compareText(left.bodyHash, right.bodyHash) ||
+  compareDecimal(left.recordIndex, right.recordIndex);
 
 const traceCursorFor = (summary: TraceSummary): TraceCursorValue => ({
   _tag: "traces",
@@ -121,7 +127,8 @@ export const searchLogRecords = (records: ReadonlyArray<LogRecord>, query: LogSe
     const limit = query.limit ?? 100;
     const needle = query.query?.trim().toLowerCase();
     const matches = records
-      .filter((record) => {
+      .map((record, recordIndex) => ({ record, cursor: logCursorFor(record, recordIndex) }))
+      .filter(({ record }) => {
         if (!within(record.timeUnixNano, bounds)) return false;
         if (query.services !== undefined && !query.services.includes(record.serviceName))
           return false;
@@ -139,14 +146,14 @@ export const searchLogRecords = (records: ReadonlyArray<LogRecord>, query: LogSe
           needle === undefined || needle.length === 0 || searchableLog(record).includes(needle)
         );
       })
-      .filter((record) => cursor === null || compareLogCursors(logCursorFor(record), cursor) < 0)
-      .sort((left, right) => compareLogCursors(logCursorFor(right), logCursorFor(left)));
+      .filter((entry) => cursor === null || compareLogCursors(entry.cursor, cursor) < 0)
+      .sort((left, right) => compareLogCursors(right.cursor, left.cursor));
     const page = matches.slice(0, limit);
     const hasMore = matches.length > limit;
     const last = page.at(-1);
     return new LogSearchPage({
-      records: page,
-      nextCursor: hasMore && last !== undefined ? encodeCursor(logCursorFor(last)) : null,
+      records: page.map(({ record }) => record),
+      nextCursor: hasMore && last !== undefined ? encodeCursor(last.cursor) : null,
       hasMore,
       hint:
         query.cursor === undefined && matches.length === 0
@@ -265,13 +272,17 @@ const treeNode = (
   span: SpanRecord,
   childrenByParent: ReadonlyMap<string, ReadonlyArray<SpanRecord>>,
   ancestors: ReadonlySet<string>,
+  visited: Set<string>,
 ): TraceTreeNode => {
+  visited.add(String(span.spanId));
   const nextAncestors = new Set(ancestors).add(String(span.spanId));
   return {
     span,
     children: (childrenByParent.get(String(span.spanId)) ?? [])
-      .filter((child) => !nextAncestors.has(String(child.spanId)))
-      .map((child) => treeNode(child, childrenByParent, nextAncestors)),
+      .filter(
+        (child) => !nextAncestors.has(String(child.spanId)) && !visited.has(String(child.spanId)),
+      )
+      .map((child) => treeNode(child, childrenByParent, nextAncestors, visited)),
   };
 };
 
@@ -319,9 +330,10 @@ export const getTraceDetail = (
   traceId: SpanRecord["traceId"],
 ) =>
   Effect.gen(function* () {
-    const selected = spans
+    const allSelected = spans
       .filter((span) => span.traceId === traceId)
       .sort((left, right) => Number(left.startTimeUnixNano - right.startTimeUnixNano));
+    const selected = allSelected.slice(0, maximumTraceSpans);
     const summary = traceSummary(selected);
     if (summary === null) {
       return yield* new TraceNotFound({ traceId, message: "Trace not found" });
@@ -334,19 +346,32 @@ export const getTraceDetail = (
       children.push(span);
       childrenByParent.set(String(span.parentSpanId), children);
     }
+    const visited = new Set<string>();
     const roots = selected
       .filter((span) => span.parentSpanId === null || !byId.has(span.parentSpanId))
-      .map((span) => treeNode(span, childrenByParent, new Set()));
-    const complete = selected.every(
-      (span) => span.parentSpanId === null || byId.has(span.parentSpanId),
-    );
+      .map((span) => treeNode(span, childrenByParent, new Set(), visited));
+    const correlatedLogs = logs
+      .filter((record) => record.traceId === traceId)
+      .sort((left, right) => Number(left.timeUnixNano - right.timeUnixNano));
+    const truncated =
+      allSelected.length > maximumTraceSpans || correlatedLogs.length > maximumCorrelatedLogs;
+    const complete =
+      !truncated &&
+      byId.size === selected.length &&
+      roots.length > 0 &&
+      visited.size === selected.length &&
+      selected.every((span) => span.parentSpanId === null || byId.has(span.parentSpanId));
     return new TraceDetail({
       summary,
       roots,
       spans: selected,
-      correlatedLogs: logs.filter((record) => record.traceId === traceId),
+      correlatedLogs: correlatedLogs.slice(0, maximumCorrelatedLogs),
       serviceEdges: serviceEdges(selected),
       complete,
-      hint: complete ? null : "Some parent spans have not arrived yet",
+      hint: complete
+        ? null
+        : truncated
+          ? "This unusually large trace was truncated to protect the query service"
+          : "Some parent spans are missing or the trace structure is invalid",
     });
   });

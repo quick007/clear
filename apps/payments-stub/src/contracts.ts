@@ -33,6 +33,7 @@ export const FailureState = Schema.Struct({
   failureRate: FailureRate,
   requestsInWindow: Schema.Natural,
   seed: Schema.NonEmptyString,
+  totalRequests: Schema.Natural,
   windowStartedAt: Schema.Number,
 });
 

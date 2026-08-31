@@ -5,7 +5,6 @@ import {
   DisplayName,
   EmailAddress,
   EntityNotFound,
-  HostedSession,
   HostedSubject,
   Project,
   ProjectId,
@@ -13,7 +12,6 @@ import {
   ProjectSlug,
   type SandboxSession,
   type Session,
-  SessionId,
   UserId,
 } from "@groundtruth/domain";
 import {
@@ -21,9 +19,9 @@ import {
   hostedProjectQuotas,
   hostedRawRetentionDays,
   ProjectRepository,
+  type AuthSessionRecord,
 } from "@groundtruth/persistence";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Ref } from "effect";
-import type { SessionRecord } from "../auth/AuthService.js";
 import { sandboxProjectId, sandboxProjectIdForSession, sandboxUserId } from "../memory/SeedIds.js";
 
 interface IdentityState {
@@ -92,13 +90,12 @@ export class IdentityService extends Context.Service<
       email: EmailAddress,
       displayName: DisplayName | undefined,
     ): Effect.Effect<ResolvedIdentity, ServiceUnavailable>;
-    sessionView(record: SessionRecord): Effect.Effect<SessionView, ServiceUnavailable>;
+    sessionView(record: AuthSessionRecord): Effect.Effect<SessionView, ServiceUnavailable>;
     projectForSandboxSession(session: SandboxSession): Effect.Effect<Project>;
     authorizeProject(
       session: Session,
       projectId: ProjectId,
     ): Effect.Effect<Project, EntityNotFound | AccessDenied | ServiceUnavailable>;
-    getProject(projectId: ProjectId): Effect.Effect<Project, EntityNotFound | ServiceUnavailable>;
   }
 >()("groundtruth/backend/identity/IdentityService") {
   static readonly layerMemory = Layer.effect(
@@ -177,40 +174,17 @@ export class IdentityService extends Context.Service<
       });
 
       const sessionView = Effect.fn("IdentityService.sessionView")(function* (
-        record: SessionRecord,
+        record: AuthSessionRecord,
       ) {
-        const subject = HostedSubject.make(record.principal.hostedSubject);
-        const email = EmailAddress.make(record.principal.email);
-        const displayName =
-          record.principal.displayName === null
-            ? undefined
-            : DisplayName.make(record.principal.displayName);
-        const identity = yield* resolveHostedIdentity(subject, email, displayName);
-        const session = new HostedSession({
-          id: SessionId.make(record.id),
-          userId: identity.account.id,
-          createdAt: DateTime.fromDateUnsafe(new Date(record.createdAt)),
-          lastSeenAt: yield* DateTime.now,
-          expiresAt: DateTime.fromDateUnsafe(new Date(record.expiresAt)),
-        });
+        const projects = Array.from((yield* Ref.get(state)).projectsById.values()).filter(
+          (project) => project.ownerId === record.account.id,
+        );
         return new SessionView({
-          session,
-          account: identity.account,
-          projects: identity.projects,
-          activeProjectId: identity.projects[0]?.id ?? null,
+          session: record.session,
+          account: record.account,
+          projects,
+          activeProjectId: projects[0]?.id ?? null,
         });
-      });
-
-      const getProject = Effect.fn("IdentityService.getProject")(function* (projectId: ProjectId) {
-        const project = (yield* Ref.get(state)).projectsById.get(projectId);
-        if (project === undefined) {
-          return yield* new EntityNotFound({
-            entity: "project",
-            id: projectId,
-            message: "Project not found",
-          });
-        }
-        return project;
       });
 
       const authorizeProject = Effect.fn("IdentityService.authorizeProject")(function* (
@@ -228,9 +202,8 @@ export class IdentityService extends Context.Service<
             message: "The sandbox session cannot access another session's project",
           });
         }
-        const project = yield* getProject(projectId);
-        const authorized = project.ownerId === session.userId;
-        if (!authorized) {
+        const project = (yield* Ref.get(state)).projectsById.get(projectId);
+        if (project === undefined || project.ownerId !== session.userId) {
           return yield* new AccessDenied({
             projectId,
             action: "read project",
@@ -245,7 +218,6 @@ export class IdentityService extends Context.Service<
         sessionView,
         projectForSandboxSession: (session) => Effect.succeed(sandboxSessionProject(session)),
         authorizeProject,
-        getProject,
       });
     }),
   );
@@ -283,54 +255,36 @@ export class IdentityService extends Context.Service<
         email: EmailAddress,
         displayName: DisplayName | undefined,
       ) {
+        const hostedSubject = HostedSubject.make(normalizeSubject(subject));
         const normalizedEmail = normalizeEmail(email);
         return yield* Effect.gen(function* () {
+          const existing =
+            displayName === undefined
+              ? yield* accounts.findByHostedSubject(hostedSubject)
+              : Option.none<Account>();
           const account = yield* accounts.upsertHosted({
-            hostedSubject: HostedSubject.make(normalizeSubject(subject)),
+            hostedSubject,
             email: EmailAddress.make(normalizedEmail),
-            displayName: displayName ?? null,
+            displayName:
+              displayName ??
+              Option.match(existing, { onNone: () => null, onSome: (value) => value.displayName }),
           });
           return { account, projects: yield* projectsFor(account) };
         }).pipe(Effect.mapError(identityUnavailable));
       });
 
       const sessionView = Effect.fn("IdentityService.sessionView")(function* (
-        record: SessionRecord,
+        record: AuthSessionRecord,
       ) {
-        const identity = yield* resolveHostedIdentity(
-          HostedSubject.make(record.principal.hostedSubject),
-          EmailAddress.make(record.principal.email),
-          record.principal.displayName === null
-            ? undefined
-            : DisplayName.make(record.principal.displayName),
+        const ownedProjects = yield* projectsFor(record.account).pipe(
+          Effect.mapError(identityUnavailable),
         );
-        const session = new HostedSession({
-          id: SessionId.make(record.id),
-          userId: identity.account.id,
-          createdAt: DateTime.fromDateUnsafe(new Date(record.createdAt)),
-          lastSeenAt: yield* DateTime.now,
-          expiresAt: DateTime.fromDateUnsafe(new Date(record.expiresAt)),
-        });
         return new SessionView({
-          session,
-          account: identity.account,
-          projects: identity.projects,
-          activeProjectId: identity.projects[0]?.id ?? null,
+          session: record.session,
+          account: record.account,
+          projects: ownedProjects,
+          activeProjectId: ownedProjects[0]?.id ?? null,
         });
-      });
-
-      const getProject = Effect.fn("IdentityService.getProject")(function* (projectId: ProjectId) {
-        const result = yield* projects
-          .findById(projectId)
-          .pipe(Effect.mapError(identityUnavailable));
-        if (Option.isNone(result)) {
-          return yield* new EntityNotFound({
-            entity: "project",
-            id: projectId,
-            message: "Project not found",
-          });
-        }
-        return result.value;
       });
 
       const authorizeProject = Effect.fn("IdentityService.authorizeProject")(function* (
@@ -348,15 +302,17 @@ export class IdentityService extends Context.Service<
             message: "The sandbox session cannot access another session's project",
           });
         }
-        const project = yield* getProject(projectId);
-        if (project.ownerId !== session.userId) {
+        const project = yield* projects
+          .findForOwner(session.userId, projectId)
+          .pipe(Effect.mapError(identityUnavailable));
+        if (Option.isNone(project)) {
           return yield* new AccessDenied({
             projectId,
             action: "read project",
             message: "The current session cannot access this project",
           });
         }
-        return project;
+        return project.value;
       });
 
       return IdentityService.of({
@@ -364,7 +320,6 @@ export class IdentityService extends Context.Service<
         sessionView,
         projectForSandboxSession: (session) => Effect.succeed(sandboxSessionProject(session)),
         authorizeProject,
-        getProject,
       });
     }),
   );

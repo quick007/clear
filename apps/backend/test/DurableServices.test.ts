@@ -1,10 +1,17 @@
 import { NodeCrypto } from "@effect/platform-node";
 import { assert, describe, it } from "@effect/vitest";
-import { DisplayName, EmailAddress, HostedSubject, IngestKeyName } from "@groundtruth/domain";
+import {
+  Account,
+  DisplayName,
+  EmailAddress,
+  HostedSubject,
+  IngestKeyName,
+  UserId,
+} from "@groundtruth/domain";
 import { PersistenceMemory, RepositoriesMemoryControl } from "@groundtruth/persistence/testing";
-import { Context, Effect, Layer, Redacted } from "effect";
+import { Context, DateTime, Effect, Layer, Redacted } from "effect";
 import { TestClock } from "effect/testing";
-import { AuthPrincipal, AuthService } from "../src/auth/AuthService.js";
+import { AuthService } from "../src/auth/AuthService.js";
 import { BackendConfig } from "../src/config/BackendConfig.js";
 import { IdentityService } from "../src/identity/IdentityService.js";
 import { authorizeCollectorProject } from "../src/http/CollectorHandlers.js";
@@ -53,25 +60,27 @@ const DurableServicesTest = Layer.mergeAll(
   Layer.provideMerge(NodeCrypto.layer),
 );
 
+const account = new Account({
+  id: UserId.make("01993f71-0001-7000-8000-000000000101"),
+  hostedSubject: HostedSubject.make("chatgpt-user-1"),
+  email: EmailAddress.make("operator@example.com"),
+  displayName: DisplayName.make("Operator"),
+  createdAt: DateTime.fromDateUnsafe(new Date(0)),
+  lastSeenAt: DateTime.fromDateUnsafe(new Date(0)),
+});
+
 describe("persistence-backed services", () => {
   it.effect("stores single-use auth state without exposing raw credentials", () =>
     Effect.gen(function* () {
       const auth = yield* AuthService;
       const reconstructedAuth = yield* ReconstructedAuthService;
       const control = yield* RepositoriesMemoryControl;
-      const issued = yield* auth.issueHandoff(
-        new AuthPrincipal({
-          hostedSubject: "chatgpt-user-1",
-          email: "operator@example.com",
-          displayName: "Operator",
-        }),
-        "/projects",
-      );
+      const issued = yield* auth.issueHandoff(account, "/projects");
       const redeemed = yield* reconstructedAuth.redeemHandoff(issued.code, issued.browserNonce);
 
       assert.strictEqual(redeemed.returnPath, "/projects");
       assert.strictEqual(
-        (yield* reconstructedAuth.authenticate(redeemed.sessionToken)).id,
+        (yield* reconstructedAuth.authenticate(redeemed.sessionToken)).session.id,
         redeemed.session.id,
       );
       assert.strictEqual(
@@ -96,14 +105,9 @@ describe("persistence-backed services", () => {
       yield* TestClock.setTime(Date.parse("2026-08-29T08:00:00.000Z"));
       const auth = yield* AuthService;
       const control = yield* RepositoriesMemoryControl;
-      const principal = new AuthPrincipal({
-        hostedSubject: "chatgpt-user-1",
-        email: "operator@example.com",
-        displayName: "Operator",
-      });
-      const sessionHandoff = yield* auth.issueHandoff(principal, "/projects");
+      const sessionHandoff = yield* auth.issueHandoff(account, "/projects");
       yield* auth.redeemHandoff(sessionHandoff.code, sessionHandoff.browserNonce);
-      yield* auth.issueHandoff(principal, "/settings");
+      yield* auth.issueHandoff(account, "/settings");
 
       yield* TestClock.adjust("8 days");
 

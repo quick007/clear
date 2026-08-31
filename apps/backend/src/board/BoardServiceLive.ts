@@ -164,15 +164,32 @@ export const BoardServiceLive = Layer.effect(
       if (isSandboxProjectId(projectId)) return yield* memory.getDefaultBoard(projectId);
       const records = yield* listRecords(projectId);
       const current = records.find((record) => record.isDefault) ?? records[0];
-      const record =
-        current ??
-        (yield* fromRepository(
-          repository.create(projectId, {
-            name: DashboardName.make("Operations"),
-            description: null,
-            isDefault: true,
-          }),
-        ));
+      if (current !== undefined) return toBoardState(current);
+      const seeded = yield* fromRepository(
+        repository.seedIfEmpty(projectId, {
+          name: DashboardName.make("Operations"),
+          description: null,
+          isDefault: true,
+          panels: [],
+        }),
+      );
+      const record = yield* Option.match(seeded, {
+        onNone: () =>
+          listRecords(projectId).pipe(
+            Effect.flatMap((concurrent) => {
+              const created = concurrent.find((item) => item.isDefault) ?? concurrent[0];
+              return created === undefined
+                ? Effect.fail(
+                    new ServiceUnavailable({
+                      service: "storage",
+                      message: "The concurrently created dashboard could not be reloaded",
+                    }),
+                  )
+                : Effect.succeed(created);
+            }),
+          ),
+        onSome: Effect.succeed,
+      });
       return toBoardState(record);
     });
 

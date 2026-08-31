@@ -25,7 +25,7 @@ import { AlertSection, ManualAlertRow, ThresholdAlertRow } from "./alert-list";
 import { ManualAlertDialog } from "./manual-alert-dialog";
 
 export const investigationWorkspaceNavigation = {
-  search: { guide: undefined },
+  search: { demo: undefined, guide: undefined },
   to: "/board",
 } as const;
 

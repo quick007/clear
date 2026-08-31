@@ -58,6 +58,20 @@ describe("IncidentService", () => {
           (reason) => Cause.isFailReason(reason) && reason.error._tag === "InvalidStateTransition",
         ),
       );
+
+      const reopened = yield* incidents.openIncident(
+        sandboxProjectId,
+        IncidentTitle.make("A later checkout incident"),
+      );
+      assert.notStrictEqual(reopened.incident.id, opened.incident.id);
+      assert.deepStrictEqual(
+        (yield* incidents.listIncidents(sandboxProjectId)).map(({ id }) => id),
+        [reopened.incident.id, opened.incident.id],
+      );
+      assert.strictEqual(
+        (yield* incidents.getDetail(sandboxProjectId, opened.incident.id)).incident.status,
+        "closed",
+      );
     }).pipe(Effect.provide(IncidentTest)),
   );
 

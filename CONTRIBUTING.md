@@ -17,28 +17,32 @@ Requirements:
 - Docker Engine with Compose v2 for storage and integration work
 - Go 1.25 or newer when changing `apps/collector`
 
-Install the workspace:
+Install and validate the workspace without environment files:
 
 ```sh
 vp install
-```
-
-Run the main validation gate:
-
-```sh
 vp run ready
 ```
+
+Before running the console or local infrastructure, create the three uncommitted configuration files:
+
+```sh
+cp .env.example .env
+cp apps/console/.env.example apps/console/.env.local
+cp apps/checkout-web/.env.example apps/checkout-web/.env.local
+```
+
+`vp run ready` checks formatting, lint rules, and types with Vite+, then runs the fast workspace test suites and builds. It is intentionally environment-free. Database integration tests are opt-in because they start PostgreSQL and ClickHouse; run the documented [persistence integration command](packages/persistence/README.md) when changing persistence code.
 
 Run the console:
 
 ```sh
-vp dev
+vp run dev
 ```
 
 Run the local infrastructure:
 
 ```sh
-cp .env.example .env
 docker compose -f infra/compose.yaml up --build
 ```
 

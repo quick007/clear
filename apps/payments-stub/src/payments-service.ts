@@ -1,7 +1,7 @@
 import { Clock, Context, Effect, Layer, Metric } from "effect";
 import { createHash } from "node:crypto";
 import { PaymentAuthorizationRequest, PaymentAuthorizationResponse } from "./contracts.js";
-import { FailureModel } from "./failure-model.js";
+import { FailureModel, hashUnit } from "./failure-model.js";
 import {
   effectiveFailureRate,
   replicas,
@@ -66,7 +66,7 @@ export class PaymentsService extends Context.Service<
           { discard: true },
         );
 
-        if (decision.failed) {
+        if (decision.failed && hashUnit(request.requestId) < 1 / 50) {
           yield* Effect.logWarning("Payment authorization failed").pipe(
             Effect.annotateLogs({
               attempt: request.attempt,

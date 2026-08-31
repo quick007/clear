@@ -19,6 +19,9 @@ const invalidRequest = HttpServerResponse.jsonUnsafe(
   { status: 400 },
 );
 
+const invalidScenario = (reason: string) =>
+  HttpServerResponse.jsonUnsafe({ code: "invalid_scenario", message: reason }, { status: 400 });
+
 const notRunning = HttpServerResponse.jsonUnsafe(
   { code: "scenario_not_running", message: "No scenario is running" },
   { status: 409 },
@@ -58,6 +61,7 @@ const startRoute = Effect.gen(function* () {
   Effect.catchTags({
     AuthenticationFailed: () => Effect.succeed(unauthorized),
     ExampleServiceUnavailable: (error) => Effect.succeed(unavailable(error.service, error.status)),
+    InvalidScenario: (error) => Effect.succeed(invalidScenario(error.reason)),
     ScenarioAlreadyRunning: (error) =>
       Effect.succeed(
         HttpServerResponse.jsonUnsafe(
@@ -95,6 +99,7 @@ const stopRoute = Effect.gen(function* () {
 }).pipe(
   Effect.catchTags({
     AuthenticationFailed: () => Effect.succeed(unauthorized),
+    ExampleServiceUnavailable: (error) => Effect.succeed(unavailable(error.service, error.status)),
     ScenarioNotRunning: () => Effect.succeed(notRunning),
   }),
   Effect.catchCause(() => Effect.succeed(invalidRequest)),

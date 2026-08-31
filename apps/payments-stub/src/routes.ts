@@ -1,5 +1,10 @@
 import { Effect, Layer } from "effect";
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
+import {
+  HttpMiddleware,
+  HttpRouter,
+  HttpServerRequest,
+  HttpServerResponse,
+} from "effect/unstable/http";
 import { RequestAuth } from "./auth.js";
 import {
   FailureRateUpdate,
@@ -39,24 +44,26 @@ const withRouteErrors = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   );
 
 const authorizeRoute = withRouteErrors(
-  Effect.gen(function* () {
-    const auth = yield* RequestAuth;
-    yield* auth.service;
-    const input = yield* HttpServerRequest.schemaBodyJson(PaymentAuthorizationRequest);
-    const service = yield* PaymentsService;
-    const outcome = yield* service.authorize(input);
+  HttpMiddleware.withLoggerDisabled(
+    Effect.gen(function* () {
+      const auth = yield* RequestAuth;
+      yield* auth.service;
+      const input = yield* HttpServerRequest.schemaBodyJson(PaymentAuthorizationRequest);
+      const service = yield* PaymentsService;
+      const outcome = yield* service.authorize(input);
 
-    return outcome._tag === "Approved"
-      ? yield* HttpServerResponse.schemaJson(PaymentAuthorizationResponse)(outcome.value)
-      : HttpServerResponse.jsonUnsafe(
-          {
-            code: "upstream_unavailable",
-            message: "The payment processor is temporarily unavailable",
-            retryable: true,
-          },
-          { status: 503 },
-        );
-  }),
+      return outcome._tag === "Approved"
+        ? yield* HttpServerResponse.schemaJson(PaymentAuthorizationResponse)(outcome.value)
+        : HttpServerResponse.jsonUnsafe(
+            {
+              code: "upstream_unavailable",
+              message: "The payment processor is temporarily unavailable",
+              retryable: true,
+            },
+            { status: 503 },
+          );
+    }),
+  ),
 );
 
 const stateRoute = withRouteErrors(

@@ -30,8 +30,9 @@ it reaches payments. Health checks bypass both traffic controls.
 
 Metric `user.id` values are deterministically mapped into 8,192 buckets. This
 keeps the unique-user signal useful for the incident while placing a hard upper
-bound on metric series cardinality. Request IDs remain available on logs and
-traces for correlation, but are never metric dimensions.
+bound on metric series cardinality. Request IDs remain available on traces and
+a deterministic sample of failure logs for correlation, but are never metric
+dimensions.
 
 `http.server.requests` records one completed incoming checkout, and
 `http.server.duration` covers its entire payment workflow. Each payment attempt,

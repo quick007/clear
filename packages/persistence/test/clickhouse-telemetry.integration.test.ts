@@ -2,6 +2,7 @@ import { ProjectId } from "@groundtruth/domain";
 import {
   CanonicalTelemetryBatch,
   LogSearch,
+  MetricAggregateQuery,
   MetricQuery,
   TelemetryBytes,
   TelemetryInteger,
@@ -264,7 +265,12 @@ const makeRateFixture = () => {
     start: new Date(baseMillis - 1_000).toISOString(),
     end: new Date(baseMillis + 31_000).toISOString(),
   } as const;
-  return { batch, range };
+  const aggregateRange = {
+    _tag: "absolute",
+    start: new Date(baseMillis + 5_000).toISOString(),
+    end: new Date(baseMillis + 31_000).toISOString(),
+  } as const;
+  return { aggregateRange, batch, range };
 };
 
 describe.skipIf(!databaseTestsEnabled)("ClickHouse telemetry repository", () => {
@@ -389,7 +395,7 @@ describe.skipIf(!databaseTestsEnabled)("ClickHouse telemetry repository", () => 
   it(
     "differences cumulative rates, handles resets, and preserves delta contributions",
     async () => {
-      const { batch, range } = makeRateFixture();
+      const { aggregateRange, batch, range } = makeRateFixture();
       await runtime.runPromise(
         Effect.gen(function* () {
           const telemetry = yield* TelemetryRepository;
@@ -407,6 +413,17 @@ describe.skipIf(!databaseTestsEnabled)("ClickHouse telemetry repository", () => 
             query("requests.cumulative"),
           );
           expect(cumulative.series[0]?.points.map(({ value }) => value)).toEqual([1, 0.5, 1]);
+
+          const aggregate = yield* telemetry.aggregateMetric(
+            otherProjectId,
+            Schema.decodeUnknownSync(MetricAggregateQuery)({
+              metric: "requests.cumulative",
+              aggregation: "rate",
+              range: aggregateRange,
+            }),
+          );
+          expect(aggregate.matchedPoints).toBe(3);
+          expect(aggregate.value).toBeCloseTo(25 / 26, 8);
 
           const delta = yield* telemetry.queryMetrics(otherProjectId, query("requests.delta"));
           expect(delta.series[0]?.points.map(({ value }) => value)).toEqual([1, 2]);

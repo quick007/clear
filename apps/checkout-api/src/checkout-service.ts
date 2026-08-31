@@ -115,13 +115,6 @@ export class CheckoutService extends Context.Service<
           }),
         );
 
-        yield* Effect.logInfo("Checkout confirmed").pipe(
-          Effect.annotateLogs({
-            requestId: request.requestId,
-            userId: request.userId,
-          }),
-        );
-
         return CheckoutResponse.make({
           authorizationId: authorization.authorizationId,
           requestId: request.requestId,

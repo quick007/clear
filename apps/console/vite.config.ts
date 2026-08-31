@@ -9,7 +9,15 @@ import { readConsoleConfig } from "./src/config";
 const appRoot = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig(({ mode }) => {
-  if (mode !== "test") readConsoleConfig(loadEnv(mode, appRoot, ""));
+  if (mode !== "test") {
+    const environment = loadEnv(mode, appRoot, "");
+    if (
+      environment.VITE_CLEAR_OTLP_ENDPOINT !== undefined ||
+      environment.VITE_GROUNDTRUTH_API_URL !== undefined
+    ) {
+      readConsoleConfig(environment);
+    }
+  }
 
   return {
     plugins: [

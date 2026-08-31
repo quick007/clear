@@ -58,14 +58,20 @@ export const measureRequests = (batches: ReadonlyArray<TelemetryBatch>) => {
   });
 };
 
+const finiteRatio = (numerator: number, denominator: number) =>
+  denominator === 0 ? 0 : numerator / denominator;
+
 export const evaluateAcceptance = (
   baselineBatches: ReadonlyArray<TelemetryBatch>,
   amplificationBatches: ReadonlyArray<TelemetryBatch>,
 ) => {
   const baseline = measureRequests(baselineBatches);
   const amplification = measureRequests(amplificationBatches);
-  const upstreamRequestRatio = amplification.upstreamRequests / baseline.upstreamRequests;
-  const uniqueUserRatio = amplification.uniqueUsers / baseline.uniqueUsers;
+  const upstreamRequestRatio = finiteRatio(
+    amplification.upstreamRequests,
+    baseline.upstreamRequests,
+  );
+  const uniqueUserRatio = finiteRatio(amplification.uniqueUsers, baseline.uniqueUsers);
   const upstreamRequestsTripled = upstreamRequestRatio >= 2.9 && upstreamRequestRatio <= 3.1;
   const usersStayedFlat = uniqueUserRatio >= 0.9 && uniqueUserRatio <= 1.1;
   const retriesDominate = amplification.upstreamRetryShare > 0.55;

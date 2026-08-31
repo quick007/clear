@@ -1,7 +1,13 @@
 import { Schema } from "effect";
 
-const Positive = Schema.Finite.check(Schema.isGreaterThan(0));
-const PositiveInt = Schema.Int.check(Schema.isGreaterThan(0));
+export const ScenarioDuration = Schema.Int.check(
+  Schema.isBetween({ minimum: 1, maximum: 3_600_000 }),
+);
+export const ScenarioRate = Schema.Finite.check(Schema.isBetween({ minimum: 1, maximum: 500 }));
+export const ScenarioUserCount = Schema.Int.check(
+  Schema.isBetween({ minimum: 1, maximum: 100_000 }),
+);
+export const FailureRate = Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 1 }));
 
 export const ScenarioPhase = Schema.Literals([
   "idle",
@@ -20,12 +26,13 @@ export const ScenarioStatus = Schema.Literals(["idle", "running", "stopped", "co
 export type ScenarioStatus = typeof ScenarioStatus.Type;
 
 export const ScenarioStart = Schema.Struct({
-  baselineDurationMs: Schema.optionalKey(PositiveInt),
-  blipDurationMs: Schema.optionalKey(PositiveInt),
-  maxDurationMs: Schema.optionalKey(PositiveInt),
-  rateRps: Schema.optionalKey(Positive),
+  baselineDurationMs: Schema.optionalKey(ScenarioDuration),
+  blipDurationMs: Schema.optionalKey(ScenarioDuration),
+  incidentFailureRate: Schema.optionalKey(FailureRate),
+  maxDurationMs: Schema.optionalKey(ScenarioDuration),
+  rateRps: Schema.optionalKey(ScenarioRate),
   seed: Schema.optionalKey(Schema.NonEmptyString),
-  uniqueUsers: Schema.optionalKey(PositiveInt),
+  uniqueUsers: Schema.optionalKey(ScenarioUserCount),
 });
 
 export type ScenarioStart = typeof ScenarioStart.Type;
@@ -39,13 +46,15 @@ export const ScenarioTransition = Schema.Struct({
 export type ScenarioTransition = typeof ScenarioTransition.Type;
 
 export const ScenarioState = Schema.Struct({
-  baselineDurationMs: PositiveInt,
-  blipDurationMs: PositiveInt,
+  baselineDurationMs: ScenarioDuration,
+  blipDurationMs: ScenarioDuration,
+  controlError: Schema.optionalKey(Schema.String),
   failedRequests: Schema.Natural,
-  lastError: Schema.optionalKey(Schema.String),
-  maxDurationMs: PositiveInt,
+  incidentFailureRate: FailureRate,
+  lastRequestError: Schema.optionalKey(Schema.String),
+  maxDurationMs: ScenarioDuration,
   phase: ScenarioPhase,
-  rateRps: Positive,
+  rateRps: ScenarioRate,
   requested: Schema.Natural,
   runId: Schema.NonEmptyString,
   seed: Schema.NonEmptyString,
@@ -53,14 +62,14 @@ export const ScenarioState = Schema.Struct({
   status: ScenarioStatus,
   successfulRequests: Schema.Natural,
   transitions: Schema.Array(ScenarioTransition),
-  uniqueUsers: PositiveInt,
+  uniqueUsers: ScenarioUserCount,
 });
 
 export type ScenarioState = typeof ScenarioState.Type;
 
 export const CheckoutRequest = Schema.Struct({
-  amountCents: PositiveInt,
-  itemCount: PositiveInt,
+  amountCents: Schema.Int.check(Schema.isGreaterThan(0)),
+  itemCount: Schema.Int.check(Schema.isGreaterThan(0)),
   requestId: Schema.NonEmptyString,
   userId: Schema.NonEmptyString,
 });
@@ -68,6 +77,6 @@ export const CheckoutRequest = Schema.Struct({
 export type CheckoutRequest = typeof CheckoutRequest.Type;
 
 export const FailureRateUpdate = Schema.Struct({
-  failureRate: Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 1 })),
+  failureRate: FailureRate,
   seed: Schema.optionalKey(Schema.NonEmptyString),
 });

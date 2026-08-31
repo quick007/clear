@@ -1,8 +1,8 @@
 # Payments Stub
 
 A private, deterministic payments dependency for the Clear incident
-stack. It exports real OTLP metrics, logs, and traces and models a small upstream
-failure becoming worse under retry pressure.
+stack. It exports real OTLP metrics, logs, and traces and models a controlled
+upstream fault becoming worse under retry pressure.
 
 This is canonical deployed incident-service code. The hosted Render runtime
 runs it privately alongside the backend, Collector, and state stores.
@@ -20,6 +20,14 @@ The failure decision is deterministic for the configured seed and request
 sequence. Request volume beyond `EXPECTED_RPS` increases both the effective
 failure rate and latency, which lets the checkout service's immediate retries
 create a measurable feedback loop.
+
+The authenticated admin state includes the current one-second request count and
+the total requests observed since the most recent failure-rate change. This
+makes scenario rehearsals verifiable without relying on log volume.
+
+Every authorization remains visible in traces and metrics. Failure logs use a
+deterministic request sample so the retry storm stays queryable without flooding
+the telemetry backend.
 
 ## Configuration
 

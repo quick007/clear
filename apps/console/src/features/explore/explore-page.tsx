@@ -20,7 +20,7 @@ import { StaleDataNotice } from "../../ui/stale-data-notice";
 import { MetricChart } from "../overview/metric-chart";
 import { LogsPage } from "../logs/logs-page";
 import { TracesPage } from "../traces/traces-page";
-import { aggregationFor, formatStat, toPanelSeries, windowLabels } from "./explore-format";
+import { aggregationFor, formatMetricStat, toPanelSeries, windowLabels } from "./explore-format";
 import { overviewContextFailure } from "./explore-context";
 import { ExploreNavigation } from "./explore-navigation";
 
@@ -113,6 +113,7 @@ function MetricsExplorer({
   const catalogUnavailable =
     (runtime.isError && !runtime.data) || (catalog.isError && !catalog.data);
   const metricUnavailable = metricResult.isError && !metricResult.data;
+  const metricLoading = metricResult.isPending && !metricResult.data;
   const catalogFailure = runtime.isError && !runtime.data ? runtime.error : catalog.error;
   const returnPath = `/explore?signal=metrics&window=${window}${selectedMetric ? `&metric=${encodeURIComponent(selectedMetric)}` : ""}${service ? `&service=${encodeURIComponent(service)}` : ""}`;
   const staleFailure =
@@ -236,10 +237,34 @@ function MetricsExplorer({
                 <span {...stylex.props(styles.aggregation)}>{aggregation}</span>
               </header>
               <div {...stylex.props(styles.stats)}>
-                <Stat label="Latest" value={formatStat(metricResult.data?.stats.last)} />
-                <Stat label="Average" value={formatStat(metricResult.data?.stats.average)} />
-                <Stat label="Maximum" value={formatStat(metricResult.data?.stats.maximum)} />
-                <Stat label="Series" value={String(metricResult.data?.series.length ?? 0)} />
+                <Stat
+                  label="Latest"
+                  value={
+                    metricLoading
+                      ? "Loading"
+                      : formatMetricStat(metricResult.data?.stats.last, activeMetric.unit)
+                  }
+                />
+                <Stat
+                  label="Average"
+                  value={
+                    metricLoading
+                      ? "Loading"
+                      : formatMetricStat(metricResult.data?.stats.average, activeMetric.unit)
+                  }
+                />
+                <Stat
+                  label="Maximum"
+                  value={
+                    metricLoading
+                      ? "Loading"
+                      : formatMetricStat(metricResult.data?.stats.maximum, activeMetric.unit)
+                  }
+                />
+                <Stat
+                  label="Series"
+                  value={metricLoading ? "Loading" : String(metricResult.data?.series.length ?? 0)}
+                />
               </div>
               <div {...stylex.props(styles.chartFrame)}>
                 {metricResult.isPending && !metricResult.data ? (
@@ -421,7 +446,10 @@ const styles = stylex.create({
     borderBottomStyle: "solid",
     borderBottomWidth: 1,
     display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gridTemplateColumns: {
+      default: "repeat(4, minmax(0, 1fr))",
+      "@media (max-width: 520px)": "repeat(2, minmax(0, 1fr))",
+    },
   },
   stat: {
     borderRightColor: colors.line,
@@ -440,7 +468,9 @@ const styles = stylex.create({
     borderTopWidth: 1,
     color: colors.textSubtle,
     display: "flex",
+    flexDirection: { default: "row", "@media (max-width: 520px)": "column" },
     fontSize: 10,
+    gap: { default: 0, "@media (max-width: 520px)": space.x1 },
     justifyContent: "space-between",
     padding: space.x4,
   },

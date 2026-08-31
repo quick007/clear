@@ -151,7 +151,9 @@ function PanelContent({
     );
   }
   if (panel.spec._tag === "stat") {
-    if (data.results.length === 0) return <ContentState title="No data in this window" />;
+    if (!hasRenderableChartPoints(data.results)) {
+      return <ContentState title="No data in this window" />;
+    }
     return (
       <PanelDataFrame data={data}>
         <StatPanel catalog={catalog} series={data.results} spec={panel.spec} />
@@ -159,7 +161,9 @@ function PanelContent({
     );
   }
   if (panel.spec._tag === "table") {
-    if (data.results.length === 0) return <ContentState title="No data in this window" />;
+    if (!hasRenderableChartPoints(data.results)) {
+      return <ContentState title="No data in this window" />;
+    }
     return (
       <PanelDataFrame data={data}>
         <TablePanel series={data.results} spec={panel.spec} />
@@ -427,9 +431,10 @@ const styles = stylex.create({
     gap: space.x2,
     paddingBlock: 4,
     paddingInline: 8,
-    position: "absolute",
-    right: 0,
-    top: 0,
+    marginBottom: { default: 0, "@media (max-width: 620px)": space.x2 },
+    position: { default: "absolute", "@media (max-width: 620px)": "static" },
+    right: { default: 0, "@media (max-width: 620px)": "auto" },
+    top: { default: 0, "@media (max-width: 620px)": "auto" },
     zIndex: 2,
   },
   statPanel: {

@@ -1,15 +1,16 @@
 import { assert, describe, it } from "@effect/vitest";
 import { NodeCrypto } from "@effect/platform-node";
 import { ServiceUnavailable } from "@groundtruth/api-contract";
-import { Cause, Effect, Exit, Layer, Logger, Redacted, Ref } from "effect";
+import { Account, DisplayName, EmailAddress, HostedSubject, UserId } from "@groundtruth/domain";
+import { Cause, DateTime, Effect, Exit, Layer, Logger, Redacted, Ref } from "effect";
 import { TestClock } from "effect/testing";
 import {
-  AuthPrincipal,
   AuthService,
   AuthServiceMaintenance,
   AdminLoginDisabled,
   InvalidAdminCredential,
   InvalidHandoffCode,
+  InvalidReturnPath,
   SessionNotFound,
 } from "../src/auth/AuthService.js";
 import { BackendConfig } from "../src/config/BackendConfig.js";
@@ -41,19 +42,20 @@ const ConfigDisabled = Layer.succeed(
 );
 
 const AuthTest = AuthService.layerMemory.pipe(Layer.provide([ConfigTest, NodeCrypto.layer]));
+const account = new Account({
+  id: UserId.make("01993f71-0001-7000-8000-000000000101"),
+  hostedSubject: HostedSubject.make("chatgpt-user-1"),
+  email: EmailAddress.make("operator@example.com"),
+  displayName: DisplayName.make("Operator"),
+  createdAt: DateTime.fromDateUnsafe(new Date(0)),
+  lastSeenAt: DateTime.fromDateUnsafe(new Date(0)),
+});
 
 describe("AuthService", () => {
   it.effect("redeems a handoff exactly once and revokes the session", () =>
     Effect.gen(function* () {
       const auth = yield* AuthService;
-      const handoff = yield* auth.issueHandoff(
-        new AuthPrincipal({
-          hostedSubject: "chatgpt-user-1",
-          email: "operator@example.com",
-          displayName: "Operator",
-        }),
-        "/projects",
-      );
+      const handoff = yield* auth.issueHandoff(account, "/projects");
 
       const wrongNonce = yield* Effect.exit(
         auth.redeemHandoff(handoff.code, Redacted.make("wrong-browser-nonce")),
@@ -62,8 +64,8 @@ describe("AuthService", () => {
 
       const redeemed = yield* auth.redeemHandoff(handoff.code, handoff.browserNonce);
       assert.strictEqual(redeemed.returnPath, "/projects");
-      assert.strictEqual(redeemed.session.principal.hostedSubject, "chatgpt-user-1");
-      assert.strictEqual(redeemed.session.principal.email, "operator@example.com");
+      assert.strictEqual(redeemed.account.hostedSubject, "chatgpt-user-1");
+      assert.strictEqual(redeemed.account.email, "operator@example.com");
 
       const duplicate = yield* Effect.exit(auth.redeemHandoff(handoff.code, handoff.browserNonce));
       assert(Exit.isFailure(duplicate));
@@ -74,7 +76,7 @@ describe("AuthService", () => {
       );
 
       const active = yield* auth.authenticate(redeemed.sessionToken);
-      assert.strictEqual(active.id, redeemed.session.id);
+      assert.strictEqual(active.session.id, redeemed.session.id);
 
       yield* auth.logout(redeemed.sessionToken);
       const loggedOut = yield* Effect.exit(auth.authenticate(redeemed.sessionToken));
@@ -109,18 +111,30 @@ describe("AuthService", () => {
     }).pipe(Effect.provide(AuthTest)),
   );
 
+  it.effect("rejects return paths that resolve outside the configured console origin", () =>
+    Effect.gen(function* () {
+      const auth = yield* AuthService;
+
+      for (const returnPath of ["//evil.example", "/\\evil.example", "/\n//evil.example"]) {
+        const rejected = yield* Effect.flip(auth.issueHandoff(account, returnPath));
+        assert(rejected instanceof InvalidReturnPath);
+      }
+
+      const accepted = yield* auth.issueHandoff(account, "/projects?tab=telemetry");
+      assert.strictEqual(
+        (yield* auth.redeemHandoff(accepted.code, accepted.browserNonce)).returnPath,
+        "/projects?tab=telemetry",
+      );
+    }).pipe(Effect.provide(AuthTest)),
+  );
+
   it.effect("purges expired in-memory handoffs and sessions", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(Date.parse("2026-08-29T08:00:00.000Z"));
       const auth = yield* AuthService;
-      const principal = new AuthPrincipal({
-        hostedSubject: "chatgpt-user-1",
-        email: "operator@example.com",
-        displayName: "Operator",
-      });
-      const sessionHandoff = yield* auth.issueHandoff(principal, "/projects");
+      const sessionHandoff = yield* auth.issueHandoff(account, "/projects");
       yield* auth.redeemHandoff(sessionHandoff.code, sessionHandoff.browserNonce);
-      yield* auth.issueHandoff(principal, "/settings");
+      yield* auth.issueHandoff(account, "/settings");
 
       yield* TestClock.adjust("8 days");
 

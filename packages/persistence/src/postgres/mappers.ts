@@ -12,6 +12,7 @@ import {
   Project,
   TimelineEntry,
 } from "@groundtruth/domain";
+import { PanelSpec } from "@groundtruth/panel-dsl";
 import { DateTime, Effect, Schema } from "effect";
 import { persistenceError } from "../errors.ts";
 import { PanelAnnotationRecord } from "../records.ts";
@@ -118,7 +119,7 @@ export const panelFromRow = (row: PanelRow): PanelRecord => ({
     createdAt: utc(row.createdAt),
     updatedAt: utc(row.updatedAt),
   }),
-  spec: row.spec,
+  spec: Schema.decodeUnknownSync(PanelSpec)(row.spec),
   annotations: Schema.decodeUnknownSync(Schema.Array(PanelAnnotationRecord))(row.annotations),
 });
 

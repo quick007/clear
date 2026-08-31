@@ -1,8 +1,11 @@
 import { assert, describe, it } from "@effect/vitest";
-import { Effect, Exit, Schema } from "effect";
+import { Effect, Exit, Result, Schema } from "effect";
 import {
   AbsoluteTimeRange,
+  aggregateMetricPoints,
+  AttributeFilter,
   CanonicalTelemetryBatch,
+  MetricAggregateQuery,
   MetricQuery,
   maximumMetricQuerySeconds,
   metricQueryDurationSeconds,
@@ -164,6 +167,122 @@ describe("telemetry schemas", () => {
         range: { _tag: "relative", window: "15m" },
       }).pipe(Effect.exit);
       assert(Exit.isFailure(misplaced));
+    }),
+  );
+
+  it.effect("keeps aggregate queries unbucketed and validates distinct attributes", () =>
+    Effect.gen(function* () {
+      const query = yield* Schema.decodeUnknownEffect(MetricAggregateQuery)({
+        metric: "http.server.requests",
+        aggregation: "count-distinct",
+        distinctKey: "user.id",
+        range: { _tag: "relative", window: "15m" },
+      });
+      assert.strictEqual(query.distinctKey, "user.id");
+      assert(!("step" in query));
+
+      const missing = yield* Schema.decodeUnknownEffect(MetricAggregateQuery)({
+        metric: "http.server.requests",
+        aggregation: "count-distinct",
+        range: { _tag: "relative", window: "15m" },
+      }).pipe(Effect.exit);
+      assert(Exit.isFailure(missing));
+    }),
+  );
+
+  it("aggregates a complete counter window and excludes missing distinct attributes", () => {
+    const baseMillis = Date.parse("2027-01-15T08:00:00.000Z");
+    const baseNano = BigInt(baseMillis) * 1_000_000n;
+    const tenSeconds = 10_000_000_000n; // 10 seconds
+    const counterStart = baseNano - 60_000_000_000n; // 1 minute
+    const resetAt = baseNano + 2n * tenSeconds;
+    const point = (value: number, timeUnixNano: bigint, startTimeUnixNano: bigint) => ({
+      ...metricBase,
+      _tag: "sum" as const,
+      name: "requests.cumulative",
+      attributes: { route: "/checkout" },
+      startTimeUnixNano: String(startTimeUnixNano),
+      timeUnixNano: String(timeUnixNano),
+      value: { _tag: "int" as const, value: String(value) },
+      temporality: "cumulative" as const,
+      monotonic: true,
+    });
+    const batch = Schema.decodeUnknownSync(CanonicalTelemetryBatch)({
+      id: "550e8400-e29b-41d4-a716-446655440010",
+      receivedAt: "2027-01-15T08:01:00.000Z",
+      metrics: [
+        point(100, baseNano, counterStart),
+        point(110, baseNano + tenSeconds, counterStart),
+        point(5, resetAt, resetAt),
+        point(15, baseNano + 3n * tenSeconds, resetAt),
+        {
+          ...metricBase,
+          _tag: "gauge",
+          name: "users.active",
+          attributes: {},
+          timeUnixNano: String(baseNano + tenSeconds),
+          value: { _tag: "int", value: "1" },
+        },
+        {
+          ...metricBase,
+          _tag: "gauge",
+          name: "users.active",
+          attributes: { user: "ada" },
+          timeUnixNano: String(baseNano + 2n * tenSeconds),
+          value: { _tag: "int", value: "1" },
+        },
+      ],
+      logs: [],
+      spans: [],
+    });
+    const range = {
+      _tag: "absolute",
+      start: new Date(baseMillis + 5_000).toISOString(),
+      end: new Date(baseMillis + 31_000).toISOString(),
+    };
+    const rateQuery = Schema.decodeUnknownSync(MetricAggregateQuery)({
+      metric: "requests.cumulative",
+      aggregation: "rate",
+      range,
+    });
+    const rate = aggregateMetricPoints(batch.metrics, rateQuery, baseMillis + 31_000);
+    assert(Result.isSuccess(rate));
+    assert.strictEqual(rate.success.matchedPoints, 3);
+    assert.closeTo(rate.success.value!, 25 / 26, 0.000_000_01);
+
+    const distinctQuery = Schema.decodeUnknownSync(MetricAggregateQuery)({
+      metric: "users.active",
+      aggregation: "count-distinct",
+      distinctKey: "user",
+      range,
+    });
+    const distinct = aggregateMetricPoints(batch.metrics, distinctQuery, baseMillis + 31_000);
+    assert(Result.isSuccess(distinct));
+    assert.strictEqual(distinct.success.value, 1);
+  });
+
+  it.effect("keeps attribute filter operators and values coherent", () =>
+    Effect.gen(function* () {
+      const exists = yield* Schema.decodeUnknownEffect(AttributeFilter)({
+        key: "retry",
+        operator: "exists",
+        value: null,
+      });
+      assert.strictEqual(exists.value, null);
+
+      const ignoredExistsValue = yield* Schema.decodeUnknownEffect(AttributeFilter)({
+        key: "retry",
+        operator: "exists",
+        value: true,
+      }).pipe(Effect.exit);
+      assert(Exit.isFailure(ignoredExistsValue));
+
+      const missingMatchValue = yield* Schema.decodeUnknownEffect(AttributeFilter)({
+        key: "retry",
+        operator: "equals",
+        value: null,
+      }).pipe(Effect.exit);
+      assert(Exit.isFailure(missingMatchValue));
     }),
   );
 

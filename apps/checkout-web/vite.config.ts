@@ -11,7 +11,10 @@ export default defineConfig(async ({ mode }) => {
     return { plugins: [], test: { environment: "node", pool: "threads" } };
   }
 
-  readCheckoutConfig(loadEnv(mode, appRoot, ""));
+  const environment = loadEnv(mode, appRoot, "");
+  if (environment.VITE_CHECKOUT_API_URL !== undefined) {
+    readCheckoutConfig(environment);
+  }
 
   return {
     plugins: [
