@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="media/devpost/outputs/clear-devpost-hero.png" alt="Clear: Let your agent see production" width="640" />
+  <img src="media/devpost/outputs/clear-devpost-hero.png" alt="Clear: Let your agent see production" width="320" />
   <h1>Clear</h1>
   <p>
     <a href="https://github.com/quick007/clear/actions/workflows/ci.yml"><img src="https://github.com/quick007/clear/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
