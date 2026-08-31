@@ -125,7 +125,10 @@ export function ConnectPage() {
       <PageHeader
         actions={
           progress.isConnected ? (
-            <Button render={<Link search={{ guide: undefined }} to="/board" />} tone="primary">
+            <Button
+              render={<Link search={{ demo: undefined, guide: undefined }} to="/board" />}
+              tone="primary"
+            >
               Open board <Icon icon={ArrowRight01Icon} size={15} />
             </Button>
           ) : undefined

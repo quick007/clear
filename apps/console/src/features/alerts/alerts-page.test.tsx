@@ -125,7 +125,7 @@ describe("alert investigation routing", () => {
     expect(testState.startInvestigation).toHaveBeenCalledOnce();
     expect(testState.navigate).toHaveBeenCalledWith(investigationWorkspaceNavigation);
     expect(investigationWorkspaceNavigation).toEqual({
-      search: { guide: undefined },
+      search: { demo: undefined, guide: undefined },
       to: "/board",
     });
   });

@@ -7,6 +7,7 @@ import type {
 } from "@groundtruth/telemetry";
 
 import { metricQueryBucketDuration, panelPalette, type PanelSeries } from "../../data/panels";
+import { formatPanelValue } from "../board/panel-format";
 
 export const windowLabels: Record<TelemetryWindow, string> = {
   "5m": "last 5 minutes",
@@ -44,9 +45,7 @@ export const toPanelSeries = (result: MetricQueryResult): ReadonlyArray<PanelSer
     };
   });
 
-export const formatStat = (value: number | null | undefined) =>
+export const formatMetricStat = (value: number | null | undefined, unit: string) =>
   value === null || value === undefined
     ? "No data"
-    : new Intl.NumberFormat(undefined, { maximumFractionDigits: 2, notation: "compact" }).format(
-        value,
-      );
+    : formatPanelValue(value, { _tag: "auto" }, unit);

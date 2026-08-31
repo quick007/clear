@@ -69,6 +69,7 @@ const boardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/board",
   validateSearch: (search: Record<string, unknown>) => ({
+    demo: search.demo === true || search.demo === "true" ? true : undefined,
     guide: search.guide === true || search.guide === "true" ? true : undefined,
   }),
 });

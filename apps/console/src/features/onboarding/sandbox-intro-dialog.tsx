@@ -23,7 +23,7 @@ const steps = [
   {
     title: "Investigate together",
     detail:
-      "Open this workspace with the agent that knows your code, then ask it to test a hypothesis and add the evidence here.",
+      "Use the agent that knows your code. WebMCP tools let it test a hypothesis and add the evidence here.",
   },
 ] as const;
 
@@ -140,23 +140,23 @@ export function SandboxIntroDialog({
 function AgentAccessNotice({ access }: { access: SandboxAgentAccess }) {
   const copy = {
     checking: {
-      title: "Checking agent access",
-      detail: "Clear is confirming that your agent can join this workspace before you begin.",
+      title: "Checking WebMCP access",
+      detail: "Clear is confirming that your agent can use this workspace's site tools.",
     },
     failed: {
-      title: "Agent access could not start",
+      title: "WebMCP access could not start",
       detail:
         "Try again before starting, or continue here without agent collaboration. This sandbox stays in this browser tab.",
     },
     ready: {
-      title: "Ready to investigate with your agent",
+      title: "WebMCP tools ready",
       detail:
-        "Keep this page open with your agent. The questions you ask and the evidence it adds stay visible in the same workspace.",
+        "Your agent can query live telemetry, test hypotheses, and add evidence to the same board you see.",
     },
     unsupported: {
       title: "Open this page inside ChatGPT before starting",
       detail:
-        "Agent collaboration is not available in this browser. Copy the live URL and open it inside ChatGPT. A sandbox started here stays in this tab and will not carry over.",
+        "WebMCP site tools are not available in this browser. Copy the live URL and open it inside ChatGPT. A sandbox started here stays in this tab and will not carry over.",
     },
   }[access];
 
@@ -213,7 +213,7 @@ function BaselineActions({
           {pending ? "Starting incident" : "Continue here without an agent"}
         </Button>
         <Button disabled={pending || blocked} onClick={onRetryAgentAccess} tone="primary">
-          Try agent access again
+          Try WebMCP access again
         </Button>
       </>
     );
@@ -230,7 +230,7 @@ function BaselineActions({
         tone="primary"
       >
         {access === "checking"
-          ? "Checking agent access"
+          ? "Checking WebMCP access"
           : pending
             ? "Starting incident"
             : "Trigger checkout incident"}

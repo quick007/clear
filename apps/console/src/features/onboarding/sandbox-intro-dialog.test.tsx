@@ -68,7 +68,8 @@ describe("sandbox intro agent access", () => {
   it("keeps the agent-guided start primary when access is ready", () => {
     const html = renderDialog("ready");
 
-    expect(html).toContain("Ready to investigate with your agent");
+    expect(html).toContain("WebMCP tools ready");
+    expect(html).toContain("query live telemetry");
     expect(html).toContain("Trigger checkout incident");
     expect(html).not.toContain("Continue here without an agent");
   });
@@ -86,7 +87,7 @@ describe("sandbox intro agent access", () => {
   it("waits for the capability check before offering the guided start", () => {
     const html = renderDialog("checking");
 
-    expect(html).toContain("Checking agent access");
+    expect(html).toContain("Checking WebMCP access");
     expect(html).toContain("disabled");
     expect(html).not.toContain("Continue here without an agent");
   });
@@ -94,8 +95,8 @@ describe("sandbox intro agent access", () => {
   it("offers retry or an explicit human-only path after startup fails", () => {
     const html = renderDialog("failed");
 
-    expect(html).toContain("Agent access could not start");
-    expect(html).toContain("Try agent access again");
+    expect(html).toContain("WebMCP access could not start");
+    expect(html).toContain("Try WebMCP access again");
     expect(html).toContain("Continue here without an agent");
   });
 });

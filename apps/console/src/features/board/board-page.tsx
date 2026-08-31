@@ -22,7 +22,11 @@ import { ContentState } from "../../ui/page";
 import { InvestigationGuide } from "../onboarding/investigation-guide";
 import { investigationStage } from "../onboarding/investigation-progress";
 import { SandboxIntroDialog } from "../onboarding/sandbox-intro-dialog";
-import { boardContextMessage, type BoardDependencyState } from "./board-context";
+import {
+  boardContextMessage,
+  boardDependencyState,
+  type BoardDependencyState,
+} from "./board-context";
 import { chartNeedsFullWidth } from "./panel-layout";
 import { LivePanel } from "./panel-renderer";
 import {
@@ -74,17 +78,27 @@ export function BoardPage() {
   ).toString();
   const boardUnavailable = (runtime.isError && !runtime.data) || (board.isError && !board.data);
   const boardFailure = runtime.isError && !runtime.data ? runtime.error : board.error;
-  const catalogState = dependencyState(catalog.isError, catalog.data !== undefined);
-  const incidentHistoryState = dependencyState(incidents.isError, incidents.data !== undefined);
-  const overviewState = dependencyState(overview.isError, overview.data !== undefined);
-  const dependencyFailure =
-    catalogState !== "available" ||
-    incidentHistoryState !== "available" ||
-    overviewState !== "available";
+  const boardState = boardDependencyState(board.isError, board.data !== undefined);
+  const catalogState = boardDependencyState(catalog.isError, catalog.data !== undefined);
+  const incidentHistoryState = boardDependencyState(
+    incidents.isError,
+    incidents.data !== undefined,
+  );
+  const overviewState = boardDependencyState(overview.isError, overview.data !== undefined);
+  const contextNeedsAttention = [
+    boardState,
+    catalogState,
+    incidentHistoryState,
+    overviewState,
+  ].some((state) => state !== "available");
   const triggerOutcomeUnknown =
     triggerIncident.isError && mutationOutcomeIsUnknown(triggerIncident.error);
   const resetOutcomeUnknown = resetSandbox.isError && mutationOutcomeIsUnknown(resetSandbox.error);
-  const closeGuide = () => void navigate({ replace: true, search: { guide: undefined } });
+  const closeGuide = () =>
+    void navigate({
+      replace: true,
+      search: (current) => ({ ...current, guide: undefined }),
+    });
   const startIncident = () => {
     if (triggerOutcomeUnknown || triggerIncident.isPending) return;
     triggerIncident.mutate(undefined, { onSuccess: closeGuide });
@@ -184,7 +198,9 @@ export function BoardPage() {
               stage === "baseline" ? (
                 <Button
                   disabled={triggerIncident.isPending || triggerOutcomeUnknown}
-                  onClick={() => void navigate({ search: { guide: true } })}
+                  onClick={() =>
+                    void navigate({ search: (current) => ({ ...current, guide: true }) })
+                  }
                   tone="primary"
                 >
                   Start investigation
@@ -202,13 +218,20 @@ export function BoardPage() {
                   Review and close
                 </Button>
               ) : stage === "reviewed" ? (
-                <Button onClick={() => void navigate({ search: { guide: true } })} tone="secondary">
+                <Button
+                  onClick={() =>
+                    void navigate({ search: (current) => ({ ...current, guide: true }) })
+                  }
+                  tone="secondary"
+                >
                   Start over
                 </Button>
               ) : null
             }
             agentUnavailable={toolStatus === "failed" || toolStatus === "unsupported"}
-            onOpenGuide={() => void navigate({ search: { guide: true } })}
+            onOpenGuide={() =>
+              void navigate({ search: (current) => ({ ...current, guide: true }) })
+            }
             prompt={investigationPrompts[stage]}
             stage={stage}
           />
@@ -237,18 +260,22 @@ export function BoardPage() {
           {errorMessage(runtime.isError && !runtime.data ? runtime.error : board.error)}
         </ContentState>
       ) : null}
-      {board.data && dependencyFailure ? (
+      {board.data && contextNeedsAttention ? (
         <BoardContextNotice
+          board={boardState}
           catalog={catalogState}
-          error={catalog.error ?? overview.error ?? incidents.error}
+          error={board.error ?? catalog.error ?? overview.error ?? incidents.error}
           incidentHistory={incidentHistoryState}
           onRetry={() => {
+            if (board.isError) void board.refetch();
             if (catalog.isError) void catalog.refetch();
             if (overview.isError) void overview.refetch();
             if (incidents.isError) void incidents.refetch();
           }}
           overview={overviewState}
-          retrying={catalog.isFetching || overview.isFetching || incidents.isFetching}
+          retrying={
+            board.isFetching || catalog.isFetching || overview.isFetching || incidents.isFetching
+          }
         />
       ) : null}
       {board.data?.panels.length === 0 ? (
@@ -281,6 +308,7 @@ export function BoardPage() {
 }
 
 function BoardContextNotice({
+  board,
   catalog,
   error,
   incidentHistory,
@@ -288,6 +316,7 @@ function BoardContextNotice({
   overview,
   retrying,
 }: {
+  board: BoardDependencyState;
   catalog: BoardDependencyState;
   error: unknown;
   incidentHistory: BoardDependencyState;
@@ -298,7 +327,7 @@ function BoardContextNotice({
   return (
     <aside aria-live="polite" role="status" {...stylex.props(styles.contextNotice)}>
       <span {...stylex.props(styles.contextNoticeCopy)}>
-        {boardContextMessage({ catalog, incidentHistory, overview })}
+        {boardContextMessage({ board, catalog, incidentHistory, overview })}
       </span>
       <ConsoleFailureActions
         compact
@@ -310,9 +339,6 @@ function BoardContextNotice({
     </aside>
   );
 }
-
-const dependencyState = (failed: boolean, loaded: boolean): BoardDependencyState =>
-  failed ? (loaded ? "stale" : "missing") : "available";
 
 const styles = stylex.create({
   page: {
@@ -340,7 +366,7 @@ const styles = stylex.create({
     paddingBottom: space.x10,
   },
   contextNotice: {
-    alignItems: "center",
+    alignItems: { default: "center", "@media (max-width: 620px)": "flex-start" },
     backgroundColor: colors.surface,
     borderColor: colors.line,
     borderRadius: radii.md,
@@ -348,6 +374,7 @@ const styles = stylex.create({
     borderWidth: 1,
     color: colors.textMuted,
     display: "flex",
+    flexDirection: { default: "row", "@media (max-width: 620px)": "column" },
     fontSize: 12,
     gap: space.x3,
     justifyContent: "space-between",
