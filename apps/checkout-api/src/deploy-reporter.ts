@@ -13,7 +13,7 @@ const report = Effect.gen(function* () {
   const request = yield* HttpClientRequest.post(config.deployEventsUrl.value).pipe(
     HttpClientRequest.setHeader("x-clear-ingest-key", Redacted.value(config.ingestKey.value)),
     HttpClientRequest.bodyJson({
-      description: "checkout-api deployment started",
+      description: "checkout-api process started",
       service: "checkout-api",
       sha: config.renderGitCommit,
       url: Option.getOrUndefined(config.renderExternalUrl),

@@ -69,6 +69,7 @@ export class FailureModel extends Context.Service<
           failureRate: state.failureRate,
           requestsInWindow: state.requestsInWindow,
           seed: state.seed,
+          totalRequests: state.totalRequests,
           windowStartedAt: state.windowStartedAt,
         });
 

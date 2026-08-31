@@ -48,6 +48,12 @@ Expected behavior:
 
 Check disk capacity, process memory, recent merges, failed migrations, and credentials. Restart only after identifying whether the failure is resource exhaustion or configuration. If the hosted disk is corrupt, stop ingest and rebuild. The hackathon deployment has no off-host recovery promise.
 
+## Intermittent telemetry query failures
+
+The hosted ClickHouse profile runs queries on one thread and accepts up to eight concurrent queries. Each application ClickHouse client is bounded to four open connections, so a normal dashboard burst waits in the client instead of crossing the server limit.
+
+If telemetry reads still alternate between success and retryable `503` responses, inspect the backend's correlated storage error before changing limits. ClickHouse error `202` indicates query concurrency saturation, while `241` indicates memory pressure. Raising either limit without checking the client pools and the 2 GB service memory budget can turn a short overload into a process restart.
+
 ## PostgreSQL unavailable
 
 The API cannot authenticate projects or reliably write product state, so it should fail readiness and reject ingest rather than bypass project-key validation. Inspect the PostgreSQL child process, disk capacity, credentials, and connection limits. Do not point the hosted service at an in-memory fallback.

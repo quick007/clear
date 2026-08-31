@@ -2,7 +2,9 @@
     <profiles>
         <groundtruth>
             <max_memory_usage>268435456</max_memory_usage>
-            <max_threads>2</max_threads>
+            <!-- The hosted service has one CPU. Client pools stay below the query
+                 limit, so bursts queue without multiplying execution threads. -->
+            <max_threads>1</max_threads>
             <max_concurrent_queries_for_user>8</max_concurrent_queries_for_user>
         </groundtruth>
     </profiles>

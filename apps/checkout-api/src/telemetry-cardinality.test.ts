@@ -1,5 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
-import { maximumUserMetricCardinality, metricUserId } from "./telemetry-cardinality.js";
+import {
+  isSampledTelemetryId,
+  maximumUserMetricCardinality,
+  metricUserId,
+} from "./telemetry-cardinality.js";
 
 describe("metricUserId", () => {
   it("is deterministic and never returns the raw identifier", () => {
@@ -25,5 +29,14 @@ describe("metricUserId", () => {
     );
 
     expect(generatedUsers.size).toBeGreaterThanOrEqual(720);
+  });
+
+  it("selects a deterministic, bounded request sample for logs", () => {
+    const requests = Array.from({ length: 10_000 }, (_, index) => `request-${index}`);
+    const sample = requests.filter(isSampledTelemetryId);
+
+    expect(sample.length).toBeGreaterThan(150);
+    expect(sample.length).toBeLessThan(250);
+    expect(requests.filter(isSampledTelemetryId)).toEqual(sample);
   });
 });

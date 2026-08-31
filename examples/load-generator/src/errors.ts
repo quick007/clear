@@ -15,6 +15,10 @@ export class ScenarioNotRunning extends Schema.TaggedError<ScenarioNotRunning>()
   {},
 ) {}
 
+export class InvalidScenario extends Schema.TaggedError<InvalidScenario>()("InvalidScenario", {
+  reason: Schema.String,
+}) {}
+
 export class ExampleServiceUnavailable extends Schema.TaggedError<ExampleServiceUnavailable>()(
   "ExampleServiceUnavailable",
   {

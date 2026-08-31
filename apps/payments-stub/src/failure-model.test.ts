@@ -8,8 +8,9 @@ describe("failure model", () => {
   });
 
   it("amplifies failures only after the expected request rate is exceeded", () => {
-    expect(effectiveRate(0.02, 50, 51, 0.22)).toBe(0.02);
-    expect(effectiveRate(0.02, 52, 51, 0.22)).toBeCloseTo(0.24);
-    expect(effectiveRate(0.02, 70, 51, 0.22)).toBe(0.98);
+    expect(effectiveRate(0.002, 50, 51, 0.22)).toBe(0.002);
+    expect(effectiveRate(0.65, 51, 51, 0.22)).toBe(0.65);
+    expect(effectiveRate(0.65, 52, 51, 0.22)).toBeCloseTo(0.87);
+    expect(effectiveRate(0.65, 53, 51, 0.22)).toBe(0.98);
   });
 });

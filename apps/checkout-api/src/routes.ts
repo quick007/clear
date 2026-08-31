@@ -16,14 +16,16 @@ const health = HttpServerResponse.jsonUnsafe({
   status: "ok",
 });
 
-const checkoutRoute = Effect.gen(function* () {
-  const service = yield* CheckoutService;
-  const request = yield* HttpServerRequest.schemaBodyJson(CheckoutRequest);
-  const result = yield* service.checkout(request);
-  return yield* HttpServerResponse.schemaJson(CheckoutResponse)(result, {
-    status: 200,
-  });
-}).pipe(
+const checkoutRoute = HttpMiddleware.withLoggerDisabled(
+  Effect.gen(function* () {
+    const service = yield* CheckoutService;
+    const request = yield* HttpServerRequest.schemaBodyJson(CheckoutRequest);
+    const result = yield* service.checkout(request);
+    return yield* HttpServerResponse.schemaJson(CheckoutResponse)(result, {
+      status: 200,
+    });
+  }),
+).pipe(
   Effect.catch((error) =>
     Effect.succeed(
       error instanceof PaymentUnavailable

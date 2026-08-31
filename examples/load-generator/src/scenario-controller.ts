@@ -2,13 +2,17 @@ import { Clock, Context, Effect, Fiber, Layer, Metric, Option, Ref, Semaphore } 
 import { CheckoutClient } from "./checkout-client.js";
 import { GeneratorConfig } from "./config.js";
 import { ScenarioPhase, ScenarioStart, ScenarioState, ScenarioTransition } from "./contracts.js";
-import { ExampleServiceUnavailable, ScenarioAlreadyRunning, ScenarioNotRunning } from "./errors.js";
+import {
+  ExampleServiceUnavailable,
+  InvalidScenario,
+  ScenarioAlreadyRunning,
+  ScenarioNotRunning,
+} from "./errors.js";
 import { configuredRate, configuredUsers, scenarioPhase } from "./metrics.js";
 import { PaymentsAdmin } from "./payments-admin.js";
 import { requestFor } from "./request-shape.js";
 
 const baselineFailureRate = 0.002;
-const incidentFailureRate = 0.02;
 
 const phaseValues: Record<ScenarioPhase, number> = {
   amplification: 3,
@@ -30,13 +34,20 @@ export const phaseAt = (
   return "amplification";
 };
 
+export const hasAmplificationWindow = (
+  baselineDurationMs: number,
+  blipDurationMs: number,
+  maxDurationMs: number,
+) => baselineDurationMs + blipDurationMs < maxDurationMs;
+
 const normalize = (config: GeneratorConfig["Service"], input: ScenarioStart) => ({
   baselineDurationMs: input.baselineDurationMs ?? config.baselineDurationMs,
   blipDurationMs: input.blipDurationMs ?? config.blipDurationMs,
+  incidentFailureRate: input.incidentFailureRate ?? config.incidentFailureRate,
   maxDurationMs: input.maxDurationMs ?? config.maxDurationMs,
   rateRps: input.rateRps ?? config.baselineRps,
   seed: input.seed ?? config.scenarioSeed,
-  uniqueUsers: Math.floor(input.uniqueUsers ?? config.uniqueUsers),
+  uniqueUsers: input.uniqueUsers ?? config.uniqueUsers,
 });
 
 const transition = (state: ScenarioState, phase: ScenarioPhase, at: number) =>
@@ -59,9 +70,12 @@ export class ScenarioController extends Context.Service<
     readonly recover: Effect.Effect<ScenarioState, ScenarioNotRunning | ExampleServiceUnavailable>;
     readonly start: (
       input: ScenarioStart,
-    ) => Effect.Effect<ScenarioState, ScenarioAlreadyRunning | ExampleServiceUnavailable>;
+    ) => Effect.Effect<
+      ScenarioState,
+      InvalidScenario | ScenarioAlreadyRunning | ExampleServiceUnavailable
+    >;
     readonly state: Effect.Effect<ScenarioState>;
-    readonly stop: Effect.Effect<ScenarioState, ScenarioNotRunning>;
+    readonly stop: Effect.Effect<ScenarioState, ScenarioNotRunning | ExampleServiceUnavailable>;
   }
 >()("groundtruth/load-generator/ScenarioController") {
   static readonly layer = Layer.effect(
@@ -76,6 +90,7 @@ export class ScenarioController extends Context.Service<
           baselineDurationMs: config.baselineDurationMs,
           blipDurationMs: config.blipDurationMs,
           failedRequests: 0,
+          incidentFailureRate: config.incidentFailureRate,
           maxDurationMs: config.maxDurationMs,
           phase: "idle",
           rateRps: config.baselineRps,
@@ -91,32 +106,42 @@ export class ScenarioController extends Context.Service<
       );
       const fiberRef = yield* Ref.make<Option.Option<Fiber.Fiber<void, never>>>(Option.none());
       const lock = yield* Semaphore.make(1);
+      const phaseLock = yield* Semaphore.make(1);
 
       const enterPhase = (phase: ScenarioPhase) =>
-        Effect.gen(function* () {
-          const current = yield* Ref.get(stateRef);
-          if (current.phase === phase) return current;
+        phaseLock.withPermit(
+          Effect.gen(function* () {
+            const current = yield* Ref.get(stateRef);
+            if (
+              current.phase === phase ||
+              (current.phase === "recovery" && phase !== "completed")
+            ) {
+              return current;
+            }
 
-          if (phase === "blip") {
-            yield* payments.setFailureRate(incidentFailureRate, current.seed);
-          } else if (phase === "recovery") {
-            yield* payments.setFailureRate(baselineFailureRate, current.seed);
-          }
+            if (phase === "blip") {
+              yield* payments.setFailureRate(current.incidentFailureRate, current.seed);
+            } else if (phase === "recovery") {
+              yield* payments.setFailureRate(baselineFailureRate, current.seed);
+            }
 
-          const now = yield* Clock.currentTimeMillis;
-          const next = transition(current, phase, now);
-          yield* Ref.set(stateRef, next);
-          yield* Metric.update(scenarioPhase, phaseValues[phase]);
-          yield* Effect.logInfo("Scenario phase changed").pipe(
-            Effect.annotateLogs({
-              elapsedMs: now - current.startedAt,
-              phase,
-              runId: current.runId,
-              seed: current.seed,
-            }),
-          );
-          return next;
-        });
+            const now = yield* Clock.currentTimeMillis;
+            const next = yield* Ref.modify(stateRef, (latest) => {
+              const updated = transition(latest, phase, now);
+              return [updated, updated];
+            });
+            yield* Metric.update(scenarioPhase, phaseValues[phase]);
+            yield* Effect.logInfo("Scenario phase changed").pipe(
+              Effect.annotateLogs({
+                elapsedMs: now - next.startedAt,
+                phase,
+                runId: next.runId,
+                seed: next.seed,
+              }),
+            );
+            return next;
+          }),
+        );
 
       const send = (index: number, state: ScenarioState) =>
         Effect.gen(function* () {
@@ -126,11 +151,13 @@ export class ScenarioController extends Context.Service<
               onFailure: (error) =>
                 Effect.gen(function* () {
                   yield* Ref.update(stateRef, (current) =>
-                    ScenarioState.make({
-                      ...current,
-                      failedRequests: current.failedRequests + 1,
-                      lastError: error.reason,
-                    }),
+                    current.runId === state.runId
+                      ? ScenarioState.make({
+                          ...current,
+                          failedRequests: current.failedRequests + 1,
+                          lastRequestError: error.reason,
+                        })
+                      : current,
                   );
                   if (index % 50 === 0) {
                     yield* Effect.logWarning("Generated checkout failed").pipe(
@@ -145,10 +172,12 @@ export class ScenarioController extends Context.Service<
                 }),
               onSuccess: () =>
                 Ref.update(stateRef, (current) =>
-                  ScenarioState.make({
-                    ...current,
-                    successfulRequests: current.successfulRequests + 1,
-                  }),
+                  current.runId === state.runId
+                    ? ScenarioState.make({
+                        ...current,
+                        successfulRequests: current.successfulRequests + 1,
+                      })
+                    : current,
                 ),
             }),
           );
@@ -162,11 +191,11 @@ export class ScenarioController extends Context.Service<
           const now = yield* Clock.currentTimeMillis;
           const elapsedMs = now - current.startedAt;
           if (elapsedMs >= current.maxDurationMs) {
-            const completed = yield* enterPhase("completed");
-            yield* Ref.set(stateRef, ScenarioState.make({ ...completed, status: "completed" }));
-            yield* payments
-              .setFailureRate(baselineFailureRate, current.seed)
-              .pipe(Effect.catch(() => Effect.void));
+            yield* enterPhase("completed");
+            yield* Ref.update(stateRef, (latest) =>
+              ScenarioState.make({ ...latest, status: "completed" }),
+            );
+            yield* payments.setFailureRate(baselineFailureRate, current.seed);
             return;
           }
 
@@ -198,6 +227,17 @@ export class ScenarioController extends Context.Service<
             }
 
             const options = normalize(config, input);
+            if (
+              !hasAmplificationWindow(
+                options.baselineDurationMs,
+                options.blipDurationMs,
+                options.maxDurationMs,
+              )
+            ) {
+              return yield* new InvalidScenario({
+                reason: "maxDurationMs must extend beyond the baseline and blip phases",
+              });
+            }
             const now = yield* Clock.currentTimeMillis;
             yield* payments.setFailureRate(baselineFailureRate, options.seed);
             const state = ScenarioState.make({
@@ -225,6 +265,7 @@ export class ScenarioController extends Context.Service<
               Effect.annotateLogs({
                 baselineDurationMs: state.baselineDurationMs,
                 blipDurationMs: state.blipDurationMs,
+                incidentFailureRate: state.incidentFailureRate,
                 maxDurationMs: state.maxDurationMs,
                 rateRps: state.rateRps,
                 runId: state.runId,
@@ -240,7 +281,7 @@ export class ScenarioController extends Context.Service<
                   yield* Ref.update(stateRef, (value) =>
                     ScenarioState.make({
                       ...transition(value, "stopped", failedAt),
-                      lastError: error.reason,
+                      controlError: error.reason,
                       status: "stopped",
                     }),
                   );
@@ -270,19 +311,30 @@ export class ScenarioController extends Context.Service<
           });
           yield* Ref.set(stateRef, stopped);
           yield* Ref.set(fiberRef, Option.none());
+          yield* Metric.update(scenarioPhase, phaseValues.stopped);
           yield* payments
             .setFailureRate(baselineFailureRate, current.seed)
-            .pipe(Effect.catch(() => Effect.void));
-          yield* Metric.update(scenarioPhase, phaseValues.stopped);
+            .pipe(
+              Effect.tapError((error) =>
+                Ref.update(stateRef, (state) =>
+                  ScenarioState.make({ ...state, controlError: error.reason }),
+                ),
+              ),
+            );
           return stopped;
         }),
       );
 
-      const recover = Effect.gen(function* () {
-        const fiber = yield* Ref.get(fiberRef);
-        if (Option.isNone(fiber)) return yield* new ScenarioNotRunning({});
-        return yield* enterPhase("recovery");
-      });
+      const recover = lock.withPermit(
+        Effect.gen(function* () {
+          const fiber = yield* Ref.get(fiberRef);
+          const current = yield* Ref.get(stateRef);
+          if (Option.isNone(fiber) || current.status !== "running") {
+            return yield* new ScenarioNotRunning({});
+          }
+          return yield* enterPhase("recovery");
+        }),
+      );
 
       return ScenarioController.of({
         recover,

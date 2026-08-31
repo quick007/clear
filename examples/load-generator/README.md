@@ -21,6 +21,8 @@ Scenario routes require `Authorization: Bearer <CONTROL_TOKEN>`. Starting a run
 returns its seed, rate, deterministic user count, durations, counters, and
 transition history. The service moves through baseline, blip, and amplification
 until an operator requests recovery or the maximum duration is reached.
+Expected checkout failures are reported separately from scenario-control and
+cleanup failures.
 
 ## Configuration
 
@@ -30,6 +32,8 @@ Render host and port values through `CHECKOUT_HOSTPORT` and
 
 `AUTOSTART=true` starts the default scenario when the service becomes ready.
 The default is false so rehearsals can begin from a known state.
+`INCIDENT_FAILURE_RATE` defaults to 0.65, the controlled fault level that makes
+the checkout service's immediate retries produce about 3x upstream traffic.
 
 Set `GROUNDTRUTH_INGEST_KEY` to add `x-clear-ingest-key` to every OTLP
 export. The standard OpenTelemetry exporter endpoint variables remain
