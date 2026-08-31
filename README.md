@@ -7,45 +7,37 @@
 [![CI](https://github.com/quick007/clear/actions/workflows/ci.yml/badge.svg)](https://github.com/quick007/clear/actions/workflows/ci.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-f4b968.svg)](LICENSE)
 
-Most observability dashboards have built-in agents these days, and that agent can piece together answers or make changes to the interface. But these built-in agents are isolated from your repo, skills, and context.
+Clear is an OpenTelemetry workspace shared by you and the coding agent that already knows your code.
 
-Clear solves this by making observability visible and malleable to your coding agent. With WebMCP, humans and agents can triage issues, build dashboards, and understand incidents. Services send metrics, logs, and traces to Clear, and setting it up is as simple as pointing any OpenTelemetry client that supports HTTP exports at our endpoints.
+Most observability products put a vendor copilot beside the dashboard. Clear exposes metrics, logs, traces, alerts, panels, and incident context as typed WebMCP tools instead. Your agent can investigate production evidence and build durable views while you follow the same board. Connect it by pointing any OTLP/HTTP exporter at Clear.
 
-Clear stops at observability. It never checks out your repository, stores deploy credentials, or executes a fix. Your agent uses the repository and infrastructure access it already has. The result flows back into Clear as a deploy event and recovering telemetry.
+Clear does not check out your repository, store deploy credentials, or execute a fix. Your agent handles code changes and deploys using the access it already has.
 
 ## Try it
 
-| Surface          | URL                                                                                |
-| ---------------- | ---------------------------------------------------------------------------------- |
-| Live app         | [clear.seufert.sh](https://clear.seufert.sh)                                       |
-| Public status    | [clear.seufert.sh/status](https://clear.seufert.sh/status)                         |
-| Example checkout | [clear-checkout.seufert.chatgpt.site](https://clear-checkout.seufert.chatgpt.site) |
-| Runtime health   | [api.clear.seufert.sh/health](https://api.clear.seufert.sh/health)                 |
-| API reference    | [api.clear.seufert.sh/docs](https://api.clear.seufert.sh/docs)                     |
-| Source           | [github.com/quick007/clear](https://github.com/quick007/clear)                     |
+| Surface       | URL                                                            |
+| ------------- | -------------------------------------------------------------- |
+| Live app      | [clear.seufert.sh](https://clear.seufert.sh)                   |
+| Public status | [clear.seufert.sh/status](https://clear.seufert.sh/status)     |
+| API reference | [api.clear.seufert.sh/docs](https://api.clear.seufert.sh/docs) |
+| Source        | [github.com/quick007/clear](https://github.com/quick007/clear) |
 
-The anonymous sandbox and real OTLP runtime are live. Sign in with ChatGPT when you want to create a project and point your own exporter at Clear. The submission video is recorded against the real checkout stack.
+### Try the demo
 
-### Thirty-second path
-
-1. Open the live sandbox in ChatGPT's in-app browser with site tools available, or in Chrome with WebMCP enabled.
-2. Select **Investigate an incident**. The walkthrough starts from a healthy baseline before introducing the controlled failure.
+1. Open Clear in ChatGPT's in-app browser with site tools available, or in Chrome with WebMCP enabled.
+2. Select **Investigate an incident**.
 3. Copy the suggested prompt from the board into your agent conversation.
-4. Keep the board visible while your agent queries telemetry, tests explanations, and composes the evidence you need.
+4. Keep the board visible while your agent investigates and adds panels.
 
-Each visitor receives an isolated two-hour sandbox. It covers investigation and diagnosis, then resets cleanly. It does not pretend that a code change or deployment happened.
+## WebMCP
 
-## Why WebMCP fits
+Clear gives you and your coding agent access to the same dashboard and telemetry.
 
-Most observability products place a vendor-owned copilot beside a dashboard. Clear makes the observability surface itself operable by the agent you already use.
-
-- The human and agent work from the same live evidence.
-- Typed site tools cover metrics, logs, traces, alerts, deploys, boards, and incident context.
-- The tool surface follows the work. Incident capabilities appear only while an incident is open.
-- Agent-authored panels become durable, shared views instead of disposable chat output.
-- Execution stays in the agent's existing repository and infrastructure environment.
-
-The repository also includes a deterministic sandbox and a real, instrumented checkout stack. The submission video uses a scripted diagnosis against manufactured load. The traffic, telemetry, WebMCP calls, code change, Render deployment, deploy marker, and recovery are real.
+- You and your agent work from the same telemetry.
+- Site tools let your agent query metrics, logs, traces, alerts, and deploys.
+- Incident tools become available when an incident is open.
+- Panels created by your agent are saved to the board.
+- Code changes and deploys still happen through your agent's existing environment.
 
 ## Architecture
 
@@ -70,13 +62,13 @@ OpenTelemetry SDKs and Collectors
 
 The Go data plane uses official OpenTelemetry Collector components for OTLP parsing, compression, batching, memory limits, and transport. The TypeScript control plane uses Effect v4 contracts, schemas, layers, and services. PostgreSQL owns accounts, projects, boards, incidents, keys, and deploy events. ClickHouse owns telemetry and rollups.
 
-For the hackathon, the stateful Clear services run together on one Render instance with a persistent disk. The checkout API is a separate Render service so a code push produces a real, isolated deployment. The console and storefront are published with ChatGPT Sites.
+The hosted version runs the stateful Clear services together on one Render instance with a persistent disk. The console is published with ChatGPT Sites.
 
-The hosted application services send their own OpenTelemetry into Clear. A bounded [public status page](https://clear.seufert.sh/status) shows three component states plus recent request rate and latency for an explicit service allowlist. It is a read-only projection of Clear's application telemetry, not a view of Render-managed metrics or logs.
+Clear also monitors its own hosted services. The [public status page](https://clear.seufert.sh/status) shows their health, request rate, and latency using telemetry collected by Clear.
 
 Read [the architecture guide](docs/architecture.md) for the detailed component and trust boundaries.
 
-## OpenTelemetry, without a Clear SDK
+## Connect OpenTelemetry
 
 Clear uses standard OTLP. There is no proprietary Clear SDK to install.
 
@@ -97,13 +89,13 @@ Clear accepts the three stable signals at their standard paths:
 - `POST /v1/logs`
 - `POST /v1/traces`
 
-The hosted runtime exposes OTLP/HTTP protobuf and JSON at `https://otlp.clear.seufert.sh`. Public OTLP/gRPC is intentionally out of scope for the hackathon deployment, but it remains available in the local contributor stack.
+The hosted service supports OTLP/HTTP protobuf and JSON at `https://otlp.clear.seufert.sh`. The local development stack also supports OTLP/gRPC.
 
 See the [OpenTelemetry quickstart](docs/otel-quickstart.md) for application and upstream Collector setup.
 
 ## Run locally
 
-The Compose stack is a contributor environment, not a supported self-hosted release.
+The local Compose stack is intended for development, not as a supported self-hosted release.
 
 Requirements:
 
@@ -148,7 +140,7 @@ docker compose -f infra/compose.yaml up --build
 | Collector health  | `http://localhost:13133/healthz`                  |
 | Checkout API      | `http://localhost:4101`                           |
 
-The console starts in an anonymous sandbox. The checked-in development secrets are only for local use. Replace every secret before exposing the stack to a shared machine or network.
+The console starts in demo mode. The checked-in development secrets are only for local use. Replace every secret before exposing the stack to a shared machine or network.
 
 ## Example incident stack
 
@@ -182,8 +174,6 @@ examples/
   node-otel/        Runnable official OpenTelemetry Node example
 infra/              Compose, Render deployment, migrations, and runbooks
 docs/               Architecture, integration, operation, and design notes
-video/              Script, captions, shot list, and media tooling
-media/devpost/      Reproducible Devpost source captures and outputs
 ```
 
 ## Hosted release boundaries
@@ -191,7 +181,7 @@ media/devpost/      Reproducible Devpost source captures and outputs
 - One durable project per account and up to three active ingest keys.
 - Raw metrics, logs, and traces are retained for 24 hours. Metric rollups are retained for 7 days.
 - Hosted ingest supports OTLP/HTTP protobuf and JSON.
-- The hackathon deployment is single-instance and does not claim high availability.
+- The hosted service is single-instance and does not provide high availability.
 - The local Compose topology is for development and testing. Self-hosted operation is not supported for this release.
 - The project has not completed an independent security audit or production load test.
 
