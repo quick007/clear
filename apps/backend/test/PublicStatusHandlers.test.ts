@@ -34,9 +34,25 @@ interface HarnessOptions {
   readonly accountFailure?: PersistenceError;
   readonly metricNotFound?: boolean;
   readonly metricUnavailable?: boolean;
+  readonly signalHealth?: ReadonlyArray<SignalHealth>;
 }
 
 const fixedNow = DateTime.fromDateUnsafe(new Date("2026-08-30T12:00:00.000Z"));
+
+const healthySignal = (signal: "logs" | "metrics" | "traces") =>
+  new SignalHealth({
+    signal,
+    status: "healthy",
+    firstSeenAt: fixedNow,
+    lastSeenAt: fixedNow,
+    services: [ServiceName.make("clear-api")],
+  });
+
+const defaultSignalHealth = [
+  healthySignal("metrics"),
+  healthySignal("logs"),
+  healthySignal("traces"),
+];
 
 const configLayer = (enabled: boolean) =>
   Layer.succeed(
@@ -154,31 +170,7 @@ const makeHarness = (options: HarnessOptions = {}) =>
       signalHealth: (projectId) =>
         Ref.update(healthCalls, (count) => count + 1).pipe(
           Effect.andThen(Ref.update(telemetryProjects, (seen) => [...seen, String(projectId)])),
-          Effect.andThen(
-            Effect.succeed([
-              new SignalHealth({
-                signal: "metrics",
-                status: "healthy",
-                firstSeenAt: fixedNow,
-                lastSeenAt: fixedNow,
-                services: [ServiceName.make("clear-api")],
-              }),
-              new SignalHealth({
-                signal: "logs",
-                status: "healthy",
-                firstSeenAt: fixedNow,
-                lastSeenAt: fixedNow,
-                services: [ServiceName.make("clear-api")],
-              }),
-              new SignalHealth({
-                signal: "traces",
-                status: "healthy",
-                firstSeenAt: fixedNow,
-                lastSeenAt: fixedNow,
-                services: [ServiceName.make("clear-api")],
-              }),
-            ]),
-          ),
+          Effect.andThen(Effect.succeed(options.signalHealth ?? defaultSignalHealth)),
         ),
       queryMetrics: (projectId, query) =>
         Effect.gen(function* () {
@@ -279,10 +271,10 @@ describe("public status handler", () => {
           for (const query of captured) {
             assert.strictEqual(query.range._tag, "relative");
             if (query.range._tag === "relative") assert.strictEqual(query.range.window, "15m");
-            assert.strictEqual(query.step, "10s");
+            assert.strictEqual(query.step, "30s");
             assert.deepStrictEqual((query.groupBy ?? []).map(String), ["service.name"]);
             assert.strictEqual(query.maxSeries, 4);
-            assert.strictEqual(query.maxPoints, 64);
+            assert.strictEqual(query.maxPoints, 128);
           }
 
           assert.strictEqual(status.schemaVersion, 1);
@@ -337,6 +329,84 @@ describe("public status handler", () => {
             "operational",
           );
           assert.strictEqual(status.status, "operational");
+        }),
+      ({ dispose }) => Effect.promise(dispose),
+    ),
+  );
+
+  it.effect(
+    "keeps intake operational when periodic metrics are healthy and sparse signals age",
+    () =>
+      Effect.acquireUseRelease(
+        makeHarness({
+          signalHealth: [
+            healthySignal("metrics"),
+            new SignalHealth({
+              signal: "logs",
+              status: "delayed",
+              firstSeenAt: fixedNow,
+              lastSeenAt: DateTime.subtractDuration(fixedNow, "10 minutes"),
+              services: [ServiceName.make("checkout-api")],
+            }),
+            new SignalHealth({
+              signal: "traces",
+              status: "delayed",
+              firstSeenAt: fixedNow,
+              lastSeenAt: DateTime.subtractDuration(fixedNow, "10 minutes"),
+              services: [ServiceName.make("checkout-api")],
+            }),
+          ],
+        }),
+        ({ handler }) =>
+          Effect.gen(function* () {
+            const response = yield* getStatus(handler);
+            const status = yield* Schema.decodeUnknownEffect(PublicStatusResponse)(
+              yield* Effect.promise(() => response.json()),
+            );
+            const intake = status.components.find(({ key }) => key === "telemetry");
+
+            assert.strictEqual(status.status, "operational");
+            assert.strictEqual(intake?.status, "operational");
+            assert.strictEqual(intake?.summary, "OpenTelemetry metrics are arriving normally.");
+            assert.deepStrictEqual(intake?.observedAt, fixedNow);
+          }),
+        ({ dispose }) => Effect.promise(dispose),
+      ),
+  );
+
+  it.effect("degrades intake when the periodic metrics heartbeat is delayed", () =>
+    Effect.acquireUseRelease(
+      makeHarness({
+        signalHealth: [
+          new SignalHealth({
+            signal: "metrics",
+            status: "delayed",
+            firstSeenAt: fixedNow,
+            lastSeenAt: DateTime.subtractDuration(fixedNow, "10 minutes"),
+            services: [ServiceName.make("clear-api")],
+          }),
+          healthySignal("logs"),
+          healthySignal("traces"),
+        ],
+      }),
+      ({ handler }) =>
+        Effect.gen(function* () {
+          const response = yield* getStatus(handler);
+          const status = yield* Schema.decodeUnknownEffect(PublicStatusResponse)(
+            yield* Effect.promise(() => response.json()),
+          );
+          const intake = status.components.find(({ key }) => key === "telemetry");
+
+          assert.strictEqual(status.status, "degraded");
+          assert.strictEqual(intake?.status, "degraded");
+          assert.strictEqual(
+            intake?.summary,
+            "Recent OpenTelemetry metrics are delayed or have not arrived.",
+          );
+          assert.deepStrictEqual(
+            intake?.observedAt,
+            DateTime.subtractDuration(fixedNow, "10 minutes"),
+          );
         }),
       ({ dispose }) => Effect.promise(dispose),
     ),

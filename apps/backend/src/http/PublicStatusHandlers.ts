@@ -41,15 +41,18 @@ const unavailable = () =>
 
 const runtimeVersion = () => (process.env.RENDER_GIT_COMMIT ?? "development").slice(0, 12);
 
+const publicMetricStep = "30s"; // 30 seconds
+const publicMetricPointBudget = 128; // 31 buckets across four public series, with a safety margin
+
 const metricQuery = (metric: string, aggregation: "rate" | "p95") =>
   new MetricQuery({
     metric: MetricName.make(metric),
     aggregation,
     range: new RelativeTimeRange({ window: "15m" }),
-    step: "10s",
+    step: publicMetricStep,
     groupBy: [AttributeKey.make("service.name")],
     maxSeries: 4,
-    maxPoints: 64,
+    maxPoints: publicMetricPointBudget,
   });
 
 const requestRateQuery = metricQuery("http.server.requests", "rate");
@@ -121,18 +124,6 @@ const publicMetric = (
   });
 };
 
-const latestObservedAt = (signals: ReadonlyArray<SignalHealth>) =>
-  signals.reduce<DateTime.Utc | null>((latest, signal) => {
-    if (signal.lastSeenAt === null) return latest;
-    if (
-      latest === null ||
-      DateTime.toEpochMillis(signal.lastSeenAt) > DateTime.toEpochMillis(latest)
-    ) {
-      return signal.lastSeenAt;
-    }
-    return latest;
-  }, null);
-
 const telemetryComponent = (result: ProbeResult<ReadonlyArray<SignalHealth>>) => {
   if (result._tag === "unavailable") {
     return new PublicStatusComponent({
@@ -143,18 +134,17 @@ const telemetryComponent = (result: ProbeResult<ReadonlyArray<SignalHealth>>) =>
       observedAt: null,
     });
   }
-  const healthy = result.value.filter(({ status }) => status === "healthy").length;
-  const delayed = result.value.some(({ status }) => status === "delayed");
-  const status = healthy === 0 ? "degraded" : delayed ? "degraded" : "operational";
+  const metrics = result.value.find(({ signal }) => signal === "metrics");
+  const status = metrics?.status === "healthy" ? "operational" : "degraded";
   return new PublicStatusComponent({
     key: "telemetry",
     name: "Telemetry intake",
     status,
     summary:
       status === "operational"
-        ? "OpenTelemetry signals are arriving normally."
-        : "Recent OpenTelemetry signals are incomplete or delayed.",
-    observedAt: latestObservedAt(result.value),
+        ? "OpenTelemetry metrics are arriving normally."
+        : "Recent OpenTelemetry metrics are delayed or have not arrived.",
+    observedAt: metrics?.lastSeenAt ?? null,
   });
 };
 

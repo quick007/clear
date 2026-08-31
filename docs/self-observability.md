@@ -38,6 +38,10 @@ The endpoint returns a bounded snapshot with:
 - recent request rate and p95 latency for an explicit Clear service allowlist
 - a server observation time and short human-readable summaries
 
+The telemetry-intake component uses the continuously exported metrics stream as
+its heartbeat. Logs and traces are event-driven, so an otherwise quiet service
+does not become degraded merely because those signals have no recent events.
+
 The endpoint does not accept a project ID, filters, a query language, or a time
 range. It does not return account or project identifiers, user information,
 ingest keys, arbitrary service names or attributes, raw metric points outside
