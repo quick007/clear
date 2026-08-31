@@ -45,6 +45,17 @@ cp apps/checkout-web/.env.example apps/checkout-web/.env.local
 
 The public console and API health endpoint were reachable when this guide was last checked. Hosted availability, browser WebMCP support, and identity handoff remain deployment-time checks, not guarantees made by the source tree.
 
+### Verification snapshot
+
+The following checks passed on August 30, 2026:
+
+- An environment-free `vp run ready` completed formatting, lint, type checks, 448 fast tests, and every workspace build. The normal fast gate skipped 17 database integration tests.
+- The focused ClickHouse aggregate integration suite passed 2 tests against a real ClickHouse instance.
+- The live console, sandbox route, and API health endpoint returned successful responses.
+- ChatGPT's in-app browser discovered the live WebMCP surface and successfully called `get_console_overview`, `list_metrics`, and `query_metrics` against an isolated sandbox.
+- Starting the controlled sandbox incident exposed the incident-scoped tools. Resetting the sandbox removed those tools and restored the healthy baseline.
+- The real checkout scenario produced 966 upstream payment calls from 295 incident-window checkouts, a 3.27 times amplification. Recovery returned to approximately one upstream call per checkout at the same 50 requests per second input rate.
+
 ## Potential impact
 
 The concrete problem is an operational gap: coding agents can inspect code, but without production evidence they can confidently pursue the wrong explanation. Clear lets the operator and that agent work from the same OpenTelemetry evidence and retain the useful view on the board.

@@ -96,13 +96,15 @@ The hosted runtime exposes OTLP/HTTP protobuf and JSON at `https://otlp.clear.se
 
 See the [OpenTelemetry quickstart](docs/otel-quickstart.md) for application and upstream Collector setup.
 
-## Run locally
+## Install and run locally
 
 The Compose stack is a contributor environment, not a supported self-hosted release. Start from a fresh clone with Node.js 24 or newer, [Vite+](https://viteplus.dev/) 0.3.x, Docker Engine with Compose v2, and at least 4 GB available to Docker.
 
 Verify the repository without configuring any environment files:
 
 ```sh
+git clone https://github.com/quick007/clear.git
+cd clear
 vp install
 vp run ready
 ```
