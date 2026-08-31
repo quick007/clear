@@ -205,6 +205,9 @@ settings:
 
 catalogs:
   default:
+    '@effect/opentelemetry':
+      specifier: 4.0.0-beta.107
+      version: 4.0.0-beta.107
     '@effect/vitest':
       specifier: 4.0.0-beta.107
       version: 4.0.0-beta.107
@@ -214,6 +217,18 @@ catalogs:
     '@fontsource/ibm-plex-sans':
       specifier: ^5.3.0
       version: 5.3.0
+    '@opentelemetry/exporter-metrics-otlp-proto':
+      specifier: 0.221.0
+      version: 0.221.0
+    '@opentelemetry/exporter-trace-otlp-proto':
+      specifier: 0.221.0
+      version: 0.221.0
+    '@opentelemetry/sdk-metrics':
+      specifier: 2.10.0
+      version: 2.10.0
+    '@opentelemetry/sdk-trace-base':
+      specifier: 2.10.0
+      version: 2.10.0
     '@paper-design/shaders-react':
       specifier: 0.0.80
       version: 0.0.80
@@ -267,6 +282,9 @@ importers:
 
   apps/backend:
     dependencies:
+      '@effect/opentelemetry':
+        specifier: 'catalog:'
+        version: 4.0.0-beta.107(@opentelemetry/api-logs@0.221.0)(@opentelemetry/api@1.9.0)(@opentelemetry/resources@2.10.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-logs@0.221.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@2.10.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@2.10.0(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.43.0)(effect@4.0.0-beta.107)
       '@effect/platform-node':
         specifier: 4.0.0-beta.107
         version: 4.0.0-beta.107(effect@4.0.0-beta.107)(ioredis@5.11.1(supports-color@10.2.2))
@@ -288,6 +306,18 @@ importers:
       '@groundtruth/telemetry-gen':
         specifier: workspace:*
         version: link:../../packages/telemetry-gen
+      '@opentelemetry/exporter-metrics-otlp-proto':
+        specifier: 'catalog:'
+        version: 0.221.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/exporter-trace-otlp-proto':
+        specifier: 'catalog:'
+        version: 0.221.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-metrics':
+        specifier: 'catalog:'
+        version: 2.10.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-trace-base':
+        specifier: 'catalog:'
+        version: 2.10.0(@opentelemetry/api@1.9.0)
       effect:
         specifier: 4.0.0-beta.107
         version: 4.0.0-beta.107

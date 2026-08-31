@@ -1,7 +1,7 @@
 import { NodeCrypto, NodeHttpServer, NodeRuntime } from "@effect/platform-node";
 import { BootstrapPersistence, PersistenceLive } from "@groundtruth/persistence";
 import { Config, Effect, Layer, Schedule } from "effect";
-import { HttpMiddleware, HttpRouter } from "effect/unstable/http";
+import { HttpRouter } from "effect/unstable/http";
 import { createServer } from "node:http";
 import { AlertEvaluatorRuntime } from "./alerts/AlertEvaluator.js";
 import { AlertService } from "./alerts/AlertService.js";
@@ -25,6 +25,9 @@ import { LiveEventBus } from "./live/LiveEventBus.js";
 import { SandboxService } from "./sandbox/SandboxService.js";
 import { CollectorIngestService } from "./telemetry/CollectorIngestService.js";
 import { CollectorQuotaService } from "./telemetry/CollectorQuotaService.js";
+import { BackendHttpMiddleware, HttpTelemetryPolicyLive } from "./telemetry/HttpTelemetryPolicy.js";
+import { BackendTelemetryLive } from "./telemetry/BackendTelemetry.js";
+import { ProcessMetricsLive } from "./telemetry/ProcessMetrics.js";
 import { TelemetryStore } from "./telemetry/TelemetryStore.js";
 
 const sandboxPruneInterval = "10 minutes"; // 10 minutes
@@ -106,8 +109,9 @@ const RuntimeLayers = Layer.mergeAll(
 const RoutesLive = HttpRoutes.pipe(Layer.provide(RuntimeLayers));
 
 const ServerLive = HttpRouter.serve(RoutesLive, {
-  middleware: HttpMiddleware.tracer,
+  middleware: BackendHttpMiddleware,
 }).pipe(
+  Layer.provide(HttpTelemetryPolicyLive),
   Layer.provide(
     NodeHttpServer.layerConfig(createServer, {
       host: Config.string("GROUNDTRUTH_HOST").pipe(Config.withDefault("0.0.0.0")),
@@ -116,4 +120,8 @@ const ServerLive = HttpRouter.serve(RoutesLive, {
   ),
 );
 
-Layer.launch(ServerLive).pipe(NodeRuntime.runMain);
+const ObservedApplicationLive = Layer.mergeAll(ServerLive, ProcessMetricsLive).pipe(
+  Layer.provide(BackendTelemetryLive),
+);
+
+Layer.launch(ObservedApplicationLive).pipe(NodeRuntime.runMain);

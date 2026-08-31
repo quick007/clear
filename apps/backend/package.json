@@ -13,6 +13,7 @@
     "test": "vp test run"
   },
   "dependencies": {
+    "@effect/opentelemetry": "catalog:",
     "@effect/platform-node": "4.0.0-beta.107",
     "@groundtruth/api-contract": "workspace:*",
     "@groundtruth/domain": "workspace:*",
@@ -20,6 +21,10 @@
     "@groundtruth/persistence": "workspace:*",
     "@groundtruth/telemetry": "workspace:*",
     "@groundtruth/telemetry-gen": "workspace:*",
+    "@opentelemetry/exporter-metrics-otlp-proto": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-proto": "catalog:",
+    "@opentelemetry/sdk-metrics": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
     "effect": "4.0.0-beta.107"
   },
   "devDependencies": {
