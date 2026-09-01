@@ -1,33 +1,21 @@
 [
   {
     "id": "trace-poc-v2",
-    "description": "The redesigned checkout trace presented at a calm scale with the surrounding product context intact.",
+    "description": "One failed checkout trace with three causal, non-overlapping attempts.",
     "output": "clear-trace-poc-v2.png",
-    "canvas": {
-      "width": 1920,
-      "height": 1080,
-      "background": "#091116"
-    },
-    "format": {
-      "type": "png",
-      "compressionLevel": 9
-    },
+    "canvas": { "width": 1920, "height": 1080, "background": "#080a0b" },
+    "format": { "type": "png", "compressionLevel": 9 },
     "maxBytes": 10000000,
     "layers": [
       {
-        "source": "auroraBackground07",
+        "source": "auroraBackground02",
         "x": 0,
         "y": 0,
         "width": 1920,
         "height": 1080,
         "fit": "cover",
         "position": "centre",
-        "style": {
-          "modulate": {
-            "brightness": 0.66,
-            "saturation": 0.72
-          }
-        }
+        "style": { "modulate": { "brightness": 0.62, "saturation": 0.74 } }
       },
       {
         "source": "traceDetail",
@@ -39,24 +27,18 @@
         "position": "centre",
         "style": {
           "borderRadius": 16,
-          "border": {
-            "width": 1,
-            "color": "#ffffff",
-            "opacity": 0.1
-          },
+          "border": { "width": 1, "color": "#ffffff", "opacity": 0.08 },
           "shadow": {
             "x": 0,
-            "y": 22,
-            "blur": 54,
+            "y": 24,
+            "blur": 60,
             "spread": 0,
-            "color": "#02070a",
-            "opacity": 0.32
+            "color": "#020607",
+            "opacity": 0.34
           }
         }
       }
     ],
-    "editorial": {
-      "theme": "dark"
-    }
+    "editorial": { "theme": "dark" }
   }
 ]

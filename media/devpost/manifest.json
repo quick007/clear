@@ -41,15 +41,15 @@
       }
     },
     "boardReveal": {
-      "file": "board-reveal.png",
-      "description": "Clear board after the agent creates the requests-versus-users and retries panels.",
+      "file": "board-diagnosis-v2.png",
+      "description": "Clear board after the agent creates the requests-versus-users and retry-attempt panels.",
       "capture": {
         "route": "/board",
         "viewport": {
-          "width": 2560,
-          "height": 1440
+          "width": 1910,
+          "height": 1074
         },
-        "state": "Amplification active, requests elevated, users flat, retry share visible."
+        "state": "Amplification active, unique users flat, attempts two and three adding exactly two extra upstream layers."
       }
     },
     "codexAgent": {
@@ -121,43 +121,43 @@
           "width": 2500,
           "height": 1200
         },
-        "state": "Codex occupies the left 28 percent and Clear occupies the right 72 percent with no browser chrome or stale-session notices."
+        "state": "A concise real Codex exchange occupies the left side and the matching diagnosed Clear board occupies the right side."
       }
     },
     "traceDetail": {
-      "file": "trace-detail-v2.png",
-      "description": "The redesigned trace detail view showing a recovered checkout request and its retry tree.",
+      "file": "trace-detail-v3.png",
+      "description": "The redesigned trace detail view showing a failed checkout request and three causal attempts.",
       "capture": {
-        "route": "/traces/ef81e82e0aed76f62d2afbdb3189dd3b?source=traces&window=1h",
+        "route": "/traces/969fa04175692be889538a617448a645?window=15m",
         "viewport": {
           "width": 1910,
           "height": 1074
         },
-        "state": "A 200 root response recovered after two 503 payment retries, with all eight spans visible."
+        "state": "A 503 root response after three sequential payment attempts, with all eight spans visible and no overlap."
       }
     },
     "logDetail": {
-      "file": "log-detail.png",
-      "description": "A real correlated log view from the same checkout incident.",
+      "file": "log-correlation-v2.png",
+      "description": "The three exact logs correlated from the selected checkout trace.",
       "capture": {
-        "route": "/explore?signal=logs&service=checkout-api&window=1h",
+        "route": "/explore?signal=logs&trace=969fa04175692be889538a617448a645&window=15m",
         "viewport": {
-          "width": 2560,
-          "height": 1440
+          "width": 1910,
+          "height": 1074
         },
-        "state": "Keep the same service and incident time window as the trace capture."
+        "state": "Trace filter visible with the exhausted-attempt error and the two immediate retry warnings."
       }
     },
     "recoveryBoard": {
-      "file": "recovery-board.png",
-      "description": "Clear board after the real checkout deploy, with its marker and recovery visible.",
+      "file": "board-recovery-v2.png",
+      "description": "Clear board after the checkout deploy, with its marker and recovery visible.",
       "capture": {
         "route": "/board",
         "viewport": {
-          "width": 2560,
-          "height": 1440
+          "width": 1910,
+          "height": 1074
         },
-        "state": "Real deploy event present, retry volume collapsing, latency and errors recovering."
+        "state": "Deploy event present, retry layers collapsing, and upstream request volume returning toward baseline."
       }
     },
     "auroraBackground07": {
