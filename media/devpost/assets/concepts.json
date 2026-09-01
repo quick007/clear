@@ -1,8 +1,8 @@
 [
   {
-    "id": "ui-glass-poc",
+    "id": "board-glass",
     "description": "A real Clear investigation board floating above the user-provided cyan and amber atmosphere.",
-    "output": "clear-ui-glass-poc.png",
+    "output": "clear-board-glass.png",
     "canvas": {
       "width": 1920,
       "height": 1080,
