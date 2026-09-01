@@ -166,6 +166,30 @@ describe("panel query and chart rendering", () => {
       series: [{ fillOpacity: 0.35, stackId: "panel-left" }],
       visualization: "area",
     });
+    const stackedModel = buildMetricChartModel({
+      axes: RetryAmplificationPanel.axes,
+      series: [
+        series({
+          label: "attempt=1",
+          queryRef: RetryAmplificationPanel.queries[0].refId,
+          values: [["2026-08-28T08:00:00Z", 50]],
+        }),
+        series({
+          label: "attempt=2",
+          queryRef: RetryAmplificationPanel.queries[0].refId,
+          values: [["2026-08-28T08:00:00Z", 50]],
+        }),
+        series({
+          label: "attempt=3",
+          queryRef: RetryAmplificationPanel.queries[0].refId,
+          values: [["2026-08-28T08:00:00Z", 50]],
+        }),
+      ],
+      stacking: "normal",
+      visualization: "area",
+    });
+    expect(stackedModel.axisDomains.left).toEqual([0, 200]);
+    expect(stackedModel.axisTicks.left).toEqual([0, 50, 100, 150, 200]);
     expect(
       buildMetricChartModel({
         axes: RetryAmplificationPanel.axes,

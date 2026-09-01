@@ -116,6 +116,7 @@ export function buildMetricChartModel({
         axes.find((axis) => axis.id === axisId),
         series.filter((item) => item.axis === axisId),
         thresholds.filter((threshold) => threshold.axis === axisId),
+        stacking,
       ),
     ]),
   ) as Record<"left" | "right", AxisScale>;
@@ -153,10 +154,13 @@ const axisScale = (
   axis: Axis | undefined,
   series: ReadonlyArray<PanelSeries>,
   thresholds: ReadonlyArray<ChartThreshold>,
+  stacking: NonNullable<MetricChartPanel["stacking"]>,
 ): AxisScale => {
   if (!axis) return { domain: ["auto", "auto"] };
   const values = [
-    ...series.flatMap((item) => item.points.map((point) => point.value)),
+    ...(stacking === "normal"
+      ? normalStackExtents(series)
+      : series.flatMap((item) => item.points.map((point) => point.value))),
     ...thresholds.map((threshold) => threshold.value),
   ];
   if (values.length === 0) {
@@ -175,6 +179,20 @@ const axisScale = (
   const maximum = axis.maximum ?? largest + padding;
   const expandedMaximum = minimum === maximum ? maximum + fallbackSpan : maximum;
   return niceLinearScale(minimum, expandedMaximum, axis.minimum, axis.maximum);
+};
+
+const normalStackExtents = (series: ReadonlyArray<PanelSeries>) => {
+  const totals = new Map<number, { negative: number; positive: number }>();
+  for (const item of series) {
+    for (const point of item.points) {
+      const atMs = alignedBucketTimestamp(point.at, item.bucketDurationMs);
+      const total = totals.get(atMs) ?? { negative: 0, positive: 0 };
+      if (point.value < 0) total.negative += point.value;
+      else total.positive += point.value;
+      totals.set(atMs, total);
+    }
+  }
+  return [...totals.values()].flatMap(({ negative, positive }) => [negative, positive]);
 };
 
 const targetTickIntervals = 5;
