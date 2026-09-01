@@ -90,6 +90,21 @@ const validateStyle = (style, label, failures) => {
       }
     }
   }
+  if (style.glassRing !== undefined) {
+    if (!isRecord(style.glassRing)) {
+      failures.push(`${label}.style.glassRing must be an object`);
+    } else {
+      if (!isPositiveInteger(style.glassRing.width)) {
+        failures.push(`${label}.style.glassRing.width must be a positive integer`);
+      }
+      if (!isNumberInRange(style.glassRing.opacity, Number.EPSILON, 1)) {
+        failures.push(`${label}.style.glassRing.opacity must be greater than 0 and at most 1`);
+      }
+      if (!isNonNegativeInteger(style.glassRing.glow)) {
+        failures.push(`${label}.style.glassRing.glow must be a non-negative integer`);
+      }
+    }
+  }
   if (style.shadow !== undefined) {
     if (!isRecord(style.shadow)) {
       failures.push(`${label}.style.shadow must be an object`);
@@ -396,6 +411,16 @@ const borderSvg = (canvas, layer) => {
   );
 };
 
+const glassRingSvg = (canvas, layer) => {
+  const ring = layer.style.glassRing;
+  const inset = ring.width / 2;
+  const radius = Math.max(0, (layer.style.borderRadius ?? 0) - inset);
+  const glowOpacity = Math.min(0.24, ring.opacity * 0.4);
+  return Buffer.from(
+    `<svg width="${canvas.width}" height="${canvas.height}" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="ring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.96"/><stop offset="0.45" stop-color="#d8fbff" stop-opacity="0.48"/><stop offset="1" stop-color="#ffffff" stop-opacity="0.78"/></linearGradient><filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${ring.glow}"/></filter></defs><rect x="${layer.x + inset}" y="${layer.y + inset}" width="${layer.width - ring.width}" height="${layer.height - ring.width}" rx="${radius}" fill="none" stroke="#e9fdff" stroke-opacity="${glowOpacity}" stroke-width="${ring.width + 2}" filter="url(#glow)"/><rect x="${layer.x + inset}" y="${layer.y + inset}" width="${layer.width - ring.width}" height="${layer.height - ring.width}" rx="${radius}" fill="none" stroke="url(#ring)" stroke-opacity="${ring.opacity}" stroke-width="${ring.width}"/><rect x="${layer.x + ring.width + 0.5}" y="${layer.y + ring.width + 0.5}" width="${layer.width - ring.width * 2 - 1}" height="${layer.height - ring.width * 2 - 1}" rx="${Math.max(0, radius - ring.width)}" fill="none" stroke="#ffffff" stroke-opacity="${ring.opacity * 0.22}" stroke-width="1"/></svg>`,
+  );
+};
+
 const renderLayer = async (layer, sourcePath) => {
   let pipeline = sharp(sourcePath, { failOn: "warning" });
   if (layer.crop) pipeline = pipeline.extract(layer.crop);
@@ -441,6 +466,8 @@ export const renderAsset = async ({ asset, outputDirectory, sourceMetadata }) =>
     composites.push({ input: image, left: layer.x, top: layer.y });
     if (layer.style?.border)
       composites.push({ input: borderSvg(asset.canvas, layer), left: 0, top: 0 });
+    if (layer.style?.glassRing)
+      composites.push({ input: glassRingSvg(asset.canvas, layer), left: 0, top: 0 });
   }
   const editorial = renderEditorial(asset.canvas, asset.editorial);
   if (editorial) composites.push({ input: editorial, left: 0, top: 0 });

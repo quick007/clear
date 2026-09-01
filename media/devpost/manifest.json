@@ -159,7 +159,67 @@
         },
         "state": "Real deploy event present, retry volume collapsing, latency and errors recovering."
       }
+    },
+    "auroraBackground07": {
+      "file": "aurora-background-07.png",
+      "description": "Abstract cyan and amber atmosphere used behind the UI glass proof of concept.",
+      "capture": {
+        "route": "User-provided background asset",
+        "viewport": {
+          "width": 1672,
+          "height": 941
+        },
+        "state": "Use the source image unchanged as the full-canvas background."
+      }
+    },
+    "auroraBackground02": {
+      "file": "aurora-background-02.png",
+      "description": "Abstract amber and cyan atmosphere used behind the trace view.",
+      "capture": {
+        "route": "User-provided background asset",
+        "viewport": {
+          "width": 1672,
+          "height": 941
+        },
+        "state": "Use the source image unchanged as the full-canvas background."
+      }
+    },
+    "auroraBackground04": {
+      "file": "aurora-background-04.png",
+      "description": "Abstract cyan and amber atmosphere used behind the log view.",
+      "capture": {
+        "route": "User-provided background asset",
+        "viewport": {
+          "width": 1672,
+          "height": 941
+        },
+        "state": "Use the source image unchanged as the full-canvas background."
+      }
+    },
+    "auroraBackground05": {
+      "file": "aurora-background-05.png",
+      "description": "Abstract blue, cyan, and amber atmosphere used behind the shared workspace.",
+      "capture": {
+        "route": "User-provided background asset",
+        "viewport": {
+          "width": 1672,
+          "height": 941
+        },
+        "state": "Use the source image unchanged as the full-canvas background."
+      }
+    },
+    "auroraBackground06": {
+      "file": "aurora-background-06.png",
+      "description": "Abstract violet, cyan, and amber atmosphere used behind correlated evidence.",
+      "capture": {
+        "route": "User-provided background asset",
+        "viewport": {
+          "width": 1672,
+          "height": 941
+        },
+        "state": "Use the source image unchanged as the full-canvas background."
+      }
     }
   },
-  "assetFiles": ["assets/gallery.json", "assets/evidence.json"]
+  "assetFiles": ["assets/gallery.json", "assets/evidence.json", "assets/concepts.json"]
 }

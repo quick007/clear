@@ -140,6 +140,16 @@
             "opacity": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
           }
         },
+        "glassRing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "opacity", "glow"],
+          "properties": {
+            "width": { "$ref": "#/$defs/positiveInteger" },
+            "opacity": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "glow": { "type": "integer", "minimum": 0 }
+          }
+        },
         "shadow": {
           "type": "object",
           "additionalProperties": false,

@@ -1,0 +1,309 @@
+[
+  {
+    "id": "ui-glass-poc",
+    "description": "A real Clear investigation board floating above the user-provided cyan and amber atmosphere.",
+    "output": "clear-ui-glass-poc.png",
+    "canvas": {
+      "width": 1920,
+      "height": 1080,
+      "background": "#091116"
+    },
+    "format": {
+      "type": "png",
+      "compressionLevel": 9
+    },
+    "maxBytes": 10000000,
+    "layers": [
+      {
+        "source": "auroraBackground07",
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080,
+        "fit": "cover",
+        "position": "centre"
+      },
+      {
+        "source": "boardReveal",
+        "x": 92,
+        "y": 52,
+        "width": 1736,
+        "height": 976,
+        "fit": "cover",
+        "position": "north",
+        "style": {
+          "borderRadius": 34,
+          "glassRing": {
+            "width": 3,
+            "opacity": 0.68,
+            "glow": 10
+          },
+          "shadow": {
+            "x": 0,
+            "y": 24,
+            "blur": 42,
+            "spread": 4,
+            "color": "#02070a",
+            "opacity": 0.62
+          }
+        }
+      }
+    ],
+    "editorial": {
+      "theme": "dark"
+    }
+  },
+  {
+    "id": "trace-glass",
+    "description": "A real failing checkout trace floating above the matching amber and cyan atmosphere.",
+    "output": "clear-trace-glass.png",
+    "canvas": {
+      "width": 1920,
+      "height": 1080,
+      "background": "#091116"
+    },
+    "format": {
+      "type": "png",
+      "compressionLevel": 9
+    },
+    "maxBytes": 10000000,
+    "layers": [
+      {
+        "source": "auroraBackground02",
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080,
+        "fit": "cover",
+        "position": "centre"
+      },
+      {
+        "source": "traceDetail",
+        "x": 92,
+        "y": 52,
+        "width": 1736,
+        "height": 976,
+        "fit": "cover",
+        "position": "north",
+        "style": {
+          "borderRadius": 34,
+          "glassRing": {
+            "width": 3,
+            "opacity": 0.68,
+            "glow": 10
+          },
+          "shadow": {
+            "x": 0,
+            "y": 24,
+            "blur": 42,
+            "spread": 4,
+            "color": "#02070a",
+            "opacity": 0.62
+          }
+        }
+      }
+    ],
+    "editorial": {
+      "theme": "dark"
+    }
+  },
+  {
+    "id": "logs-glass",
+    "description": "Real retry and checkout failure logs floating above a balanced cyan and amber atmosphere.",
+    "output": "clear-logs-glass.png",
+    "canvas": {
+      "width": 1920,
+      "height": 1080,
+      "background": "#091116"
+    },
+    "format": {
+      "type": "png",
+      "compressionLevel": 9
+    },
+    "maxBytes": 10000000,
+    "layers": [
+      {
+        "source": "auroraBackground04",
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080,
+        "fit": "cover",
+        "position": "centre"
+      },
+      {
+        "source": "logDetail",
+        "x": 92,
+        "y": 52,
+        "width": 1736,
+        "height": 976,
+        "fit": "cover",
+        "position": "north",
+        "style": {
+          "borderRadius": 34,
+          "glassRing": {
+            "width": 3,
+            "opacity": 0.68,
+            "glow": 10
+          },
+          "shadow": {
+            "x": 0,
+            "y": 24,
+            "blur": 42,
+            "spread": 4,
+            "color": "#02070a",
+            "opacity": 0.62
+          }
+        }
+      }
+    ],
+    "editorial": {
+      "theme": "dark"
+    }
+  },
+  {
+    "id": "agent-glass",
+    "description": "The real Codex investigation and matching Clear board presented as one shared workspace.",
+    "output": "clear-agent-glass.png",
+    "canvas": {
+      "width": 1920,
+      "height": 1080,
+      "background": "#091116"
+    },
+    "format": {
+      "type": "png",
+      "compressionLevel": 9
+    },
+    "maxBytes": 10000000,
+    "layers": [
+      {
+        "source": "auroraBackground05",
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080,
+        "fit": "cover",
+        "position": "centre"
+      },
+      {
+        "source": "heroWorkspace",
+        "x": 68,
+        "y": 126,
+        "width": 1784,
+        "height": 856,
+        "fit": "contain",
+        "position": "centre",
+        "style": {
+          "borderRadius": 34,
+          "glassRing": {
+            "width": 3,
+            "opacity": 0.72,
+            "glow": 11
+          },
+          "shadow": {
+            "x": 0,
+            "y": 26,
+            "blur": 46,
+            "spread": 4,
+            "color": "#02070a",
+            "opacity": 0.64
+          }
+        }
+      }
+    ],
+    "editorial": {
+      "theme": "dark"
+    }
+  },
+  {
+    "id": "correlation-glass",
+    "description": "A real failing trace and its matching retry logs presented as correlated evidence.",
+    "output": "clear-correlation-glass.png",
+    "canvas": {
+      "width": 1920,
+      "height": 1080,
+      "background": "#091116"
+    },
+    "format": {
+      "type": "png",
+      "compressionLevel": 9
+    },
+    "maxBytes": 10000000,
+    "layers": [
+      {
+        "source": "auroraBackground06",
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080,
+        "fit": "cover",
+        "position": "centre"
+      },
+      {
+        "source": "traceDetail",
+        "x": 174,
+        "y": 58,
+        "width": 1660,
+        "height": 535,
+        "fit": "cover",
+        "position": "north",
+        "crop": {
+          "left": 480,
+          "top": 220,
+          "width": 2040,
+          "height": 657
+        },
+        "style": {
+          "borderRadius": 30,
+          "glassRing": {
+            "width": 3,
+            "opacity": 0.7,
+            "glow": 10
+          },
+          "shadow": {
+            "x": 0,
+            "y": 22,
+            "blur": 38,
+            "spread": 3,
+            "color": "#02070a",
+            "opacity": 0.62
+          }
+        }
+      },
+      {
+        "source": "logDetail",
+        "x": 86,
+        "y": 540,
+        "width": 1660,
+        "height": 500,
+        "fit": "cover",
+        "position": "north",
+        "crop": {
+          "left": 480,
+          "top": 350,
+          "width": 2040,
+          "height": 614
+        },
+        "style": {
+          "borderRadius": 30,
+          "glassRing": {
+            "width": 3,
+            "opacity": 0.7,
+            "glow": 10
+          },
+          "shadow": {
+            "x": 0,
+            "y": 22,
+            "blur": 38,
+            "spread": 3,
+            "color": "#02070a",
+            "opacity": 0.62
+          }
+        }
+      }
+    ],
+    "editorial": {
+      "theme": "dark"
+    }
+  }
+]
