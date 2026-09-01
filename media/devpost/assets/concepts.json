@@ -31,10 +31,10 @@
       },
       {
         "source": "traceDetail",
-        "x": 230,
-        "y": 129,
-        "width": 1460,
-        "height": 822,
+        "x": 96,
+        "y": 54,
+        "width": 1728,
+        "height": 972,
         "fit": "contain",
         "position": "centre",
         "style": {
