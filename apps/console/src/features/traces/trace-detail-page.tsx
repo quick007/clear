@@ -111,10 +111,10 @@ export function TraceDetailPage() {
   const rootFailed = rootSpan?.status.code === "error";
   const diagnosisTitle = rootFailed
     ? retryCount > 0
-      ? `Request failed after ${retryCount} ${retryCount === 1 ? "retry" : "retries"}`
+      ? `Request failed on attempt ${retryCount + 1}`
       : "Request failed"
     : containsErrors && retryCount > 0
-      ? `Recovered after ${retryCount} ${retryCount === 1 ? "retry" : "retries"}`
+      ? `Request succeeded on attempt ${retryCount + 1}`
       : containsErrors
         ? "Completed with span errors"
         : "Request completed";
@@ -146,9 +146,10 @@ export function TraceDetailPage() {
                   <Link
                     search={{
                       metric: undefined,
-                      query: traceId,
+                      query: undefined,
                       service: undefined,
                       signal: "logs",
+                      trace: traceId,
                       window: traceContext.window,
                     }}
                     to="/explore"

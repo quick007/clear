@@ -47,7 +47,7 @@ export function TraceWaterfall({
         </div>
         <div aria-label="Span status legend" {...stylex.props(styles.legend)}>
           <span>
-            <StatusDot tone="info" /> Completed
+            <StatusDot tone="info" /> No error
           </span>
           <span>
             <StatusDot tone="critical" /> Error

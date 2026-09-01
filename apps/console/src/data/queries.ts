@@ -143,12 +143,13 @@ export function useLogsQuery(
   search: string,
   window: TelemetryWindow,
   service?: string,
+  traceId?: string,
 ) {
   return useInfiniteQuery({
     queryKey:
       projectId === null
         ? ["groundtruth", "logs", "idle"]
-        : queryKeys.logs(projectId, search, window, service),
+        : queryKeys.logs(projectId, search, window, service, traceId),
     queryFn: ({ pageParam, signal }) =>
       run(
         (runtime) =>
@@ -157,6 +158,7 @@ export function useLogsQuery(
             payload: LogSearch.make({
               query: search.length > 0 ? search : undefined,
               services: service ? [ServiceName.make(service)] : undefined,
+              traceId: traceId ? TraceId.make(traceId) : undefined,
               range: RelativeTimeRange.make({ window }),
               limit: 50,
               cursor: pageParam,

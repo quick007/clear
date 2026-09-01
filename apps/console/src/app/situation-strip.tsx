@@ -1,6 +1,7 @@
 import type { ConsoleOverview, IncidentDetail } from "@groundtruth/api-contract";
 import { Clock01Icon } from "@hugeicons/core-free-icons";
 import * as stylex from "@stylexjs/stylex";
+import { Link } from "@tanstack/react-router";
 
 import { formatOpenDuration } from "../data/format";
 import { colors, radii, space } from "../theme/tokens.stylex";
@@ -18,9 +19,13 @@ export function SituationStrip({
   const firingCount = overview?.alerts.filter((alert) => alert.status === "firing").length ?? 0;
   if (!incident) return null;
   const isClosed = incident.status === "closed";
+  const hasHypotheses = (incidentDetail?.hypotheses.length ?? 0) > 0;
 
   return (
-    <section aria-label="Current incident" {...stylex.props(styles.strip)}>
+    <section
+      aria-label="Current incident"
+      {...stylex.props(styles.strip, !hasHypotheses && styles.stripCompact)}
+    >
       <div {...stylex.props(styles.alertBlock)}>
         {isClosed ? (
           firingCount > 0 ? (
@@ -36,7 +41,13 @@ export function SituationStrip({
           </StatusPill>
         )}
         <div {...stylex.props(styles.alertCopy)}>
-          <span {...stylex.props(styles.incidentTitle)}>{incident.title}</span>
+          <Link
+            params={{ incidentId: incident.id }}
+            to="/incidents/$incidentId"
+            {...stylex.props(styles.incidentTitle)}
+          >
+            {incident.title}
+          </Link>
           {isClosed ? (
             incident.summary === null ? null : (
               <span {...stylex.props(styles.incidentSummary)}>{incident.summary}</span>
@@ -48,7 +59,7 @@ export function SituationStrip({
           )}
         </div>
       </div>
-      {incidentDetail && incidentDetail.hypotheses.length > 0 ? (
+      {incidentDetail && hasHypotheses ? (
         <HypothesisList hypotheses={incidentDetail.hypotheses} />
       ) : null}
     </section>
@@ -110,9 +121,8 @@ const hypothesisStatusStyles = stylex.create({
 const styles = stylex.create({
   strip: {
     alignItems: "center",
-    backdropFilter: "blur(12px) saturate(108%)",
-    backgroundColor: "rgba(16, 18, 18, 0.78)",
-    borderBottomColor: colors.materialLine,
+    backgroundColor: colors.canvasRaised,
+    borderBottomColor: colors.line,
     borderBottomStyle: "solid",
     borderBottomWidth: 1,
     display: "grid",
@@ -121,18 +131,22 @@ const styles = stylex.create({
       default: "minmax(260px, 0.8fr) minmax(0, 1.2fr)",
       "@media (max-width: 900px)": "minmax(0, 1fr)",
     },
-    minHeight: 72,
-    paddingBlock: space.x4,
+    minHeight: 58,
+    paddingBlock: 10,
     paddingInline: { default: space.x6, "@media (max-width: 620px)": space.x5 },
   },
+  stripCompact: { gridTemplateColumns: "minmax(0, 1fr)" },
   alertBlock: { alignItems: "center", display: "flex", flexWrap: "wrap", gap: space.x3 },
   alertCopy: { display: "flex", flexDirection: "column", gap: 3, minWidth: 0 },
   incidentTitle: {
+    color: colors.text,
     fontSize: 14,
     fontWeight: 500,
     overflow: "hidden",
     textOverflow: "ellipsis",
+    textDecoration: "none",
     whiteSpace: "nowrap",
+    ":hover": { textDecoration: "underline" },
   },
   incidentMeta: {
     alignItems: "center",
@@ -180,7 +194,7 @@ const styles = stylex.create({
     gap: 7,
     lineHeight: 1.35,
     maxWidth: "100%",
-    paddingBlock: 6,
+    paddingBlock: 5,
     paddingInline: 9,
   },
   hypothesisDot: {

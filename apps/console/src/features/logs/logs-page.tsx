@@ -10,7 +10,7 @@ import { colors, radii, space } from "../../theme/tokens.stylex";
 import { Button } from "../../ui/button";
 import { ConsoleFailureActions } from "../../ui/console-failure-actions";
 import { Icon } from "../../ui/icon";
-import { ContentState, Page, PageHeader, SearchField, Toolbar } from "../../ui/page";
+import { ContentState, FilterChip, Page, PageHeader, SearchField, Toolbar } from "../../ui/page";
 import { StaleDataNotice } from "../../ui/stale-data-notice";
 
 export function LogsPage({
@@ -29,8 +29,15 @@ export function LogsPage({
   const routeSearch = useSearch({ from: "/explore" });
   const navigate = useNavigate({ from: "/explore" });
   const query = routeSearch.query ?? "";
+  const traceId = routeSearch.trace;
   const runtime = useRuntimeQuery();
-  const logs = useLogsQuery(runtime.data?.projectId ?? null, query.trim(), window, service);
+  const logs = useLogsQuery(
+    runtime.data?.projectId ?? null,
+    query.trim(),
+    window,
+    service,
+    traceId,
+  );
   const records = logs.data
     ? uniquePageItems(
         logs.data.pages,
@@ -49,7 +56,7 @@ export function LogsPage({
     : [];
   const logsUnavailable = (runtime.isError && !runtime.data) || (logs.isError && !logs.data);
   const failure = runtime.isError && !runtime.data ? runtime.error : logs.error;
-  const returnPath = `/explore?signal=logs&window=${window}${service ? `&service=${encodeURIComponent(service)}` : ""}${query ? `&query=${encodeURIComponent(query)}` : ""}`;
+  const returnPath = `/explore?signal=logs&window=${window}${service ? `&service=${encodeURIComponent(service)}` : ""}${traceId ? `&trace=${traceId}` : ""}${query ? `&query=${encodeURIComponent(query)}` : ""}`;
   const staleFailure =
     logsUnavailable || !logs.data ? null : (runtime.error ?? logs.error ?? contextFailure);
   const retryFailedQueries = () => {
@@ -67,6 +74,7 @@ export function LogsPage({
         title="Logs"
       />
       <Toolbar>
+        {traceId ? <FilterChip>Trace {traceId.slice(0, 8)}</FilterChip> : null}
         <SearchField
           label="Search logs"
           onChange={(nextQuery) =>
@@ -75,7 +83,7 @@ export function LogsPage({
               search: (current) => ({ ...current, query: nextQuery || undefined }),
             })
           }
-          placeholder="Search message or attribute"
+          placeholder={traceId ? "Search within this trace" : "Search message or attribute"}
           value={query}
         />
       </Toolbar>

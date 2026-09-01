@@ -89,6 +89,10 @@ const exploreRoute = createRoute({
     query: typeof search.query === "string" ? search.query.slice(0, 256) : undefined,
     service: typeof search.service === "string" ? search.service.slice(0, 255) : undefined,
     signal: exploreSignal(search.signal),
+    trace:
+      typeof search.trace === "string" && /^(?!0{32}$)[0-9a-f]{32}$/.test(search.trace)
+        ? search.trace
+        : undefined,
     window: exploreWindow(search.window),
   }),
 });
@@ -102,6 +106,7 @@ const logsRoute = createRoute({
         query: undefined,
         service: undefined,
         signal: "logs" as const,
+        trace: undefined,
         window: "1h",
       }}
       to="/explore"
@@ -120,6 +125,7 @@ const tracesRoute = createRoute({
         query: undefined,
         service: undefined,
         signal: "traces" as const,
+        trace: undefined,
         window: "1h",
       }}
       to="/explore"

@@ -84,13 +84,7 @@ function WorkspaceShellContent() {
               Log in again
             </a>
           </div>
-        ) : liveUpdateStatus === "healthy" ? null : (
-          <p aria-live="polite" role="status" {...stylex.props(styles.liveUpdateNotice)}>
-            {liveUpdateStatus === "retrying"
-              ? "Live updates paused. Retrying..."
-              : "Live updates paused. Refresh to reconnect."}
-          </p>
-        )}
+        ) : null}
         <MobileWorkspaceHeader
           overview={overview.data}
           overviewState={overviewState}
@@ -128,31 +122,12 @@ const styles = stylex.create({
     position: "relative",
   },
   workspace: {
-    marginLeft: { default: 232, "@media (max-width: 840px)": 0 },
+    marginLeft: { default: 224, "@media (max-width: 840px)": 0 },
     minHeight: "100vh",
     minWidth: 0,
     position: "relative",
   },
   stage: { minHeight: "calc(100vh - 56px)", minWidth: 0 },
-  liveUpdateNotice: {
-    backgroundColor: colors.surfaceRaised,
-    borderColor: colors.lineStrong,
-    borderRadius: 999,
-    borderStyle: "solid",
-    borderWidth: 1,
-    boxShadow: "0 8px 30px rgba(0, 0, 0, 0.24)",
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 1.4,
-    margin: 0,
-    paddingBlock: 7,
-    paddingInline: 12,
-    position: "fixed",
-    right: 16,
-    top: 14,
-    zIndex: 20,
-    "@media (max-width: 840px)": { top: 58 },
-  },
   authenticationNotice: {
     alignItems: "center",
     backgroundColor: colors.surfaceRaised,

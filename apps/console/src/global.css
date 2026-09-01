@@ -14,13 +14,13 @@
   }
 
   html {
-    background: #0c0a09;
+    background: #080a0b;
     color-scheme: dark;
   }
 
   body {
-    background: #0c0a09;
-    color: #e7e5e4;
+    background: #080a0b;
+    color: #f0f2f2;
     font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
     font-size: 14px;
     line-height: 1.45;
@@ -47,12 +47,12 @@
   input:focus-visible,
   textarea:focus-visible,
   select:focus-visible {
-    outline: 2px solid #fbbf24;
+    outline: 2px solid #f5b942;
     outline-offset: 2px;
   }
 
   ::selection {
-    background: rgba(251, 191, 36, 0.22);
+    background: rgba(245, 185, 66, 0.22);
   }
 
   ::-webkit-scrollbar {
@@ -61,8 +61,8 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #44403c;
-    border: 3px solid #0c0a09;
+    background: #3a4145;
+    border: 3px solid #080a0b;
     border-radius: 999px;
   }
 

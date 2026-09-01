@@ -12,6 +12,7 @@ export const traceExplorerSearch = (context: TraceNavigationContext) => ({
   query: context.query,
   service: context.service,
   signal: context.source,
+  trace: undefined,
   window: context.window,
 });
 

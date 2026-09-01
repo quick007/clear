@@ -10,7 +10,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Dialog } from "@base-ui/react/dialog";
 import * as stylex from "@stylexjs/stylex";
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { colors, radii, space } from "../theme/tokens.stylex";
@@ -84,6 +84,7 @@ function SidebarContent({
   overviewState,
   session,
 }: WorkspaceNavigationProps & { readonly onNavigate?: () => void }) {
+  const location = useLocation();
   const firingCount = overview?.alerts.filter((alert) => alert.status === "firing").length ?? 0;
   const projectName =
     overviewState === "error"
@@ -95,7 +96,7 @@ function SidebarContent({
       : overviewState === "loading"
         ? "Loading signals"
         : session?.session._tag === "sandbox"
-          ? "Demo workspace · live telemetry"
+          ? "Sandbox · live telemetry"
           : overview?.services.length
             ? serviceSummary(overview)
             : "No signals yet";
@@ -114,7 +115,7 @@ function SidebarContent({
           <span>Clear</span>
         </Link>
         <div {...stylex.props(styles.project)}>
-          <span {...stylex.props(styles.projectMark)}>{projectName[0]?.toUpperCase() ?? "C"}</span>
+          <span aria-hidden {...stylex.props(styles.projectSignal)} />
           <span {...stylex.props(styles.projectCopy)}>
             <strong {...stylex.props(styles.projectName)}>{projectName}</strong>
             <span {...stylex.props(styles.projectSummary)}>{projectSummary}</span>
@@ -134,18 +135,30 @@ function SidebarContent({
           <span>Board</span>
         </Link>
         <Link
-          activeOptions={{ includeSearch: false }}
-          activeProps={stylex.props(navigationStyles.linkActive)}
+          aria-current={
+            location.pathname.startsWith("/explore") ||
+            location.pathname.startsWith("/traces") ||
+            location.pathname.startsWith("/deploys")
+              ? "page"
+              : undefined
+          }
           onClick={onNavigate}
           search={{
             metric: undefined,
             query: undefined,
             service: undefined,
             signal: "metrics" as const,
+            trace: undefined,
             window: "1h",
           }}
           to="/explore"
-          {...stylex.props(navigationStyles.link)}
+          {...stylex.props(
+            navigationStyles.link,
+            (location.pathname.startsWith("/explore") ||
+              location.pathname.startsWith("/traces") ||
+              location.pathname.startsWith("/deploys")) &&
+              navigationStyles.linkActive,
+          )}
         >
           <Icon icon={Search02Icon} size={18} />
           <span>Explore</span>
@@ -184,9 +197,8 @@ function SidebarContent({
 }
 const styles = stylex.create({
   desktopSidebar: {
-    backdropFilter: "blur(16px) saturate(110%)",
-    backgroundColor: "rgba(12, 14, 14, 0.86)",
-    borderRightColor: colors.materialLine,
+    backgroundColor: colors.canvasRaised,
+    borderRightColor: colors.line,
     borderRightStyle: "solid",
     borderRightWidth: 1,
     display: { default: "block", "@media (max-width: 840px)": "none" },
@@ -194,49 +206,47 @@ const styles = stylex.create({
     left: 0,
     position: "fixed",
     top: 0,
-    width: 232,
+    width: 224,
     zIndex: 50,
   },
-  sidebarContent: { display: "flex", flexDirection: "column", height: "100%", padding: space.x4 },
+  sidebarContent: { display: "flex", flexDirection: "column", height: "100%", padding: space.x3 },
   brand: {
     alignItems: "center",
     color: colors.text,
     display: "flex",
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 600,
     gap: space.x3,
-    height: 40,
-    paddingInline: space.x2,
+    height: 48,
+    paddingInline: space.x1,
     textDecoration: "none",
   },
   project: {
     alignItems: "center",
-    backgroundColor: colors.materialSurfaceStrong,
-    borderColor: colors.materialLine,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.md,
     borderStyle: "solid",
     borderWidth: 1,
     display: "flex",
-    gap: space.x3,
-    marginTop: space.x4,
-    minHeight: 58,
-    padding: space.x3,
-    boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+    gap: 10,
+    marginTop: space.x2,
+    minHeight: 50,
+    paddingBlock: 9,
+    paddingInline: 11,
     color: colors.text,
   },
-  projectMark: {
-    alignItems: "center",
-    backgroundColor: colors.amberWash,
-    borderRadius: radii.sm,
-    color: colors.amber,
-    display: "flex",
+  projectSignal: {
+    backgroundColor: colors.green,
+    borderColor: colors.canvasRaised,
+    borderRadius: radii.pill,
+    borderStyle: "solid",
+    borderWidth: 2,
+    boxShadow: `0 0 0 1px ${colors.lineStrong}`,
+    display: "block",
     flexShrink: 0,
-    fontFamily: "IBM Plex Mono, monospace",
-    fontSize: 11,
-    fontWeight: 600,
-    height: 30,
-    justifyContent: "center",
-    width: 30,
+    height: 9,
+    width: 9,
   },
   projectCopy: {
     display: "flex",
@@ -245,19 +255,19 @@ const styles = stylex.create({
   },
   projectName: {
     fontSize: 12,
-    fontWeight: 500,
+    fontWeight: 550,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
   projectSummary: {
     color: colors.textSubtle,
-    fontSize: 11,
+    fontSize: 10,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
-  nav: { display: "grid", gap: 3, marginTop: space.x6 },
+  nav: { display: "grid", gap: 2, marginTop: space.x5 },
   count: {
     backgroundColor: colors.redWash,
     borderRadius: radii.pill,
@@ -279,9 +289,8 @@ const styles = stylex.create({
   },
   mobileHeader: {
     alignItems: "center",
-    backdropFilter: "blur(16px) saturate(110%)",
-    backgroundColor: "rgba(12, 14, 14, 0.86)",
-    borderBottomColor: colors.materialLine,
+    backgroundColor: colors.canvasRaised,
+    borderBottomColor: colors.line,
     borderBottomStyle: "solid",
     borderBottomWidth: 1,
     display: { default: "none", "@media (max-width: 840px)": "grid" },
@@ -325,8 +334,7 @@ const styles = stylex.create({
   },
   backdrop: { backgroundColor: colors.overlay, inset: 0, position: "fixed", zIndex: 90 },
   drawer: {
-    backdropFilter: "blur(16px) saturate(110%)",
-    backgroundColor: "rgba(12, 14, 14, 0.94)",
+    backgroundColor: colors.canvasRaised,
     borderRightColor: colors.lineStrong,
     borderRightStyle: "solid",
     borderRightWidth: 1,

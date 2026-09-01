@@ -26,8 +26,14 @@ export const queryKeys = {
     ] as const,
   panel: (projectId: ProjectId, panelId: string, revision: number) =>
     ["groundtruth", String(projectId), "panels", panelId, revision] as const,
-  logs: (projectId: ProjectId, search: string, window: string, service?: string) =>
-    ["groundtruth", String(projectId), "logs", "search", search, window, service] as const,
+  logs: (
+    projectId: ProjectId,
+    search: string,
+    window: string,
+    service?: string,
+    traceId?: string,
+  ) =>
+    ["groundtruth", String(projectId), "logs", "search", search, window, service, traceId] as const,
   traces: (projectId: ProjectId, search: string, window: string, service?: string) =>
     ["groundtruth", String(projectId), "traces", "search", search, window, service] as const,
   trace: (projectId: ProjectId, traceId: string) =>

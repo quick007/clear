@@ -16,6 +16,7 @@ describe("trace navigation", () => {
       query: "checkout failed",
       service: "checkout/api",
       signal: "logs",
+      trace: undefined,
       window: "6h",
     });
   });

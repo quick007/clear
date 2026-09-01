@@ -30,6 +30,7 @@ export function ExploreNavigation({ services }: { services: ReadonlyArray<{ name
         metric={search.metric}
         query={search.query}
         service={search.service}
+        trace={search.trace}
         window={search.window}
       />
       <ContextControls
@@ -84,12 +85,14 @@ function ExploreTabs({
   metric,
   query,
   service,
+  trace,
   window,
 }: {
   active: "changes" | "logs" | "metrics" | "traces";
   metric?: string;
   query?: string;
   service?: string;
+  trace?: string;
   window: TelemetryWindow;
 }) {
   return (
@@ -106,6 +109,7 @@ function ExploreTabs({
                 : undefined,
             service,
             signal: tab.signal,
+            trace: tab.signal === active && tab.signal === "logs" ? trace : undefined,
             window,
           }}
           to="/explore"
