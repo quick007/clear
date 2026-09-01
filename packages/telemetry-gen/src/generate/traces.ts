@@ -47,15 +47,14 @@ const makeTrace = (
   const finalFailure =
     sample(config.seed, phaseBucket, `trace-status-${phase}`, index) < profile.upstreamErrorRate;
   const finalStatus = finalFailure ? 503 : 200;
+  const attemptDuration = Math.max(12, Math.floor((duration - 16) / attemptCount));
 
   const paymentSpans = EffectArray.makeBy(attemptCount, (attemptIndex) => {
     const attempt = attemptIndex + 1;
     const isLast = attempt === attemptCount;
     const failed = !isLast || finalFailure;
-    const childStart = timestamp(
-      rootStart + Math.round((duration / (attemptCount + 1)) * attemptIndex) + 8,
-    );
-    const childDuration = Math.max(12, Math.round(duration / (attemptCount + 0.5)));
+    const childStart = timestamp(rootStart + 8 + attemptDuration * attemptIndex);
+    const childDuration = attemptDuration;
     const clientId = spanId(
       deterministicHex(config.seed, phaseBucket, `payment-${phase}-${index}`, 16, attemptIndex),
     );

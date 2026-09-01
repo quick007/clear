@@ -76,6 +76,17 @@ describe("telemetry generator", () => {
         batch.traces.every((trace) => new Set(trace.spans.map((span) => span.service)).size === 3),
       ).toBe(true);
       expect(
+        batch.traces.every((trace) => {
+          const attempts = trace.spans
+            .filter((span) => span.service === "checkout-api" && span.kind === "client")
+            .toSorted((left, right) => left.startTime - right.startTime);
+          return attempts.every(
+            (attempt, attemptIndex) =>
+              attemptIndex === 0 || attempts[attemptIndex - 1]!.endTime <= attempt.startTime,
+          );
+        }),
+      ).toBe(true);
+      expect(
         batch.metrics.some(
           (point) =>
             point._tag === "Sum" &&
