@@ -125,15 +125,15 @@
       }
     },
     "traceDetail": {
-      "file": "trace-detail.png",
-      "description": "A real trace detail view from the manufactured checkout incident.",
+      "file": "trace-detail-v2.png",
+      "description": "The redesigned trace detail view showing a recovered checkout request and its retry tree.",
       "capture": {
-        "route": "/traces/<traceId>",
+        "route": "/traces/ef81e82e0aed76f62d2afbdb3189dd3b?source=traces&window=1h",
         "viewport": {
-          "width": 2560,
-          "height": 1440
+          "width": 1910,
+          "height": 1074
         },
-        "state": "Select a trace that exposes retry amplification and upstream failures."
+        "state": "A 200 root response recovered after two 503 payment retries, with all eight spans visible."
       }
     },
     "logDetail": {
