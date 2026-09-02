@@ -8,7 +8,7 @@ export const colorValues = {
   lineStrong: "#3a4145",
   text: "#f0f2f2",
   textMuted: "#a5aaad",
-  textSubtle: "#747b7f",
+  textSubtle: "#81898d",
   amber: "#f5b942",
   amberStrong: "#eba72a",
   amberWash: "rgba(245, 185, 66, 0.10)",

@@ -133,8 +133,8 @@ const styles = stylex.create({
     borderWidth: 1,
     display: "grid",
     gap: space.x3,
-    marginBottom: space.x5,
-    padding: space.x4,
+    marginBottom: space.x4,
+    padding: "14px 16px",
   },
   main: {
     alignItems: { default: "center", "@media (max-width: 680px)": "start" },

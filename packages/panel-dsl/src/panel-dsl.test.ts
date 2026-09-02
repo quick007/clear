@@ -242,7 +242,7 @@ describe("PanelSpec JSON Schema", () => {
     const digest = createHash("sha256").update(JSON.stringify(PanelSpecJsonSchema)).digest("hex");
 
     expect(digest).toMatchInlineSnapshot(
-      `"589ec3609c2d5f1948bf361624266cc09c5a071bac3e8eb630a9b08b00da5f2f"`,
+      `"3e0b64cb55b9f521a158ac1e44a5d24bce608351b02db3d1d576230c5df25971"`,
     );
   });
 });

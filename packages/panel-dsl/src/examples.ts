@@ -107,7 +107,7 @@ export const RequestsVsUsersPanel = decodeMetricChart({
   _tag: "metric-chart",
   version: 1,
   title: "Upstream requests vs unique users",
-  description: "Separates payment request amplification from real user demand.",
+  description: "Indexes payment work and user demand to their five-minute healthy baseline.",
   visualization: "line",
   queries: [
     {
@@ -117,6 +117,7 @@ export const RequestsVsUsersPanel = decodeMetricChart({
       window: "15m",
       step: "5s",
       axis: "left",
+      normalization: { _tag: "baseline-ratio", window: "5m" },
       style: { label: "Upstream request rate", color: "orange" },
     },
     {
@@ -126,24 +127,28 @@ export const RequestsVsUsersPanel = decodeMetricChart({
       distinctKey: "user.id",
       window: "15m",
       step: "5s",
-      axis: "right",
-      style: { label: "Unique users", color: "cyan" },
+      axis: "left",
+      normalization: { _tag: "baseline-ratio", window: "5m" },
+      style: { label: "Unique users", color: "cyan", lineStyle: "dashed" },
     },
   ],
   axes: [
     {
       id: "left",
-      label: "Upstream requests",
-      unit: { _tag: "rate", per: "second", noun: "upstream requests" },
-      minimum: 0,
+      label: "Healthy baseline = 1.0",
+      unit: { _tag: "custom", symbol: "× baseline", position: "after", decimals: 1 },
+      minimum: 0.8,
+      maximum: 3.3,
       showGrid: true,
     },
+  ],
+  thresholds: [
     {
-      id: "right",
-      label: "Unique users",
-      unit: { _tag: "number", format: "short" },
-      minimum: 0,
-      showGrid: false,
+      value: 1,
+      condition: "at_or_above",
+      severity: "info",
+      label: "Healthy baseline",
+      axis: "left",
     },
   ],
   legend: {
@@ -157,7 +162,7 @@ export const RetryAmplificationPanel = decodeMetricChart({
   _tag: "metric-chart",
   version: 1,
   title: "Upstream requests by attempt",
-  description: "Shows whether payment retries are driving upstream request volume.",
+  description: "Stacks original payment attempts and retries into total upstream work.",
   visualization: "area",
   queries: [
     {
@@ -176,7 +181,7 @@ export const RetryAmplificationPanel = decodeMetricChart({
   axes: [
     {
       id: "left",
-      label: "Upstream requests",
+      label: "Payment attempts",
       unit: { _tag: "rate", per: "second", noun: "upstream requests" },
       minimum: 0,
     },

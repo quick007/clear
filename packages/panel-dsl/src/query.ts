@@ -103,6 +103,16 @@ export const GroupBy = Schema.Struct({
 );
 export type GroupBy = typeof GroupBy.Type;
 
+export const BaselineRatioNormalization = Schema.TaggedStruct("baseline-ratio", {
+  window: Schema.Literals(["1m", "5m", "15m"]),
+}).pipe(
+  Schema.annotate({
+    identifier: "BaselineRatioNormalization",
+    description: "Indexes a chart series to the average value in its initial healthy window.",
+  }),
+);
+export type BaselineRatioNormalization = typeof BaselineRatioNormalization.Type;
+
 const metricQueryFields = {
   refId: QueryRef,
   metric: MetricName,
@@ -151,6 +161,7 @@ export type MetricQuery = typeof MetricQuery.Type;
 const ChartQueryBase = Schema.Struct({
   ...metricQueryFields,
   axis: AxisId,
+  normalization: Schema.optionalKey(BaselineRatioNormalization),
   style: Schema.optionalKey(SeriesStyle),
 });
 

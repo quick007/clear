@@ -12,6 +12,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   buildPanelPlans,
   findMissingPanelQueries,
+  normalizePanelPoints,
   panelQueryDiagnosis,
   type PanelSeries,
 } from "../../data/panels";
@@ -100,12 +101,23 @@ describe("panel query and chart rendering", () => {
     });
   });
 
-  it("preserves dual axes and per-query series styles", () => {
+  it("uses one baseline-indexed axis and preserves per-query series styles", () => {
     const planning = buildPanelPlans(RequestsVsUsersPanel.queries);
     expect(planning.error).toBeNull();
     expect(planning.plans).toMatchObject([
-      { axis: "left", label: "Upstream request rate", tone: "orange" },
-      { axis: "right", label: "Unique users", tone: "cyan" },
+      {
+        axis: "left",
+        label: "Upstream request rate",
+        normalization: { _tag: "baseline-ratio", window: "5m" },
+        tone: "orange",
+      },
+      {
+        axis: "left",
+        label: "Unique users",
+        lineStyle: "dashed",
+        normalization: { _tag: "baseline-ratio", window: "5m" },
+        tone: "cyan",
+      },
     ]);
 
     const chartSeries = [
@@ -115,18 +127,18 @@ describe("panel query and chart rendering", () => {
         values: [["2026-08-28T08:00:00Z", 120]],
       }),
       series({
-        axis: "right",
         label: "Unique users",
         queryRef: RequestsVsUsersPanel.queries[1]!.refId,
         values: [["2026-08-28T08:00:00Z", 42]],
       }),
     ];
+    chartSeries[1] = { ...chartSeries[1]!, lineStyle: "dashed" };
     expect(
       buildMetricChartModel({
         annotations: [{ _tag: "deploy", atMs: 1_772_176_400_000, label: "release" }],
         axes: RequestsVsUsersPanel.axes,
         series: chartSeries,
-        thresholds: [{ axis: "left", value: 100, condition: "above", severity: "warning" }],
+        thresholds: [{ axis: "left", value: 1, condition: "above", severity: "info" }],
         visualization: "line",
       }),
     ).toMatchObject({
@@ -136,14 +148,25 @@ describe("panel query and chart rendering", () => {
           axis: "left",
           lineStyle: "solid",
         },
-        { axis: "right", lineStyle: "dashed" },
+        { axis: "left", lineStyle: "dashed" },
       ],
-      axes: [
-        { id: "left", label: "Upstream requests" },
-        { id: "right", label: "Unique users" },
-      ],
-      thresholds: [{ axis: "left", value: 100, severity: "warning" }],
+      axes: [{ id: "left", label: "Healthy baseline = 1.0" }],
+      thresholds: [{ axis: "left", value: 1, severity: "info" }],
     });
+  });
+
+  it("indexes each comparison series to its own initial healthy window", () => {
+    const points = [
+      new MetricSeriesPoint({ at: at("2026-08-28T08:00:00Z"), value: 98 }),
+      new MetricSeriesPoint({ at: at("2026-08-28T08:04:00Z"), value: 102 }),
+      new MetricSeriesPoint({ at: at("2026-08-28T08:06:00Z"), value: 300 }),
+    ];
+
+    expect(
+      normalizePanelPoints(points, { _tag: "baseline-ratio", window: "5m" }).map(
+        (point) => point.value,
+      ),
+    ).toEqual([0.98, 1.02, 3]);
   });
 
   it("honors area fill, stacking, legend summaries, and bar rendering", () => {
@@ -231,7 +254,7 @@ describe("panel query and chart rendering", () => {
     ]);
 
     const legend = buildChartLegend(
-      { ...RequestsVsUsersPanel, legend: { visibility: "always", values: ["last", "max"] } },
+      { ...RetryAmplificationPanel, legend: { visibility: "always", values: ["last", "max"] } },
       [attemptSeries],
       {},
     );
@@ -256,7 +279,6 @@ describe("panel query and chart rendering", () => {
       ],
     });
     const right = series({
-      axis: "right",
       label: "users",
       queryRef: RequestsVsUsersPanel.queries[1]!.refId,
       values: [
@@ -369,11 +391,12 @@ describe("panel query and chart rendering", () => {
   });
 
   it("describes thresholds and annotations outside the visual chart", () => {
+    const axes = [{ id: "left", unit: { _tag: "rate", per: "second" } }] as const;
     const summary = buildMetricChartSummary({
       annotations: [
         { _tag: "note", atMs: Date.parse("2026-08-28T08:00:00Z"), label: "Fix landed" },
       ],
-      axes: RequestsVsUsersPanel.axes,
+      axes,
       series: [
         series({
           label: "requests",
@@ -392,7 +415,7 @@ describe("panel query and chart rendering", () => {
       title: "Traffic",
       units: {},
     });
-    expect(summary).toContain("Thresholds: warning at 10.0 upstream requests/s");
+    expect(summary).toContain("Thresholds: warning at 10.0/s");
     expect(summary).toContain("Annotations: Note Fix landed at");
   });
 

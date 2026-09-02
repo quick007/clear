@@ -201,13 +201,11 @@ const chartOption = (
       areaStyle:
         model.visualization === "area"
           ? { color: series.color, opacity: series.fillOpacity }
-          : model.compact
-            ? undefined
-            : { color: series.color, opacity: 0.035 },
+          : undefined,
       lineStyle: {
         color: series.color,
         type: series.lineStyle,
-        width: model.compact ? 1.75 : 2.25,
+        width: model.compact ? 1.5 : 1.8,
       },
       sampling: "lttb" as const,
       showSymbol: false,
@@ -216,32 +214,35 @@ const chartOption = (
       symbol: "circle" as const,
     };
   });
-  const latestPoints = model.series.flatMap((series) => {
-    const row = model.rows.findLast((candidate) => candidate[series.key] !== undefined);
-    return row === undefined
+  const latestPoints =
+    model.visualization === "area"
       ? []
-      : [
-          {
-            id: `${series.key}:latest`,
-            name: `${series.label} latest sample`,
-            type: "scatter" as const,
-            data: [[row.atMs, row[series.key]]],
-            yAxisIndex: model.axes.findIndex((axis) => axis.id === series.axis),
-            symbolSize: model.compact ? 5 : 7,
-            silent: true,
-            clip: false,
-            tooltip: { show: false },
-            itemStyle: {
-              color: series.color,
-              borderColor: colorValues.surface,
-              borderWidth: 2,
-              shadowBlur: 7,
-              shadowColor: series.color,
-            },
-            z: 4,
-          },
-        ];
-  });
+      : model.series.flatMap((series) => {
+          const row = model.rows.findLast((candidate) => candidate[series.key] !== undefined);
+          return row === undefined
+            ? []
+            : [
+                {
+                  id: `${series.key}:latest`,
+                  name: `${series.label} latest sample`,
+                  type: "scatter" as const,
+                  data: [[row.atMs, row[series.key]]],
+                  yAxisIndex: model.axes.findIndex((axis) => axis.id === series.axis),
+                  symbolSize: model.compact ? 5 : 7,
+                  silent: true,
+                  clip: false,
+                  tooltip: { show: false },
+                  itemStyle: {
+                    color: series.color,
+                    borderColor: colorValues.surface,
+                    borderWidth: 2,
+                    shadowBlur: 7,
+                    shadowColor: series.color,
+                  },
+                  z: 4,
+                },
+              ];
+        });
 
   return {
     animation: !reducedMotion,
@@ -250,9 +251,9 @@ const chartOption = (
     grid: model.compact
       ? { bottom: 4, containLabel: false, left: 2, right: 2, top: 8 }
       : {
-          bottom: 28,
+          bottom: 32,
           containLabel: false,
-          left: 58,
+          left: 62,
           right: model.axes.length > 1 ? 54 : 20,
           top: 18,
         },
@@ -277,7 +278,7 @@ const chartOption = (
       axisLabel: {
         color: colorValues.textSubtle,
         fontFamily: "IBM Plex Mono",
-        fontSize: 10,
+        fontSize: 11,
         hideOverlap: true,
         formatter: (value: number) =>
           value >= model.timeDomain[1] - 500 ? "Now" : shortTime(value),
@@ -290,13 +291,13 @@ const chartOption = (
       position: axis.id,
       min: model.stacking === "percent" ? 0 : numericDomain(model.axisDomains[axis.id][0]),
       max: model.stacking === "percent" ? 1 : numericDomain(model.axisDomains[axis.id][1]),
-      splitNumber: 4,
+      splitNumber: 3,
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: {
         color: colorValues.textSubtle,
         fontFamily: "IBM Plex Mono",
-        fontSize: 10,
+        fontSize: 11,
         formatter: (value: number) =>
           model.stacking === "percent"
             ? `${Math.round(value * 100)}%`
@@ -367,12 +368,12 @@ const styles = stylex.create({
     color: colors.textMuted,
     display: "flex",
     fontFamily: "IBM Plex Mono, monospace",
-    fontSize: 10,
+    fontSize: 11,
     gap: 12,
     justifyContent: "space-between",
     lineHeight: 1.4,
     minHeight: 16,
-    paddingInline: 58,
+    paddingInline: 62,
   },
   axisCaption: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
   rightAxisCaption: { textAlign: "right" },

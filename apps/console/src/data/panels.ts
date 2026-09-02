@@ -10,14 +10,15 @@ import {
   AttributeFilter,
   MetricName,
   MetricQuery,
+  MetricSeriesPoint,
   RelativeTimeRange,
   type MetricQueryResult,
-  type MetricSeriesPoint,
   type TelemetryAttributes,
 } from "@groundtruth/telemetry";
 import { useQueries } from "@tanstack/react-query";
 import { Data } from "effect";
 
+import { epochMilliseconds } from "./format";
 import { colorValues } from "../theme/color-values";
 import { queryKeys } from "./query-keys";
 import { runGroundtruthQuery } from "./queries";
@@ -65,6 +66,7 @@ export type PanelQueryPlan = {
   readonly fillOpacity?: number;
   readonly label: string;
   readonly lineStyle: "solid" | "dashed";
+  readonly normalization?: ChartQuery["normalization"];
   readonly query: MetricQuery;
   readonly queryRef: QueryRef;
   readonly tone: keyof typeof panelPalette;
@@ -159,6 +161,7 @@ export const buildPanelPlans = (queries: ReadonlyArray<ChartQuery | PanelMetricQ
       fillOpacity: style?.fillOpacity,
       label: style?.label ?? `${query.aggregation} ${query.metric}`,
       lineStyle: style?.lineStyle ?? "solid",
+      normalization: "normalization" in query ? query.normalization : undefined,
       query: MetricQuery.make({
         aggregation: query.aggregation,
         distinctKey: query.distinctKey,
@@ -226,25 +229,77 @@ const readableSeriesLabel = (attributes: Readonly<Record<string, unknown>>, fall
   return number === 1 ? "Original attempt" : `Retry ${number - 1}`;
 };
 
+const normalizationWindowMilliseconds = {
+  "1m": 60 * 1_000, // 1 minute
+  "5m": 5 * 60 * 1_000, // 5 minutes
+  "15m": 15 * 60 * 1_000, // 15 minutes
+} as const;
+
+export const normalizePanelPoints = (
+  points: ReadonlyArray<MetricSeriesPoint>,
+  normalization: ChartQuery["normalization"],
+) => {
+  if (normalization === undefined || points.length === 0) return points;
+  const firstAt = Math.min(...points.map((point) => epochMilliseconds(point.at)));
+  const baselineEnd = firstAt + normalizationWindowMilliseconds[normalization.window];
+  const baselineValues = points
+    .filter((point) => epochMilliseconds(point.at) < baselineEnd)
+    .map((point) => point.value);
+  if (baselineValues.length === 0) return points;
+  const baseline =
+    baselineValues.reduce((total, value) => total + value, 0) / baselineValues.length;
+  if (!Number.isFinite(baseline) || baseline === 0) return points;
+  return points.map(
+    (point) => new MetricSeriesPoint({ at: point.at, value: point.value / baseline }),
+  );
+};
+
+const attemptNumber = (attributes: Readonly<Record<string, unknown>>) => {
+  const value = attributes.attempt;
+  if (typeof value !== "string") return null;
+  const number = Number.parseInt(value, 10);
+  return Number.isFinite(number) && number > 0 ? number : null;
+};
+
+const groupedTone = (attributes: Readonly<Record<string, unknown>>, index: number) => {
+  const attempt = attemptNumber(attributes);
+  if (attempt === 1) return "gray";
+  if (attempt === 2) return "orange";
+  if (attempt === 3) return "amber";
+  return seriesTones[index % seriesTones.length]!;
+};
+
 export const materializePanelSeries = (result: MetricQueryResult, plan: PanelQueryPlan) =>
-  result.series.map((series, index): PanelSeries => {
-    const grouped = result.series.length > 1;
-    const tone = grouped ? seriesTones[index % seriesTones.length]! : plan.tone;
-    const groupedLabel = readableSeriesLabel(series.attributes, series.label);
-    return {
-      attributes: series.attributes,
-      axis: plan.axis,
-      bucketDurationMs: metricQueryBucketDuration(result.query.step),
-      color: grouped ? panelPalette[tone] : plan.color,
-      fillOpacity: plan.fillOpacity,
-      label: grouped
-        ? plan.label === `${result.query.aggregation} ${result.query.metric}`
-          ? groupedLabel
-          : `${plan.label} · ${groupedLabel}`
-        : plan.label,
-      lineStyle: plan.lineStyle,
-      points: series.points,
-      queryRef: plan.queryRef,
-      tone,
-    };
-  });
+  result.series
+    .toSorted(
+      (left, right) =>
+        (attemptNumber(left.attributes) ?? Number.MAX_SAFE_INTEGER) -
+        (attemptNumber(right.attributes) ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map((series, index): PanelSeries => {
+      const grouped = result.series.length > 1;
+      const tone = grouped ? groupedTone(series.attributes, index) : plan.tone;
+      const groupedLabel = readableSeriesLabel(series.attributes, series.label);
+      return {
+        attributes: series.attributes,
+        axis: plan.axis,
+        bucketDurationMs: metricQueryBucketDuration(result.query.step),
+        color: grouped ? panelPalette[tone] : plan.color,
+        fillOpacity:
+          plan.fillOpacity ??
+          (attemptNumber(series.attributes) === 1
+            ? 0.08
+            : attemptNumber(series.attributes) !== null
+              ? 0.22
+              : undefined),
+        label: grouped
+          ? plan.label === `${result.query.aggregation} ${result.query.metric}`
+            ? groupedLabel
+            : `${plan.label} · ${groupedLabel}`
+          : plan.label,
+        lineStyle: plan.lineStyle,
+        points: normalizePanelPoints(series.points, plan.normalization),
+        queryRef: plan.queryRef,
+        tone,
+      };
+    });

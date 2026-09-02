@@ -100,14 +100,15 @@ const swatchStyles = stylex.create({
 
 const styles = stylex.create({
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.canvasRaised,
     borderColor: colors.line,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     borderStyle: "solid",
     borderWidth: 1,
     minWidth: 0,
     overflow: "hidden",
     padding: space.x5,
+    boxShadow: "0 1px 0 rgba(255, 255, 255, 0.025)",
   },
   fullWidth: { gridColumn: "1 / -1" },
   header: {
@@ -118,7 +119,7 @@ const styles = stylex.create({
     justifyContent: "space-between",
   },
   heading: { minWidth: 0 },
-  title: { fontSize: 14, fontWeight: 500, marginBlock: 0 },
+  title: { fontSize: 15, fontWeight: 550, letterSpacing: "-0.01em", marginBlock: 0 },
   description: {
     color: colors.textSubtle,
     fontSize: 12,
@@ -183,7 +184,7 @@ const styles = stylex.create({
   legendSwatchDashed: { borderTopStyle: "dashed" },
   body: {
     flex: 1,
-    height: { default: 278, "@media (max-width: 520px)": 238 },
+    height: { default: 244, "@media (max-width: 520px)": 228 },
     minWidth: 0,
   },
   footer: {

@@ -122,7 +122,7 @@ const styles = stylex.create({
     position: "relative",
   },
   workspace: {
-    marginLeft: { default: 224, "@media (max-width: 840px)": 0 },
+    marginLeft: { default: 236, "@media (max-width: 840px)": 0 },
     minHeight: "100vh",
     minWidth: 0,
     position: "relative",

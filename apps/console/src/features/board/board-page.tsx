@@ -379,8 +379,8 @@ const dependencyState = (failed: boolean, loaded: boolean): BoardDependencyState
 const styles = stylex.create({
   page: {
     marginInline: "auto",
-    maxWidth: 1400,
-    padding: { default: space.x6, "@media (max-width: 620px)": space.x5 },
+    maxWidth: 1440,
+    padding: { default: "22px 28px", "@media (max-width: 620px)": space.x5 },
   },
   pageHeader: {
     alignItems: { default: "end", "@media (max-width: 620px)": "stretch" },
@@ -388,9 +388,9 @@ const styles = stylex.create({
     flexDirection: { default: "row", "@media (max-width: 620px)": "column" },
     gap: { default: space.x6, "@media (max-width: 620px)": space.x4 },
     justifyContent: "space-between",
-    marginBottom: space.x6,
+    marginBottom: space.x4,
   },
-  pageTitle: { fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em", marginBlock: 0 },
+  pageTitle: { fontSize: 24, fontWeight: 550, letterSpacing: "-0.025em", marginBlock: 0 },
   pageDescription: { color: colors.textMuted, fontSize: 13, marginBlock: 6 },
   grid: {
     display: "grid",
