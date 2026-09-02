@@ -80,6 +80,29 @@ describe("telemetry generator", () => {
           );
         }),
       ).toBe(true);
+      const linkedTrace = batch.traces.find((trace) => trace.traceId === batch.logs[0]?.traceId);
+      const linkedRoot = linkedTrace?.spans.find((span) => span.spanId === batch.logs[0]?.spanId);
+      const retryLogs = batch.logs.filter(
+        (log) => log.body === "Payment retry started immediately",
+      );
+      expect(
+        retryLogs.every((log) => {
+          const attempt = linkedTrace?.spans.find(
+            (span) =>
+              span.service === "checkout-api" &&
+              span.kind === "client" &&
+              span.attributes.attempt === log.attributes.attempt,
+          );
+          return attempt !== undefined && log.timestamp === attempt.startTime;
+        }),
+      ).toBe(true);
+      const exhausted = batch.logs.find(
+        (log) => log.body === "Checkout exhausted payment attempts",
+      );
+      expect(exhausted?.timestamp).toBe((linkedRoot?.endTime ?? 0) - 1);
+      expect(exhausted?.attributes["duration.ms"]).toBe(
+        (linkedRoot?.endTime ?? 0) - (linkedRoot?.startTime ?? 0),
+      );
       expect(batch.traces.every((trace) => trace.spans.length === 8)).toBe(true);
       expect(
         batch.traces.every((trace) => new Set(trace.spans.map((span) => span.service)).size === 3),
