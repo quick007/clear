@@ -43,7 +43,7 @@
   },
   {
     "id": "agent-collaboration",
-    "description": "A coherent Codex task shell beside the matching live Clear board.",
+    "description": "A Codex-rooted investigation exchange beside the matching live Clear board.",
     "output": "clear-agent-collaboration.png",
     "canvas": { "width": 1920, "height": 1080, "background": "#080a0b" },
     "format": { "type": "png", "compressionLevel": 9 },

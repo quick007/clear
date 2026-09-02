@@ -43,7 +43,7 @@
   },
   {
     "id": "devpost-hero",
-    "description": "A single native-looking Codex and Clear investigation workspace.",
+    "description": "A Codex-rooted investigation exchange beside the matching live Clear board.",
     "output": "clear-devpost-hero.png",
     "canvas": { "width": 1800, "height": 1200, "background": "#080a0b" },
     "format": { "type": "png", "compressionLevel": 9 },

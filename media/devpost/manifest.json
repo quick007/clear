@@ -112,16 +112,28 @@
         "state": "Focused Clear checkout investigation with the root-cause summary visible."
       }
     },
+    "codexUiReference": {
+      "file": "codex-ui-reference.png",
+      "description": "User-provided current Codex desktop reference used for the application shell and pane geometry.",
+      "capture": {
+        "route": "Codex desktop task",
+        "viewport": {
+          "width": 3456,
+          "height": 2006
+        },
+        "state": "Current Codex desktop chrome with the task pane open on the left and workspace pane open on the right."
+      }
+    },
     "heroWorkspace": {
       "file": "hero-workspace.png",
-      "description": "Single code-built Codex task shell containing a coherent WebMCP exchange beside the matching live Clear board.",
+      "description": "Codex-rooted editorial workspace with authored investigation messages and the matching live Clear board.",
       "capture": {
-        "route": "Prepared from the code-built Codex shell and responsive Clear capture",
+        "route": "Prepared from the current Codex UI reference and responsive Clear capture",
         "viewport": {
           "width": 1920,
           "height": 1080
         },
-        "state": "One complete human-agent investigation with visible WebMCP calls occupies the left side and the matching diagnosed Clear board occupies the right side."
+        "state": "The current Codex shell and SF system typography frame an authored but semantically accurate investigation exchange beside the matching diagnosed Clear board."
       }
     },
     "traceDetail": {
