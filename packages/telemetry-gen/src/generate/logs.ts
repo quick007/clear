@@ -4,7 +4,7 @@ import { LogRecord } from "../domain/telemetry.ts";
 import type { Trace } from "../domain/telemetry.ts";
 import type { BucketProfile } from "../profile.ts";
 
-const traceLink = (traces: ReadonlyArray<Trace>) => {
+const traceContext = (traces: ReadonlyArray<Trace>) => {
   const trace = traces[0];
   const root = trace?.spans.find(
     (span) => span.service === "checkout-api" && span.kind === "server",
@@ -12,6 +12,8 @@ const traceLink = (traces: ReadonlyArray<Trace>) => {
   return {
     traceId: trace?.traceId ?? null,
     spanId: root?.spanId ?? null,
+    startTime: root?.startTime ?? null,
+    endTime: root?.endTime ?? null,
   };
 };
 
@@ -22,8 +24,12 @@ export const generateLogs = (
   profile: BucketProfile,
   traces: ReadonlyArray<Trace>,
 ) => {
-  const link = traceLink(traces);
-  const at = (offset: number) => timestamp(bucketStart + offset);
+  const context = traceContext(traces);
+  const traceStart = context.startTime ?? bucketStart;
+  const traceDuration =
+    context.endTime === null ? Number.POSITIVE_INFINITY : context.endTime - traceStart;
+  const at = (offset: number) =>
+    timestamp(traceStart + Math.min(offset, Math.max(0, traceDuration - 1)));
   const log = (
     offset: number,
     severity: "debug" | "info" | "warn" | "error",
@@ -35,7 +41,8 @@ export const generateLogs = (
       severity,
       service: "checkout-api",
       body,
-      ...link,
+      traceId: context.traceId,
+      spanId: context.spanId,
       attributes,
     });
 

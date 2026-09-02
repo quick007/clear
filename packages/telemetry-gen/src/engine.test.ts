@@ -71,6 +71,15 @@ describe("telemetry generator", () => {
       expect(batch.phase).toBe("P2");
       expect(batch.logs.some((log) => log.severity === "error")).toBe(true);
       expect(batch.traces).toHaveLength(scenario.tracesPerBucket);
+      expect(
+        batch.logs.every((log) => {
+          const trace = batch.traces.find((candidate) => candidate.traceId === log.traceId);
+          const span = trace?.spans.find((candidate) => candidate.spanId === log.spanId);
+          return (
+            span !== undefined && log.timestamp >= span.startTime && log.timestamp <= span.endTime
+          );
+        }),
+      ).toBe(true);
       expect(batch.traces.every((trace) => trace.spans.length === 8)).toBe(true);
       expect(
         batch.traces.every((trace) => new Set(trace.spans.map((span) => span.service)).size === 3),
