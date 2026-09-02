@@ -155,6 +155,12 @@ describe("panel query and chart rendering", () => {
     });
   });
 
+  it("budgets a complete point window for every grouped retry series", () => {
+    const planning = buildPanelPlans(RetryAmplificationPanel.queries);
+    expect(planning.error).toBeNull();
+    expect(planning.plans[0]?.query).toMatchObject({ maxPoints: 720, maxSeries: 3 });
+  });
+
   it("indexes each comparison series to its own initial healthy window", () => {
     const points = [
       new MetricSeriesPoint({ at: at("2026-08-28T08:00:00Z"), value: 98 }),

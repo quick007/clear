@@ -167,7 +167,7 @@ export const buildPanelPlans = (queries: ReadonlyArray<ChartQuery | PanelMetricQ
         distinctKey: query.distinctKey,
         filters: convertFilters(query.filters ?? []),
         groupBy: query.groupBy?.attributes,
-        maxPoints: 240,
+        maxPoints: Math.min(2_000, 240 * (query.groupBy?.maxSeries ?? 1)),
         maxSeries: query.groupBy?.maxSeries,
         metric: MetricName.make(query.metric),
         range: RelativeTimeRange.make({ window: query.window === "7d" ? "24h" : query.window }),
