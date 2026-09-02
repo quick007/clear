@@ -1,30 +1,26 @@
 # Clear Devpost media
 
-This folder turns real Clear and Codex captures into the final Devpost gallery set. Product interfaces always come from screenshots. The renderer adds only a quiet background, a one-pixel edge, and a soft shadow declared in `manifest.json`.
+This folder turns real Clear captures and one deterministic Codex workspace shell into the final Devpost gallery set. Clear product interfaces always come from screenshots. The renderer adds only a quiet background, a one-pixel edge, and a soft shadow declared in `manifest.json`.
 
 ## Capture sources
 
 Capture product sources at 2560 by 1440 without browser chrome when the surface allows it. Keep the same sandbox session and incident window across the board, trace, log, and recovery images. Reference and derived sources retain the dimensions recorded in the manifest.
 
-| File                                    | Capture                                                     |
-| --------------------------------------- | ----------------------------------------------------------- |
-| `sources/homepage.png`                  | Signed-out homepage after the paper shader settles          |
-| `sources/homepage-material.png`         | Shader-only lower edge derived from `homepage.png`          |
-| `sources/homepage-background.png`       | Atmosphere-only homepage at the final 1800 by 1200 canvas   |
-| `sources/board-diagnosis-v2.png`        | Requests elevated, users flat, retries visible              |
-| `sources/codex-agent.png`               | Clean Codex task with only the checkout repository attached |
-| `sources/board-agent.png`               | Clear at the same moment as the Codex capture               |
-| `sources/board-agent-top.png`           | Diagnosed Clear board at scroll top with no stale notices   |
-| `sources/board-agent-pane.png`          | Diagnosed board at the final responsive pane size           |
-| `sources/codex-workspace-reference.png` | User-provided Codex investigation reference                 |
-| `sources/hero-workspace.png`            | Prepared Codex and Clear workspace                          |
-| `sources/trace-detail-v3.png`           | Three causal attempts in one failed checkout trace          |
-| `sources/log-correlation-v2.png`        | Three logs filtered by the exact selected trace             |
-| `sources/board-recovery-v2.png`         | Deploy marker with retry layers returning toward baseline   |
+| File                              | Capture                                                    |
+| --------------------------------- | ---------------------------------------------------------- |
+| `sources/homepage.png`            | Signed-out homepage after the paper shader settles         |
+| `sources/homepage-material.png`   | Shader-only lower edge derived from `homepage.png`         |
+| `sources/homepage-background.png` | Atmosphere-only homepage at the final 1800 by 1200 canvas  |
+| `sources/board-diagnosis-v2.png`  | Requests elevated, users flat, retries visible             |
+| `sources/board-agent-pane.png`    | Diagnosed board at the final responsive pane size          |
+| `sources/hero-workspace.png`      | Code-built Codex shell beside the responsive Clear capture |
+| `sources/trace-detail-v3.png`     | Three causal attempts in one failed checkout trace         |
+| `sources/log-correlation-v2.png`  | Three logs filtered by the exact selected trace            |
+| `sources/board-recovery-v2.png`   | Deploy marker with retry layers returning toward baseline  |
 
-Do not include keys, tokens, local paths, unrelated browser tabs, or unfinished UI. Use the real deployed app and a real Codex task. If a callout disagrees with the captured value or points at the wrong evidence, adjust the manifest before rendering.
+Do not include keys, tokens, local paths, unrelated browser tabs, or unfinished UI. If a label disagrees with the captured value or points at the wrong evidence, adjust the source before rendering.
 
-`hero-workspace.png` is a deterministic composition of the real Codex prompt and response captures beside `board-diagnosis-v2.png`. The crops remove unrelated app state, but do not fabricate chat content or telemetry.
+`hero-workspace.png` is a single deterministic 16:9 workspace. Its Codex pane is rendered from code so the entire exchange stays contiguous and legible. Its Clear pane is the real responsive board capture from the exact diagnosed incident state shown in the exchange.
 
 ## Final outputs
 
@@ -60,7 +56,7 @@ The renderer fails with the exact missing source and its capture instructions. I
 ## Composition rules
 
 - Keep each product capture fully opaque and at its natural aspect ratio.
-- Scale the primary surface to 90 percent of the canvas width for evidence images.
+- Scale every primary surface to 90 percent of the canvas width.
 - Use one product surface per image, except for the single native-looking Codex and Clear split workspace.
 - Do not add editorial headlines, glass rings, floating callouts, or overlapping screenshots.
 - Keep chart labels factual. The screenshot is the source of truth.

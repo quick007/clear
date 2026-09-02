@@ -94,8 +94,8 @@
       "capture": {
         "route": "/board",
         "viewport": {
-          "width": 1800,
-          "height": 1200
+          "width": 1310,
+          "height": 1024
         },
         "state": "Viewport capture from a fresh sandbox at scroll top with the rejected surge hypothesis, confirmed retry hypothesis, and no overlays or chart hover state."
       }
@@ -114,21 +114,21 @@
     },
     "heroWorkspace": {
       "file": "hero-workspace.png",
-      "description": "Deterministic split workspace combining the clean Codex task and diagnosed Clear board.",
+      "description": "Single code-built Codex task shell containing a coherent WebMCP exchange beside the matching live Clear board.",
       "capture": {
-        "route": "Derived from the Codex and Clear source captures",
+        "route": "Prepared from the code-built Codex shell and responsive Clear capture",
         "viewport": {
-          "width": 2500,
-          "height": 1200
+          "width": 1920,
+          "height": 1080
         },
-        "state": "A concise real Codex exchange occupies the left side and the matching diagnosed Clear board occupies the right side."
+        "state": "One complete human-agent investigation with visible WebMCP calls occupies the left side and the matching diagnosed Clear board occupies the right side."
       }
     },
     "traceDetail": {
       "file": "trace-detail-v3.png",
       "description": "The redesigned trace detail view showing a failed checkout request and three causal attempts.",
       "capture": {
-        "route": "/traces/969fa04175692be889538a617448a645?window=15m",
+        "route": "/traces/64c64a942f095d7a89975d1e2dcf13fc?window=15m",
         "viewport": {
           "width": 1910,
           "height": 1074
@@ -140,7 +140,7 @@
       "file": "log-correlation-v2.png",
       "description": "The three exact logs correlated from the selected checkout trace.",
       "capture": {
-        "route": "/explore?signal=logs&trace=969fa04175692be889538a617448a645&window=15m",
+        "route": "/explore?signal=logs&trace=64c64a942f095d7a89975d1e2dcf13fc&window=15m",
         "viewport": {
           "width": 1910,
           "height": 1074

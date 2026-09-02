@@ -43,7 +43,7 @@
   },
   {
     "id": "agent-collaboration",
-    "description": "A real Codex task beside the matching Clear board in one coherent workspace.",
+    "description": "A coherent Codex task shell beside the matching live Clear board.",
     "output": "clear-agent-collaboration.png",
     "canvas": { "width": 1920, "height": 1080, "background": "#080a0b" },
     "format": { "type": "png", "compressionLevel": 9 },
@@ -62,9 +62,9 @@
       {
         "source": "heroWorkspace",
         "x": 96,
-        "y": 126,
+        "y": 54,
         "width": 1728,
-        "height": 829,
+        "height": 972,
         "fit": "contain",
         "position": "centre",
         "style": {
