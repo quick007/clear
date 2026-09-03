@@ -99,16 +99,13 @@ export const resolveSandboxIncident = Effect.fn("SandboxRecovery.resolve")(funct
   );
   const latest = advanced.advancedBatches.at(-1);
   const timestampOffsetMilliseconds = latest === undefined ? 0 : materializedAt - latest.bucketEnd;
-  yield* Effect.forEach(
-    advanced.advancedBatches,
-    (batch) =>
-      services.crypto.randomUUIDv7.pipe(
-        Effect.orDie,
-        Effect.map((id) => canonicalSandboxBatch(batch, id, timestampOffsetMilliseconds)),
-        Effect.flatMap((canonical) => services.telemetry.ingest(projectId, canonical)),
-      ),
-    { discard: true },
+  const canonical = yield* Effect.forEach(advanced.runtime.batches, (batch) =>
+    services.crypto.randomUUIDv7.pipe(
+      Effect.orDie,
+      Effect.map((id) => canonicalSandboxBatch(batch, id, timestampOffsetMilliseconds)),
+    ),
   );
+  yield* services.telemetry.replace(projectId, canonical);
   yield* publishSandboxProgress(
     services.crypto,
     services.incidentState,
