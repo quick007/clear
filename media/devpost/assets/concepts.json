@@ -27,6 +27,7 @@
         "position": "centre",
         "style": {
           "borderRadius": 16,
+          "border": { "width": 1, "color": "#e8efee", "opacity": 0.16 },
           "shadow": {
             "x": 0,
             "y": 24,

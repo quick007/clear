@@ -27,6 +27,7 @@
         "position": "centre",
         "style": {
           "borderRadius": 16,
+          "border": { "width": 1, "color": "#e8efee", "opacity": 0.16 },
           "shadow": {
             "x": 0,
             "y": 24,
@@ -59,7 +60,7 @@
         "style": { "modulate": { "brightness": 0.62, "saturation": 0.74 } }
       },
       {
-        "source": "codexTraceInvestigation",
+        "source": "codexTraceHero",
         "x": 90,
         "y": 144,
         "width": 1620,
@@ -69,6 +70,7 @@
         "crop": { "left": 0, "top": 0, "width": 3456, "height": 1944 },
         "style": {
           "borderRadius": 16,
+          "border": { "width": 1, "color": "#e8efee", "opacity": 0.16 },
           "shadow": {
             "x": 0,
             "y": 24,
@@ -110,6 +112,7 @@
         "position": "centre",
         "style": {
           "borderRadius": 16,
+          "border": { "width": 1, "color": "#e8efee", "opacity": 0.16 },
           "shadow": {
             "x": 0,
             "y": 24,
@@ -151,6 +154,7 @@
         "position": "centre",
         "style": {
           "borderRadius": 16,
+          "border": { "width": 1, "color": "#e8efee", "opacity": 0.16 },
           "shadow": {
             "x": 0,
             "y": 24,

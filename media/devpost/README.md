@@ -6,23 +6,24 @@ This folder turns real Clear and Codex captures into the final Devpost gallery s
 
 Capture product sources at 2560 by 1440 without browser chrome when the surface allows it. Keep the same sandbox session and incident window across the board, trace, log, and recovery images. Reference and derived sources retain the dimensions recorded in the manifest.
 
-| File                                    | Capture                                                          |
-| --------------------------------------- | ---------------------------------------------------------------- |
-| `sources/homepage.png`                  | Signed-out homepage after the paper shader settles               |
-| `sources/homepage-material.png`         | Shader-only lower edge derived from `homepage.png`               |
-| `sources/homepage-background.png`       | Atmosphere-only homepage at the final 1800 by 1200 canvas        |
-| `sources/board-diagnosis-v3.png`        | Payment requests, failures, and latency crossing thresholds      |
-| `sources/board-agent-pane.png`          | Diagnosed board at the final responsive pane size                |
-| `sources/codex-board-fix.png`           | Real Codex and Clear board screenshot supplied by the user       |
-| `sources/codex-board-fix-hero.png`      | Editorial crop with the original composer moved below the answer |
-| `sources/codex-trace-investigation.png` | Real Codex and Clear trace screenshot supplied by the user       |
-| `sources/trace-detail-v3.png`           | Three causal attempts in one failed checkout trace               |
-| `sources/log-correlation-v2.png`        | Three logs filtered by the exact selected trace                  |
-| `sources/board-resolved-v3.png`         | Closed incident with request and latency recovery visible        |
+| File                                         | Capture                                                          |
+| -------------------------------------------- | ---------------------------------------------------------------- |
+| `sources/homepage.png`                       | Signed-out homepage after the paper shader settles               |
+| `sources/homepage-material.png`              | Shader-only lower edge derived from `homepage.png`               |
+| `sources/homepage-background.png`            | Atmosphere-only homepage at the final 1800 by 1200 canvas        |
+| `sources/board-diagnosis-v3.png`             | Payment requests, failures, and latency crossing thresholds      |
+| `sources/board-agent-pane.png`               | Diagnosed board at the final responsive pane size                |
+| `sources/codex-board-fix.png`                | Real Codex and Clear board screenshot supplied by the user       |
+| `sources/codex-board-fix-hero.png`           | Editorial crop with the original composer moved below the answer |
+| `sources/codex-trace-investigation.png`      | Real Codex and Clear trace screenshot supplied by the user       |
+| `sources/codex-trace-investigation-hero.png` | Trace screenshot with its original composer moved into the crop  |
+| `sources/trace-detail-v3.png`                | Three causal attempts in one failed checkout trace               |
+| `sources/log-correlation-v2.png`             | Three logs filtered by the exact selected trace                  |
+| `sources/board-resolved-v3.png`              | Closed incident with request and latency recovery visible        |
 
 Do not include keys, tokens, local paths, unrelated browser tabs, or unfinished UI. If a label disagrees with the captured value or points at the wrong evidence, adjust the source before rendering.
 
-`codex-board-fix-hero.png` preserves the supplied Codex and Clear pixels. It removes the response tail that was already hidden behind the composer in the source and moves the original composer upward. It does not recreate Codex chrome, controls, typography, or messages.
+The prepared Codex sources preserve the supplied Codex and Clear pixels. They move the original composer upward over the conversation so it remains visible in the final 16:9 crop. They do not recreate Codex chrome, controls, typography, or messages.
 
 ## Final outputs
 
@@ -60,7 +61,8 @@ The renderer fails with the exact missing source and its capture instructions. I
 - Keep each product capture fully opaque and at its natural aspect ratio.
 - Scale every primary surface to 90 percent of the canvas width.
 - Use one product surface per image, except for the Codex investigation and its existing browser pane.
-- Do not add editorial headlines, glass rings, floating callouts, or overlapping screenshots.
+- Do not add editorial headlines, floating callouts, or overlapping screenshots.
+- Use the same restrained one-pixel translucent neutral edge on every product surface.
 - Keep chart labels factual. The screenshot is the source of truth.
 - Prefer a focused crop over shrinking an interface until it is unreadable.
 - Recheck every asset at thumbnail size before uploading it to Devpost.

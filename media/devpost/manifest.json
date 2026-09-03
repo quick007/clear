@@ -162,14 +162,14 @@
     },
     "codexBoardHero": {
       "file": "codex-board-fix-hero.png",
-      "description": "Editorial crop of the user-provided Codex and Clear workspace with the composer moved below the final complete finding.",
+      "description": "User-provided Codex and Clear workspace with its original composer moved into the visible crop.",
       "capture": {
         "route": "Prepared from sources/codex-board-fix.png without recreating Codex UI",
         "viewport": {
           "width": 3456,
           "height": 2170
         },
-        "state": "The original application pixels are preserved while the obscured tail of the response is removed and the original composer is moved upward."
+        "state": "The original composer pixels sit above the crop boundary and cover the response tail, matching the live Codex layout."
       }
     },
     "codexTraceInvestigation": {
@@ -182,6 +182,18 @@
           "height": 2170
         },
         "state": "Two visible investigation turns and the exact three-attempt trace at 90 percent browser zoom."
+      }
+    },
+    "codexTraceHero": {
+      "file": "codex-trace-investigation-hero.png",
+      "description": "User-provided Codex and Clear trace workspace with its original composer moved into the visible crop.",
+      "capture": {
+        "route": "Prepared from sources/codex-trace-investigation.png without recreating Codex UI",
+        "viewport": {
+          "width": 3456,
+          "height": 2170
+        },
+        "state": "The original composer pixels sit above the crop boundary and cover the response tail, matching the live Codex layout."
       }
     },
     "traceDetail": {
