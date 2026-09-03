@@ -17,6 +17,10 @@ export class SandboxApi extends HttpApiGroup.make("sandbox")
       success: SandboxState,
       error: MutationErrors,
     }).middleware(GroundtruthAccess),
+    HttpApiEndpoint.post("resolveIncident", "/resolve", {
+      success: SandboxState,
+      error: MutationErrors,
+    }).middleware(GroundtruthAccess),
     HttpApiEndpoint.post("reset", "/reset", {
       success: SandboxState,
       error: MutationErrors,

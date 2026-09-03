@@ -516,6 +516,33 @@ describe("SandboxService", () => {
     }).pipe(Effect.provide(TestLayer)),
   );
 
+  it.effect("resolves the fake incident and normalizes retry traffic in one action", () =>
+    Effect.gen(function* () {
+      yield* TestClock.adjust("20 minutes");
+      const sandbox = yield* SandboxService;
+      const incidents = yield* IncidentService;
+      const opened = yield* sandbox.open(913);
+      const projectId = sandboxProjectIdForSession(opened.session.id);
+
+      yield* sandbox.trigger(opened.session.id);
+      for (let tick = 0; tick < 5; tick += 1) {
+        yield* TestClock.adjust("5 seconds");
+        yield* sandbox.advanceActive();
+      }
+      assert.strictEqual((yield* incidents.listAlerts(projectId, { status: "firing" })).length, 1);
+
+      const resolved = yield* sandbox.resolve(opened.session.id);
+
+      assert.strictEqual(resolved.phase, "recovery");
+      assert.strictEqual((yield* incidents.listAlerts(projectId, { status: "firing" })).length, 0);
+      assert.strictEqual(
+        (yield* incidents.listAlerts(projectId, { status: "resolved" })).length,
+        1,
+      );
+      assert.strictEqual(yield* incidents.getOpenIncident(projectId), null);
+    }).pipe(Effect.provide(TestLayer)),
+  );
+
   it.effect("advances recently active sandboxes on the backend clock", () =>
     Effect.gen(function* () {
       yield* TestClock.adjust("20 minutes");

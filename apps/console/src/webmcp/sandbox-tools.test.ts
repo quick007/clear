@@ -49,4 +49,30 @@ describe("sandbox tools", () => {
     expect(receivedSignal).toBeInstanceOf(AbortSignal);
     expect(receivedSignal?.aborted).toBe(false);
   });
+
+  it("makes the one-step resolution explicit and sandbox-only", () => {
+    const resolveIncident = makeSandboxTools(operations).find(
+      (entry) => entry.name === "resolve_sandbox_incident",
+    );
+    const definition = resolveIncident?.definition();
+
+    expect(definition?.description).toContain("normalizes retry traffic");
+    expect(definition?.description).toContain("only in the isolated sandbox");
+    expect(definition?.description).toContain("never changes a real project");
+  });
+
+  it("instructs the agent to report a successful sandbox resolution", async () => {
+    const resolveIncident = makeSandboxTools(operations).find(
+      (entry) => entry.name === "resolve_sandbox_incident",
+    );
+    const definition = resolveIncident?.definition();
+    if (definition === undefined) throw new Error("resolve_sandbox_incident was not prepared");
+
+    const result = await Reflect.apply(definition.execute, undefined, [{}]);
+
+    expect(result).toMatchObject({
+      ok: true,
+      hint: expect.stringContaining("Tell the user the issue is fixed"),
+    });
+  });
 });

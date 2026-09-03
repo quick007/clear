@@ -109,11 +109,13 @@ describe("GroundtruthToolRegistry", () => {
     expect(modelContext.tools.has("get_console_overview")).toBe(true);
     expect(modelContext.tools.has("open_incident")).toBe(true);
     expect(modelContext.tools.has("start_sandbox_incident")).toBe(true);
+    expect(modelContext.tools.has("resolve_sandbox_incident")).toBe(true);
     expect(modelContext.tools.has("add_timeline_note")).toBe(true);
 
     await sessions.set({ projectId, mode: "hosted", incident: null });
     expect(modelContext.tools.has("get_console_overview")).toBe(true);
     expect(modelContext.tools.has("start_sandbox_incident")).toBe(false);
+    expect(modelContext.tools.has("resolve_sandbox_incident")).toBe(false);
     expect(modelContext.tools.has("add_timeline_note")).toBe(false);
 
     registry.stop();

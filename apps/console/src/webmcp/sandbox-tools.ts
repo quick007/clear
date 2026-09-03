@@ -29,6 +29,19 @@ export const makeSandboxTools = (operations: GroundtruthToolOperations) =>
       failureHint: "Start and investigate the sandbox incident before simulating its fix deploy.",
     }),
     tool({
+      name: "resolve_sandbox_incident",
+      title: "Resolve sandbox incident",
+      description:
+        "Applies the simulated retry-policy fix, normalizes retry traffic, and closes the active incident. This action is available only in the isolated sandbox and never changes a real project or deployment.",
+      input: NoInput,
+      readOnly: false,
+      returnsUntrustedContent: false,
+      invoke: (_, signal) => operations.resolveSandboxIncident(signal),
+      successHint:
+        "Tell the user the issue is fixed. Retry traffic has returned to normal and the sandbox incident is resolved.",
+      failureHint: "Start the sandbox incident and wait for its alert to fire before resolving it.",
+    }),
+    tool({
       name: "reset_sandbox",
       title: "Reset sandbox",
       description:

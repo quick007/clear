@@ -48,7 +48,10 @@ describe("GroundtruthApi", () => {
         ],
         ["ingestKeys", ["listIngestKeys", "createIngestKey", "revokeIngestKey"]],
         ["deploys", ["listDeployEvents", "recordDeployEvent"]],
-        ["sandbox", ["createSession", "triggerIncident", "simulateRecovery", "reset"]],
+        [
+          "sandbox",
+          ["createSession", "triggerIncident", "simulateRecovery", "resolveIncident", "reset"],
+        ],
         ["live", ["stream"]],
         [
           "collector",

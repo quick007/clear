@@ -1,19 +1,13 @@
-import {
-  RecordDeployEventRequest,
-  type SandboxState,
-  type ServiceUnavailable,
-} from "@groundtruth/api-contract";
+import type { SandboxState, ServiceUnavailable } from "@groundtruth/api-contract";
 import {
   AlertId,
   EntityNotFound,
   IncidentTitle,
-  NonEmptyText,
+  InvalidStateTransition,
   type ProjectId,
   QuotaExceeded,
   SandboxSession,
-  ServiceName,
   SessionId,
-  Sha,
 } from "@groundtruth/domain";
 import type { TelemetryUnavailable } from "@groundtruth/telemetry";
 import { Context, Crypto, DateTime, Effect, Layer, Ref, Semaphore } from "effect";
@@ -28,7 +22,6 @@ import { TelemetryStore } from "../telemetry/TelemetryStore.js";
 import {
   advanceSandboxRuntime,
   makeSandboxRuntime,
-  recoverSandboxRuntime,
   sandboxBucketMilliseconds,
   sandboxRuntimePhase,
   type SandboxRuntime,
@@ -43,6 +36,7 @@ import {
 import { seedSandboxIncidentProject } from "./SandboxAlertState.js";
 import { leastRecentlyUsedIdleSession } from "./SandboxCapacityPolicy.js";
 import { publishSandboxProgress } from "./SandboxProgress.js";
+import { beginSandboxRecovery, resolveSandboxIncident } from "./SandboxRecovery.js";
 import { canonicalSandboxBatch } from "./SandboxTelemetry.js";
 
 const sandboxTtlMilliseconds = 2 * 60 * 60 * 1_000; // 2 hours
@@ -59,6 +53,7 @@ const materializationAnchor = (now: DateTime.Utc) =>
 type SandboxUnavailable = ServiceUnavailable | TelemetryUnavailable;
 type SessionLookupError = EntityNotFound | SandboxUnavailable;
 type SandboxAdmissionError = SessionLookupError | QuotaExceeded;
+type SandboxResolutionError = SandboxAdmissionError | InvalidStateTransition;
 
 export class SandboxService extends Context.Service<
   SandboxService,
@@ -72,6 +67,7 @@ export class SandboxService extends Context.Service<
     ): Effect.Effect<SandboxState, SandboxAdmissionError>;
     trigger(sessionId: SessionId): Effect.Effect<SandboxState, SessionLookupError>;
     recover(sessionId: SessionId): Effect.Effect<SandboxState, SessionLookupError>;
+    resolve(sessionId: SessionId): Effect.Effect<SandboxState, SandboxResolutionError>;
     reset(sessionId: SessionId): Effect.Effect<SandboxState, SessionLookupError>;
     advanceActive(): Effect.Effect<number, SandboxUnavailable>;
     pruneExpired(): Effect.Effect<number, SandboxUnavailable>;
@@ -380,45 +376,35 @@ export class SandboxService extends Context.Service<
           Effect.gen(function* () {
             const { now, stored } = yield* requireActive(sessionId);
             const projectId = sandboxProjectIdForSession(sessionId);
-            if (stored.record.phase === "baseline") {
-              return yield* new EntityNotFound({
-                entity: "incident",
-                id: sessionId,
-                message: "No active sandbox incident is available to recover",
-              });
-            }
-            const touched = { ...stored, lastActiveAt: DateTime.toEpochMillis(now) };
-            if (stored.record.phase === "recovery") {
-              yield* setStored(sessionId, touched);
-              return sandboxStateView(touched.record, false, now);
-            }
-            const firingAlerts = yield* incidentService.listAlerts(projectId, {
-              status: "firing",
-            });
-            if (firingAlerts.length === 0) {
-              return yield* new EntityNotFound({
-                entity: "alert",
-                id: sessionId,
-                message: "Wait for the sandbox alert to fire before starting recovery",
-              });
-            }
-            const runtime = yield* recoverSandboxRuntime(stored.runtime).pipe(Effect.orDie);
-            const record = new SandboxRecord({ session: stored.record.session, phase: "recovery" });
-            yield* deploys.record(
+            const recovery = yield* beginSandboxRecovery(
+              { crypto, deploys, incidents: incidentService, incidentState, events, telemetry },
               projectId,
-              new RecordDeployEventRequest({
-                service: ServiceName.make("checkout-api"),
-                sha: Sha.make("c1ea7f1"),
-                description: NonEmptyText.make("Bound retries with backoff, jitter, and a budget"),
-                deployedAt: now,
-              }),
+              sessionId,
+              stored,
+              now,
             );
-            yield* setStored(sessionId, {
-              ...touched,
-              record,
-              runtime,
-            });
-            return sandboxStateView(record, true, now);
+            yield* setStored(sessionId, recovery.stored);
+            return sandboxStateView(recovery.stored.record, recovery.changed, now);
+          }),
+        ),
+      );
+
+      const resolve = Effect.fn("SandboxService.resolve")((sessionId: SessionId) =>
+        transitions.withPermit(
+          Effect.gen(function* () {
+            const { now, stored } = yield* requireActive(sessionId);
+            const projectId = sandboxProjectIdForSession(sessionId);
+            const anchor = materializationAnchor(now);
+            const resolved = yield* resolveSandboxIncident(
+              { crypto, deploys, incidents: incidentService, incidentState, events, telemetry },
+              projectId,
+              sessionId,
+              stored,
+              now,
+              anchor,
+            );
+            yield* setStored(sessionId, resolved);
+            return sandboxStateView(resolved.record, true, now);
           }),
         ),
       );
@@ -489,6 +475,7 @@ export class SandboxService extends Context.Service<
         resumeOrOpen,
         trigger,
         recover,
+        resolve,
         reset,
         advanceActive,
         pruneExpired,

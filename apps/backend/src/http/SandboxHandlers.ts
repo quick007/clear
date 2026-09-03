@@ -49,6 +49,15 @@ export const SandboxHandlers = HttpApiBuilder.group(
         }),
       )
       .handle(
+        "resolveIncident",
+        Effect.fn(function* () {
+          const session = yield* currentSandboxSession();
+          return yield* sandboxes
+            .resolve(session.id)
+            .pipe(Effect.catchTag("TelemetryUnavailable", unavailable));
+        }),
+      )
+      .handle(
         "reset",
         Effect.fn(function* () {
           const session = yield* currentSandboxSession();
