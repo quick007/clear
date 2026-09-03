@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codex conversation overlay</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 579px;
+        height: 899px;
+        margin: 0;
+        overflow: hidden;
+        background: transparent;
+        color: #f2f2f2;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .title-mask {
+        position: absolute;
+        inset: 0 auto auto 218px;
+        width: 235px;
+        height: 53px;
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+        background: #181818;
+      }
+
+      .title {
+        overflow: hidden;
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 1;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .conversation {
+        position: absolute;
+        inset: 53px 0 0;
+        padding: 30px 19px 0;
+        overflow: hidden;
+        background: #181818;
+      }
+
+      .user-row {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .user-message {
+        max-width: 405px;
+        padding: 15px 18px 16px;
+        border-radius: 21px;
+        background: #183e76;
+        color: #f4f7fb;
+        font-size: 17px;
+        line-height: 1.48;
+        letter-spacing: -0.11px;
+      }
+
+      .run {
+        display: flex;
+        align-items: center;
+        height: 48px;
+        margin-top: 28px;
+        border-bottom: 1px solid #303030;
+        color: #a4a4a4;
+        font-size: 16px;
+        line-height: 1;
+      }
+
+      .chevron {
+        margin-left: 8px;
+        color: #8a8a8a;
+        font-size: 22px;
+        font-weight: 300;
+        transform: translateY(-1px);
+      }
+
+      .assistant {
+        padding-top: 24px;
+        color: #ededed;
+        font-size: 17px;
+        line-height: 1.55;
+        letter-spacing: -0.08px;
+      }
+
+      .assistant p {
+        margin: 0 0 14px;
+      }
+
+      .assistant ul {
+        margin: 8px 0 16px;
+        padding-left: 28px;
+      }
+
+      .assistant li {
+        margin: 4px 0;
+        padding-left: 2px;
+      }
+
+      .follow-up {
+        margin-top: 25px;
+      }
+
+      .follow-up .user-message {
+        max-width: 330px;
+      }
+
+      .second-run {
+        margin-top: 28px;
+      }
+
+      .second-response {
+        padding-top: 22px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="title-mask">
+      <div class="title">Investigate checkout failures</div>
+    </div>
+
+    <main class="conversation">
+      <div class="user-row">
+        <div class="user-message">
+          Checkout failures are rising, but traffic looks flat. Use Clear to find the cause. Don’t
+          change anything yet.
+        </div>
+      </div>
+
+      <div class="run">Worked for 42s <span class="chevron">›</span></div>
+      <section class="assistant">
+        <p>I traced the failed checkout requests in Clear.</p>
+        <ul>
+          <li>Incoming traffic stays near 50 requests/s.</li>
+          <li>Each payment failure triggers two immediate retries.</li>
+          <li>Upstream calls rise to about 150 requests/s.</li>
+        </ul>
+        <p>The pattern is retry amplification, not a traffic surge.</p>
+      </section>
+
+      <div class="user-row follow-up">
+        <div class="user-message">Open the board and show me the evidence.</div>
+      </div>
+
+      <div class="run second-run">Worked for 14s <span class="chevron">›</span></div>
+      <section class="assistant second-response">
+        <p>
+          The board is open on the right. The left chart holds unique users at baseline while
+          upstream requests climb to 3.1×. The right chart separates that increase into the original
+          attempt and two retry layers.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

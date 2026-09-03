@@ -102,7 +102,7 @@
     },
     "codexWorkspaceReference": {
       "file": "codex-workspace-reference.png",
-      "description": "User-provided Codex investigation reference used only for its clean left task pane.",
+      "description": "User-provided Codex investigation reference used for the in-app browser and empty composer pixels.",
       "capture": {
         "route": "Codex desktop task",
         "viewport": {
@@ -124,16 +124,28 @@
         "state": "Current Codex desktop chrome with the task pane open on the left and workspace pane open on the right."
       }
     },
+    "codexConversationOverlay": {
+      "file": "codex-conversation-overlay.png",
+      "description": "Browser-rendered Codex investigation messages matched to the authentic application shell.",
+      "capture": {
+        "route": "Rendered from sources/codex-conversation-overlay.html",
+        "viewport": {
+          "width": 579,
+          "height": 899
+        },
+        "state": "Two concise user prompts and two agent responses explain the telemetry evidence without recreating application chrome or controls."
+      }
+    },
     "heroWorkspace": {
       "file": "hero-workspace.png",
-      "description": "Codex-rooted editorial workspace with authored investigation messages and the matching live Clear board.",
+      "description": "Selectively composited Codex investigation with authentic shell, browser, and composer pixels around a matched conversation and live Clear board.",
       "capture": {
-        "route": "Prepared from the current Codex UI reference and responsive Clear capture",
+        "route": "Prepared from authentic Codex captures, the HTML conversation layer, and the responsive Clear capture",
         "viewport": {
           "width": 1920,
           "height": 1080
         },
-        "state": "The current Codex shell and SF system typography frame an authored but semantically accurate investigation exchange beside the matching diagnosed Clear board."
+        "state": "Codex shell, pane geometry, browser chrome, toolbar controls, and composer are preserved from real captures. Only the conversation content and browser viewport are replaced."
       }
     },
     "traceDetail": {
