@@ -50,6 +50,7 @@ const SandboxTest = Layer.succeed(
     resumeOrOpen: notUsed,
     trigger: notUsed,
     recover: notUsed,
+    resolve: notUsed,
     reset: notUsed,
     advanceActive: notUsed,
     pruneExpired: notUsed,
