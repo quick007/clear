@@ -92,16 +92,14 @@ const svg = String.raw`<svg width="1620" height="911" viewBox="0 0 1620 911" xml
 
     <line x1="34" y1="206" x2="422" y2="206" stroke="#ffffff" stroke-opacity="0.08"/>
 
-    <text x="34" y="270" fill="#f4f6f5" font-family="Helvetica, Arial, sans-serif" font-size="48" font-weight="600" letter-spacing="-1">${latencyRatio.toFixed(1)}× faster</text>
+    <text x="34" y="270" fill="#f4f6f5" font-family="Helvetica, Arial, sans-serif" font-size="48" font-weight="600" letter-spacing="-1">${Math.round(latencyRatio)}× faster</text>
     <text x="34" y="303" fill="#a1aaa8" font-family="Helvetica, Arial, sans-serif" font-size="17">median persisted panel update</text>
-    <text x="34" y="332" fill="#75817f" font-family="Menlo, Monaco, monospace" font-size="14">${clearMedian.toFixed(2)} ms vs ${grafanaMedian.toFixed(2)} ms locally</text>
   </g>
 
   <g transform="translate(72 758)">
     <line x1="0" y1="0" x2="1476" y2="0" stroke="#ffffff" stroke-opacity="0.09"/>
-    <text x="0" y="45" fill="#b7c0be" font-family="Helvetica, Arial, sans-serif" font-size="17">${results.environment.iterations} measured iterations · ${results.environment.warmups} warmups · localhost HTTP · same Apple Silicon machine · September 3, 2026</text>
+    <text x="0" y="45" fill="#b7c0be" font-family="Helvetica, Arial, sans-serif" font-size="17">${results.environment.iterations} measured iterations · ${results.environment.warmups} warmups · localhost HTTP</text>
     <text x="0" y="78" fill="#707c7a" font-family="Helvetica, Arial, sans-serif" font-size="15">Grafana step count follows its official Create dashboards workflow · Latency measures persistence acknowledgement, not browser paint</text>
-    <text x="1476" y="45" text-anchor="end" fill="#7bd4c6" font-family="Menlo, Monaco, monospace" font-size="15" font-weight="700">${grafanaSteps}-to-${clearSteps} interaction path</text>
   </g>
 </svg>`;
 
