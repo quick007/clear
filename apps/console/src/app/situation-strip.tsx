@@ -1,5 +1,6 @@
 import type { ConsoleOverview, IncidentDetail } from "@groundtruth/api-contract";
-import { Clock01Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, Clock01Icon } from "@hugeicons/core-free-icons";
+import { Popover } from "@base-ui/react/popover";
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "@tanstack/react-router";
 
@@ -60,60 +61,120 @@ export function SituationStrip({
         </div>
       </div>
       {incidentDetail && hasHypotheses ? (
-        <HypothesisList hypotheses={incidentDetail.hypotheses} />
+        <HypothesisPopover hypotheses={incidentDetail.hypotheses} />
       ) : null}
     </section>
   );
 }
 
+export function HypothesisPopover({ hypotheses }: Pick<IncidentDetail, "hypotheses">) {
+  const summaryHypothesis =
+    hypotheses.find(({ status }) => status === "confirmed") ??
+    hypotheses.find(({ status }) => status === "testing") ??
+    hypotheses.find(({ status }) => status === "proposed") ??
+    hypotheses[0]!;
+  const summaryCount = hypotheses.filter(
+    ({ status }) => status === summaryHypothesis.status,
+  ).length;
+  const statusSummary = ["confirmed", "testing", "proposed", "rejected"]
+    .map((status) => {
+      const count = hypotheses.filter((hypothesis) => hypothesis.status === status).length;
+      return count === 0 ? null : `${count} ${status}`;
+    })
+    .filter((summary) => summary !== null)
+    .join(", ");
+
+  return (
+    <Popover.Root>
+      <Popover.Trigger
+        aria-label={`View hypotheses: ${statusSummary}`}
+        {...stylex.props(styles.hypothesisTrigger)}
+      >
+        <span>Hypotheses</span>
+        <span
+          aria-hidden
+          {...stylex.props(styles.hypothesisDot, hypothesisStatusStyles[summaryHypothesis.status])}
+        />
+        <span
+          {...stylex.props(
+            styles.hypothesisSummary,
+            hypothesisStatusStyles[summaryHypothesis.status],
+          )}
+        >
+          {summaryCount} {summaryHypothesis.status}
+        </span>
+        <Icon icon={ArrowDown01Icon} size={14} />
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner
+          align="end"
+          side="bottom"
+          sideOffset={8}
+          {...stylex.props(styles.hypothesisPositioner)}
+        >
+          <Popover.Popup {...stylex.props(styles.hypothesisPopup)}>
+            <header {...stylex.props(styles.hypothesisPopupHeader)}>
+              <Popover.Title {...stylex.props(styles.hypothesisPopupTitle)}>
+                Incident hypotheses
+              </Popover.Title>
+              <Popover.Description {...stylex.props(styles.hypothesisPopupDescription)}>
+                {hypotheses.length} explanations tracked for this incident
+              </Popover.Description>
+            </header>
+            <HypothesisList hypotheses={hypotheses} />
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
 export function HypothesisList({ hypotheses }: Pick<IncidentDetail, "hypotheses">) {
   return (
-    <div aria-label="Incident hypotheses" role="group" {...stylex.props(styles.hypothesisGroup)}>
-      <span {...stylex.props(styles.hypothesisLabel)}>Hypotheses</span>
-      <div role="list" {...stylex.props(styles.hypotheses)}>
-        {hypotheses.map((hypothesis) => (
-          <span
-            aria-label={`${hypothesis.status} hypothesis: ${hypothesis.text}`}
-            key={hypothesis.id}
-            role="listitem"
-            {...stylex.props(styles.hypothesis, hypothesisStatusStyles[hypothesis.status])}
-          >
-            <span aria-hidden {...stylex.props(styles.hypothesisDot)} />
+    <div aria-label="Incident hypotheses" role="list" {...stylex.props(styles.hypotheses)}>
+      {hypotheses.map((hypothesis) => (
+        <article
+          aria-label={`${hypothesis.status} hypothesis: ${hypothesis.text}`}
+          key={hypothesis.id}
+          role="listitem"
+          {...stylex.props(styles.hypothesis)}
+        >
+          <span {...stylex.props(styles.hypothesisStatusLine)}>
             <span
-              {...stylex.props(
-                styles.hypothesisText,
-                hypothesis.status === "rejected" && styles.rejectedText,
-              )}
+              aria-hidden
+              {...stylex.props(styles.hypothesisDot, hypothesisStatusStyles[hypothesis.status])}
+            />
+            <span
+              {...stylex.props(styles.hypothesisStatus, hypothesisStatusStyles[hypothesis.status])}
             >
-              {hypothesis.text}
+              {hypothesis.status}
             </span>
-            <span {...stylex.props(styles.hypothesisStatus)}>{hypothesis.status}</span>
           </span>
-        ))}
-      </div>
+          <span
+            {...stylex.props(
+              styles.hypothesisText,
+              hypothesis.status === "rejected" && styles.rejectedText,
+            )}
+          >
+            {hypothesis.text}
+          </span>
+        </article>
+      ))}
     </div>
   );
 }
 
 const hypothesisStatusStyles = stylex.create({
   proposed: {
-    backgroundColor: colors.whiteWash,
-    borderColor: colors.lineStrong,
     color: colors.textMuted,
   },
   testing: {
-    backgroundColor: colors.amberWash,
-    borderColor: colors.amber,
     color: colors.amber,
   },
   rejected: {
-    backgroundColor: colors.whiteWash,
-    borderColor: colors.line,
     color: colors.textSubtle,
   },
   confirmed: {
-    backgroundColor: colors.greenWash,
-    borderColor: colors.green,
     color: colors.green,
   },
 });
@@ -128,7 +189,7 @@ const styles = stylex.create({
     display: "grid",
     gap: space.x5,
     gridTemplateColumns: {
-      default: "minmax(260px, 0.8fr) minmax(0, 1.2fr)",
+      default: "minmax(340px, 1fr) auto",
       "@media (max-width: 900px)": "minmax(0, 1fr)",
     },
     minHeight: 58,
@@ -162,40 +223,64 @@ const styles = stylex.create({
     lineHeight: 1.45,
     maxWidth: "72ch",
   },
-  hypothesisGroup: {
-    alignItems: "baseline",
-    display: "grid",
-    gap: space.x3,
-    gridTemplateColumns: {
-      default: "auto minmax(0, 1fr)",
-      "@media (max-width: 620px)": "minmax(0, 1fr)",
-    },
-    minWidth: 0,
-  },
-  hypothesisLabel: {
-    color: colors.textSubtle,
-    fontSize: 12,
-    fontWeight: 500,
-  },
-  hypotheses: {
+  hypothesisTrigger: {
     alignItems: "center",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: space.x2,
-    minWidth: 0,
-  },
-  hypothesis: {
-    alignItems: "center",
-    borderRadius: radii.pill,
+    backgroundColor: { default: colors.whiteWash, ":hover": colors.surfaceHover },
+    borderColor: colors.line,
+    borderRadius: radii.sm,
     borderStyle: "solid",
     borderWidth: 1,
+    color: colors.textMuted,
+    cursor: "pointer",
     display: "inline-flex",
     fontSize: 12,
+    fontWeight: 500,
     gap: 7,
-    lineHeight: 1.35,
-    maxWidth: "100%",
-    paddingBlock: 5,
-    paddingInline: 9,
+    justifySelf: { default: "end", "@media (max-width: 900px)": "start" },
+    minHeight: 32,
+    paddingInline: 10,
+  },
+  hypothesisSummary: { fontFamily: "IBM Plex Mono, monospace", fontSize: 10 },
+  hypothesisPositioner: { zIndex: 80 },
+  hypothesisPopup: {
+    backgroundColor: colors.surfaceRaised,
+    borderColor: colors.lineStrong,
+    borderRadius: radii.lg,
+    borderStyle: "solid",
+    borderWidth: 1,
+    boxShadow: "0 18px 50px rgba(0, 0, 0, 0.32)",
+    color: colors.text,
+    maxWidth: "calc(100vw - 32px)",
+    overflow: "hidden",
+    transformOrigin: "var(--transform-origin)",
+    width: 420,
+  },
+  hypothesisPopupHeader: {
+    borderBottomColor: colors.line,
+    borderBottomStyle: "solid",
+    borderBottomWidth: 1,
+    paddingBlock: space.x4,
+    paddingInline: space.x4,
+  },
+  hypothesisPopupTitle: { fontSize: 14, fontWeight: 600, margin: 0 },
+  hypothesisPopupDescription: {
+    color: colors.textSubtle,
+    fontSize: 12,
+    marginBlock: "4px 0",
+  },
+  hypotheses: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  hypothesis: {
+    borderBottomColor: colors.line,
+    borderBottomStyle: "solid",
+    borderBottomWidth: { default: 1, ":last-child": 0 },
+    display: "flex",
+    flexDirection: "column",
+    gap: 7,
+    paddingBlock: space.x3,
+    paddingInline: space.x4,
   },
   hypothesisDot: {
     backgroundColor: "currentColor",
@@ -204,18 +289,18 @@ const styles = stylex.create({
     height: 6,
     width: 6,
   },
+  hypothesisStatusLine: { alignItems: "center", display: "flex", gap: 7 },
   hypothesisText: {
-    color: colors.text,
-    minWidth: 0,
-    overflowWrap: "anywhere",
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 1.5,
   },
   rejectedText: {
     color: colors.textSubtle,
-    textDecorationLine: "line-through",
   },
   hypothesisStatus: {
-    flexShrink: 0,
     fontFamily: "IBM Plex Mono, monospace",
     fontSize: 10,
+    textTransform: "capitalize",
   },
 });

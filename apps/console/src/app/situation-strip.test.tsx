@@ -1,6 +1,7 @@
 import { IncidentDetail } from "@groundtruth/api-contract";
 import { Hypothesis, HypothesisId, Incident, IncidentId, ProjectId } from "@groundtruth/domain";
 import { Schema } from "effect";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vite-plus/test";
 
@@ -13,6 +14,11 @@ vi.mock("@stylexjs/stylex", () => ({
   props: (...names: ReadonlyArray<string | false>) => ({
     "data-style": names.filter(Boolean).join(" "),
   }),
+}));
+
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) =>
+    createElement("a", { href: to }, children),
 }));
 
 const projectId = ProjectId.make("01890f6e-7c00-7000-8000-000000000001");
@@ -32,7 +38,7 @@ const hypotheses = statuses.map((status, index) =>
 );
 
 describe("HypothesisList", () => {
-  it("makes every current hypothesis and its status visible to the operator", () => {
+  it("renders every hypothesis and status for the disclosure popover", () => {
     const html = renderToStaticMarkup(<HypothesisList hypotheses={hypotheses} />);
 
     expect(html).toContain('aria-label="Incident hypotheses"');
@@ -42,6 +48,7 @@ describe("HypothesisList", () => {
       expect(html).toContain(`>${status}</span>`);
     }
     expect(html).toContain('data-style="hypothesisText rejectedText"');
+    expect(html).not.toContain("line-through");
   });
 });
 
@@ -89,5 +96,9 @@ describe("SituationStrip", () => {
     expect(html).toContain("Closed");
     expect(html).toContain("Checkout latency and error spike");
     expect(html).toContain("Latency recovered after the retry policy was corrected.");
+    expect(html).toContain(
+      'aria-label="View hypotheses: 1 confirmed, 1 testing, 1 proposed, 1 rejected"',
+    );
+    expect(html).toContain(">1 confirmed</span>");
   });
 });
