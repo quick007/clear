@@ -21,10 +21,13 @@ interface DemoModeStorage {
 export const explicitDemoRequested = (search: string) =>
   new URLSearchParams(search).get("demo") === "true";
 
+export const explicitHostedRequested = (search: string) =>
+  new URLSearchParams(search).get("hosted") === "true";
+
 export const forceSandboxForTab = (search: string, storage?: DemoModeStorage) => {
   const searchParams = new URLSearchParams(search);
   const requestedDemo = searchParams.get("demo") === "true";
-  const requestedHosted = searchParams.get("hosted") === "true";
+  const requestedHosted = explicitHostedRequested(search);
   try {
     if (requestedHosted) {
       storage?.removeItem(forceSandboxStorageKey);
@@ -37,21 +40,31 @@ export const forceSandboxForTab = (search: string, storage?: DemoModeStorage) =>
   }
 };
 
-const browserExplicitlyRequestedDemo = () => {
-  if (typeof window === "undefined") return false;
+export const sandboxRequestedForTab = (
+  search: string,
+  sandboxSessionId: string | null,
+  storage?: DemoModeStorage,
+) =>
+  !explicitHostedRequested(search) &&
+  (forceSandboxForTab(search, storage) || sandboxSessionId !== null);
+
+const browserSandboxRequested = (sandboxSessionId: string | null) => {
+  if (typeof window === "undefined") return sandboxSessionId !== null;
   try {
-    return forceSandboxForTab(window.location.search, window.sessionStorage);
+    return sandboxRequestedForTab(window.location.search, sandboxSessionId, window.sessionStorage);
   } catch {
-    return forceSandboxForTab(window.location.search);
+    return sandboxRequestedForTab(window.location.search, sandboxSessionId);
   }
 };
 
 export const getConsoleRuntime = () => {
   runtime ??= (async () => {
     try {
-      const demoRequested = browserExplicitlyRequestedDemo();
       const api = await makeBrowserApiClient();
-      if (!demoRequested) api.access.setSandboxSessionId(null);
+      const demoRequested = browserSandboxRequested(api.access.get().sandboxSessionId);
+      if (typeof window !== "undefined" && explicitHostedRequested(window.location.search)) {
+        api.access.setSandboxSessionId(null);
+      }
       const sessions = await makeToolSessionSource(api, { demoRequested });
       return { api, sessions };
     } catch (error) {

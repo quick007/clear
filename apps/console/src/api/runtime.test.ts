@@ -8,7 +8,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./client", () => ({ makeBrowserApiClient: mocks.makeBrowserApiClient }));
 vi.mock("./session-source", () => ({ makeToolSessionSource: mocks.makeToolSessionSource }));
 
-import { explicitDemoRequested, forceSandboxForTab, getConsoleRuntime } from "./runtime";
+import {
+  explicitDemoRequested,
+  forceSandboxForTab,
+  getConsoleRuntime,
+  sandboxRequestedForTab,
+} from "./runtime";
 import { ConsoleUnexpected } from "../errors";
 
 beforeEach(() => {
@@ -17,10 +22,13 @@ beforeEach(() => {
 });
 
 describe("getConsoleRuntime", () => {
-  it("retries after a transient bootstrap failure", async () => {
+  it("retries bootstrap without discarding an existing sandbox", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const setSandboxSessionId = vi.fn();
-    const api = { id: "api", access: { setSandboxSessionId } };
+    const api = {
+      id: "api",
+      access: { get: () => ({ sandboxSessionId: "sandbox-1" }), setSandboxSessionId },
+    };
     const sessions = { id: "sessions" };
     mocks.makeBrowserApiClient.mockRejectedValueOnce(new Error("temporary failure"));
     mocks.makeBrowserApiClient.mockResolvedValueOnce(api);
@@ -30,7 +38,8 @@ describe("getConsoleRuntime", () => {
     await expect(getConsoleRuntime()).resolves.toEqual({ api, sessions });
     expect(mocks.makeBrowserApiClient).toHaveBeenCalledTimes(2);
     expect(mocks.makeToolSessionSource).toHaveBeenCalledOnce();
-    expect(setSandboxSessionId).toHaveBeenCalledWith(null);
+    expect(mocks.makeToolSessionSource).toHaveBeenCalledWith(api, { demoRequested: true });
+    expect(setSandboxSessionId).not.toHaveBeenCalled();
     expect(consoleError).toHaveBeenCalledWith(
       "[Clear] Console runtime failed",
       expect.objectContaining({ cause: expect.any(Error) }),
@@ -58,5 +67,18 @@ describe("explicitDemoRequested", () => {
     expect(forceSandboxForTab("?guide=true", storage)).toBe(true);
     expect(forceSandboxForTab("?hosted=true", storage)).toBe(false);
     expect(forceSandboxForTab("", storage)).toBe(false);
+  });
+
+  it("keeps an existing anonymous sandbox across full-page route navigation", () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      removeItem: (key: string) => values.delete(key),
+      setItem: (key: string, value: string) => values.set(key, value),
+    };
+
+    expect(sandboxRequestedForTab("?signal=logs", "sandbox-1", storage)).toBe(true);
+    expect(sandboxRequestedForTab("?source=traces", "sandbox-1", storage)).toBe(true);
+    expect(sandboxRequestedForTab("?hosted=true", "sandbox-1", storage)).toBe(false);
   });
 });
