@@ -7,6 +7,7 @@
   "type": "module",
   "scripts": {
     "build": "vp run -r build",
+    "benchmark:grafana": "vp exec node video/benchmarks/compare-webmcp-grafana.mjs",
     "dev": "vp run console#dev",
     "media:prepare:hero": "vp exec node video/scripts/prepare-codex-board-hero.mjs",
     "media:render": "vp exec node video/scripts/render-devpost-assets.mjs",
