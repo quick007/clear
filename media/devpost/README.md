@@ -1,29 +1,28 @@
 # Clear Devpost media
 
-This folder turns real Clear captures and one selectively composited Codex workspace into the final Devpost gallery set. Clear product interfaces always come from screenshots. The renderer adds only a quiet background, a one-pixel edge, and a soft shadow declared in `manifest.json`.
+This folder turns real Clear and Codex captures into the final Devpost gallery set. Product interfaces always come from screenshots. The renderer adds only a quiet background, rounded clipping, and a soft shadow declared in the asset files.
 
 ## Capture sources
 
 Capture product sources at 2560 by 1440 without browser chrome when the surface allows it. Keep the same sandbox session and incident window across the board, trace, log, and recovery images. Reference and derived sources retain the dimensions recorded in the manifest.
 
-| File                                      | Capture                                                          |
-| ----------------------------------------- | ---------------------------------------------------------------- |
-| `sources/homepage.png`                    | Signed-out homepage after the paper shader settles               |
-| `sources/homepage-material.png`           | Shader-only lower edge derived from `homepage.png`               |
-| `sources/homepage-background.png`         | Atmosphere-only homepage at the final 1800 by 1200 canvas        |
-| `sources/board-diagnosis-v2.png`          | Requests elevated, users flat, retries visible                   |
-| `sources/board-agent-pane.png`            | Diagnosed board at the final responsive pane size                |
-| `sources/codex-ui-reference.png`          | User-provided current Codex shell and pane geometry reference    |
-| `sources/codex-conversation-overlay.html` | Editable investigation conversation layer                        |
-| `sources/codex-conversation-overlay.png`  | Browser-rendered conversation pixels using the macOS system font |
-| `sources/hero-workspace.png`              | Selectively composited Codex and Clear workspace                 |
-| `sources/trace-detail-v3.png`             | Three causal attempts in one failed checkout trace               |
-| `sources/log-correlation-v2.png`          | Three logs filtered by the exact selected trace                  |
-| `sources/board-recovery-v2.png`           | Deploy marker with retry layers returning toward baseline        |
+| File                                    | Capture                                                          |
+| --------------------------------------- | ---------------------------------------------------------------- |
+| `sources/homepage.png`                  | Signed-out homepage after the paper shader settles               |
+| `sources/homepage-material.png`         | Shader-only lower edge derived from `homepage.png`               |
+| `sources/homepage-background.png`       | Atmosphere-only homepage at the final 1800 by 1200 canvas        |
+| `sources/board-diagnosis-v3.png`        | Payment requests, failures, and latency crossing thresholds      |
+| `sources/board-agent-pane.png`          | Diagnosed board at the final responsive pane size                |
+| `sources/codex-board-fix.png`           | Real Codex and Clear board screenshot supplied by the user       |
+| `sources/codex-board-fix-hero.png`      | Editorial crop with the original composer moved below the answer |
+| `sources/codex-trace-investigation.png` | Real Codex and Clear trace screenshot supplied by the user       |
+| `sources/trace-detail-v3.png`           | Three causal attempts in one failed checkout trace               |
+| `sources/log-correlation-v2.png`        | Three logs filtered by the exact selected trace                  |
+| `sources/board-resolved-v3.png`         | Closed incident with request and latency recovery visible        |
 
 Do not include keys, tokens, local paths, unrelated browser tabs, or unfinished UI. If a label disagrees with the captured value or points at the wrong evidence, adjust the source before rendering.
 
-`hero-workspace.png` preserves the authentic Codex shell, pane geometry, browser chrome, toolbar controls, and empty composer from the two user-provided captures. The investigation messages are the only authored Codex content and are rendered from HTML with the macOS system font. The existing browser viewport contains the matching responsive Clear board capture.
+`codex-board-fix-hero.png` preserves the supplied Codex and Clear pixels. It removes the response tail that was already hidden behind the composer in the source and moves the original composer upward. It does not recreate Codex chrome, controls, typography, or messages.
 
 ## Final outputs
 
@@ -31,11 +30,11 @@ Do not include keys, tokens, local paths, unrelated browser tabs, or unfinished 
 | ----------------------------------------- | ------------ | ---------------------------------- |
 | `outputs/clear-devpost-thumbnail.jpg`     | 1800 by 1200 | Project card and gallery thumbnail |
 | `outputs/clear-devpost-hero.png`          | 1800 by 1200 | Codex and Clear hero workspace     |
-| `outputs/clear-board-reveal.png`          | 1920 by 1080 | Retry-storm evidence               |
-| `outputs/clear-agent-collaboration.png`   | 1920 by 1080 | Shared human-agent investigation   |
-| `outputs/clear-trace-log-correlation.png` | 1920 by 1080 | Logs from one exact trace          |
-| `outputs/clear-deploy-recovery.png`       | 1920 by 1080 | Deploy marker and visible recovery |
-| `outputs/clear-trace-poc-v2.png`          | 1920 by 1080 | Causal three-attempt waterfall     |
+| `outputs/clear-board-reveal.png`          | 1800 by 1200 | Retry-storm evidence               |
+| `outputs/clear-agent-collaboration.png`   | 1800 by 1200 | Shared human-agent investigation   |
+| `outputs/clear-trace-log-correlation.png` | 1800 by 1200 | Logs from one exact trace          |
+| `outputs/clear-deploy-recovery.png`       | 1800 by 1200 | Deploy marker and visible recovery |
+| `outputs/clear-trace-poc-v2.png`          | 1800 by 1200 | Causal three-attempt waterfall     |
 
 ## Render workflow
 

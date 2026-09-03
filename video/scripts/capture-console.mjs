@@ -27,6 +27,7 @@ const height = Number(required("height"));
 const targetUrl = required("url");
 const output = resolve(repositoryRoot, required("output"));
 const sessionId = required("session");
+const clientRoute = args.route;
 const waitForText = args["wait-for"] ?? "Checkout operations";
 const minimumCanvasCount = Number(args["min-canvases"] ?? 2);
 
@@ -131,6 +132,19 @@ try {
     `,
   });
   await send("Page.navigate", { url: targetUrl });
+
+  await evaluate(`
+    new Promise((resolveReady) => {
+      if (document.readyState === "complete") resolveReady(true);
+      else window.addEventListener("load", () => resolveReady(true), { once: true });
+    })
+  `);
+  if (clientRoute !== undefined) {
+    await evaluate(`
+      history.pushState({}, "", ${JSON.stringify(clientRoute)});
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    `);
+  }
 
   await evaluate(`
     new Promise((resolveReady, rejectReady) => {

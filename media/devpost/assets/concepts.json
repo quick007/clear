@@ -3,7 +3,7 @@
     "id": "trace-poc-v2",
     "description": "One failed checkout trace with three causal, non-overlapping attempts.",
     "output": "clear-trace-poc-v2.png",
-    "canvas": { "width": 1920, "height": 1080, "background": "#080a0b" },
+    "canvas": { "width": 1800, "height": 1200, "background": "#080a0b" },
     "format": { "type": "png", "compressionLevel": 9 },
     "maxBytes": 10000000,
     "layers": [
@@ -11,23 +11,22 @@
         "source": "auroraBackground02",
         "x": 0,
         "y": 0,
-        "width": 1920,
-        "height": 1080,
+        "width": 1800,
+        "height": 1200,
         "fit": "cover",
         "position": "centre",
         "style": { "modulate": { "brightness": 0.62, "saturation": 0.74 } }
       },
       {
         "source": "traceDetail",
-        "x": 96,
-        "y": 54,
-        "width": 1728,
-        "height": 972,
+        "x": 90,
+        "y": 144,
+        "width": 1620,
+        "height": 911,
         "fit": "contain",
         "position": "centre",
         "style": {
           "borderRadius": 16,
-          "border": { "width": 1, "color": "#ffffff", "opacity": 0.08 },
           "shadow": {
             "x": 0,
             "y": 24,

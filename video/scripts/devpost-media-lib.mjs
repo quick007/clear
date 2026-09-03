@@ -10,10 +10,10 @@ export const defaultManifestPath = resolve(scriptDirectory, "../../media/devpost
 const expectedAssets = new Map([
   ["homepage-thumbnail", [1800, 1200, "clear-devpost-thumbnail.jpg"]],
   ["devpost-hero", [1800, 1200, "clear-devpost-hero.png"]],
-  ["board-reveal", [1920, 1080, "clear-board-reveal.png"]],
-  ["agent-collaboration", [1920, 1080, "clear-agent-collaboration.png"]],
-  ["trace-log-correlation", [1920, 1080, "clear-trace-log-correlation.png"]],
-  ["deploy-recovery", [1920, 1080, "clear-deploy-recovery.png"]],
+  ["board-reveal", [1800, 1200, "clear-board-reveal.png"]],
+  ["agent-collaboration", [1800, 1200, "clear-agent-collaboration.png"]],
+  ["trace-log-correlation", [1800, 1200, "clear-trace-log-correlation.png"]],
+  ["deploy-recovery", [1800, 1200, "clear-deploy-recovery.png"]],
 ]);
 
 const expectedSources = [

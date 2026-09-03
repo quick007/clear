@@ -39,7 +39,6 @@ const severityColors = {
 } as const;
 const severityRank = { critical: 3, warning: 2, info: 1 } as const;
 const thresholdLabelBudget = 2;
-const annotationLabelBudget = 2;
 
 export function MetricChart({ accessibleName, summary, ...input }: MetricChartProps) {
   const descriptionId = useId();
@@ -113,13 +112,6 @@ const chartOption = (
       .slice(0, thresholdLabelBudget)
       .map(({ index }) => index),
   );
-  const labeledAnnotations = new Set(
-    model.annotations
-      .map((annotation, index) => ({ atMs: annotation.atMs, index }))
-      .toSorted((left, right) => right.atMs - left.atMs)
-      .slice(0, annotationLabelBudget)
-      .map(({ index }) => index),
-  );
   const thresholdMarks = model.thresholds.map((threshold, index) => ({
     axis: threshold.axis,
     name: threshold.label ?? threshold.severity,
@@ -139,7 +131,7 @@ const chartOption = (
       show: labeledThresholds.has(index),
     },
   }));
-  const annotationMarks = model.annotations.map((annotation, index) => ({
+  const annotationMarks = model.annotations.map((annotation) => ({
     name: annotation.label,
     xAxis: annotation.atMs,
     lineStyle: {
@@ -153,7 +145,7 @@ const chartOption = (
       fontSize: 10,
       formatter: annotation.label,
       position: "insideEndTop" as const,
-      show: labeledAnnotations.has(index),
+      show: false,
     },
   }));
   const thresholdOwnerAxes = new Set<string>();

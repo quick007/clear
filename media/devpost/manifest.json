@@ -41,15 +41,15 @@
       }
     },
     "boardReveal": {
-      "file": "board-diagnosis-v2.png",
-      "description": "Clear board after the agent creates the requests-versus-users and retry-attempt panels.",
+      "file": "board-diagnosis-v3.png",
+      "description": "Clear board as the payment request alert and checkout latency cross their thresholds.",
       "capture": {
         "route": "/board",
         "viewport": {
           "width": 1910,
           "height": 1074
         },
-        "state": "Amplification active, unique users flat, attempts two and three adding exactly two extra upstream layers."
+        "state": "Fresh sandbox with payment requests, failures, and latency rising together after the upstream failure."
       }
     },
     "codexAgent": {
@@ -148,6 +148,42 @@
         "state": "Codex shell, pane geometry, browser chrome, toolbar controls, and composer are preserved from real captures. Only the conversation content and browser viewport are replaced."
       }
     },
+    "codexBoardFix": {
+      "file": "codex-board-fix.png",
+      "description": "User-provided Codex and Clear workspace showing the retry diagnosis and a request to open a pull request.",
+      "capture": {
+        "route": "Codex desktop task with clear.seufert.sh open on the right",
+        "viewport": {
+          "width": 3456,
+          "height": 2170
+        },
+        "state": "Two visible investigation turns, a concise evidence table, and the live Clear board at 90 percent browser zoom."
+      }
+    },
+    "codexBoardHero": {
+      "file": "codex-board-fix-hero.png",
+      "description": "Editorial crop of the user-provided Codex and Clear workspace with the composer moved below the final complete finding.",
+      "capture": {
+        "route": "Prepared from sources/codex-board-fix.png without recreating Codex UI",
+        "viewport": {
+          "width": 3456,
+          "height": 2170
+        },
+        "state": "The original application pixels are preserved while the obscured tail of the response is removed and the original composer is moved upward."
+      }
+    },
+    "codexTraceInvestigation": {
+      "file": "codex-trace-investigation.png",
+      "description": "User-provided Codex and Clear workspace showing a failed trace and the proposed bounded-retry fix.",
+      "capture": {
+        "route": "Codex desktop task with clear.seufert.sh open on the right",
+        "viewport": {
+          "width": 3456,
+          "height": 2170
+        },
+        "state": "Two visible investigation turns and the exact three-attempt trace at 90 percent browser zoom."
+      }
+    },
     "traceDetail": {
       "file": "trace-detail-v3.png",
       "description": "The redesigned trace detail view showing a failed checkout request and three causal attempts.",
@@ -173,15 +209,15 @@
       }
     },
     "recoveryBoard": {
-      "file": "board-recovery-v2.png",
-      "description": "Clear board after the checkout deploy, with its marker and recovery visible.",
+      "file": "board-resolved-v3.png",
+      "description": "Clear board after the sandbox incident is resolved and telemetry returns to baseline.",
       "capture": {
         "route": "/board",
         "viewport": {
           "width": 1910,
           "height": 1074
         },
-        "state": "Deploy event present, retry layers collapsing, and upstream request volume returning toward baseline."
+        "state": "Incident closed, deploy marker visible, failures cleared, and payment request volume and latency back at baseline."
       }
     },
     "auroraBackground07": {
