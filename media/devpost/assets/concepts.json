@@ -40,5 +40,46 @@
       }
     ],
     "editorial": { "theme": "dark" }
+  },
+  {
+    "id": "benchmark-evidence",
+    "description": "Measured workflow, request-body, and persisted-update comparisons in a single evidence card.",
+    "output": "clear-webmcp-benchmark.png",
+    "canvas": { "width": 1800, "height": 1200, "background": "#080a0b" },
+    "format": { "type": "png", "compressionLevel": 9 },
+    "maxBytes": 5000000,
+    "layers": [
+      {
+        "source": "benchmarkBackground",
+        "x": 0,
+        "y": 0,
+        "width": 1800,
+        "height": 1200,
+        "fit": "cover",
+        "position": "centre",
+        "style": { "modulate": { "brightness": 0.6, "saturation": 0.74 } }
+      },
+      {
+        "source": "benchmarkCard",
+        "x": 90,
+        "y": 144,
+        "width": 1620,
+        "height": 911,
+        "fit": "contain",
+        "position": "centre",
+        "style": {
+          "borderRadius": 16,
+          "shadow": {
+            "x": 0,
+            "y": 24,
+            "blur": 60,
+            "spread": 0,
+            "color": "#020607",
+            "opacity": 0.34
+          }
+        }
+      }
+    ],
+    "editorial": { "theme": "dark" }
   }
 ]

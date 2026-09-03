@@ -20,6 +20,8 @@ Capture product sources at 2560 by 1440 without browser chrome when the surface 
 | `sources/trace-detail-v3.png`                | Three causal attempts in one failed checkout trace               |
 | `sources/log-correlation-v2.png`             | Three logs filtered by the exact selected trace                  |
 | `sources/board-resolved-v3.png`              | Closed incident with request and latency recovery visible        |
+| `sources/benchmark-background.png`           | User-provided atmosphere for the benchmark evidence card         |
+| `sources/benchmark-card.png`                 | Evidence card generated from the checked-in benchmark results    |
 
 Do not include keys, tokens, local paths, unrelated browser tabs, or unfinished UI. If a label disagrees with the captured value or points at the wrong evidence, adjust the source before rendering.
 
@@ -36,6 +38,7 @@ The prepared Codex sources preserve the supplied Codex and Clear pixels. They mo
 | `outputs/clear-trace-log-correlation.png` | 1800 by 1200 | Logs from one exact trace          |
 | `outputs/clear-deploy-recovery.png`       | 1800 by 1200 | Deploy marker and visible recovery |
 | `outputs/clear-trace-poc-v2.png`          | 1800 by 1200 | Causal three-attempt waterfall     |
+| `outputs/clear-webmcp-benchmark.png`      | 1800 by 1200 | Measured workflow comparison       |
 
 ## Render workflow
 
@@ -43,6 +46,7 @@ From the repository root:
 
 ```bash
 vp run media:prepare:hero
+vp run media:prepare:benchmark
 vp run media:validate:manifest
 vp run media:render
 vp run media:validate

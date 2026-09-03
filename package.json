@@ -10,6 +10,7 @@
     "benchmark:grafana": "vp exec node video/benchmarks/compare-webmcp-grafana.mjs",
     "dev": "vp run console#dev",
     "media:prepare:hero": "vp exec node video/scripts/prepare-codex-board-hero.mjs",
+    "media:prepare:benchmark": "vp exec node video/scripts/prepare-benchmark-card.mjs",
     "media:render": "vp exec node video/scripts/render-devpost-assets.mjs",
     "media:validate": "vp exec node video/scripts/validate-devpost-assets.mjs",
     "media:validate:manifest": "vp exec node video/scripts/validate-devpost-assets.mjs --manifest-only",
