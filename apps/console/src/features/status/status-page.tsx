@@ -23,6 +23,7 @@ import {
 } from "./public-status-model";
 
 export const statusChartSlotHeight = 250;
+export const statusMetricEmptyHeight = 132;
 
 export function StatusPage() {
   const status = usePublicStatusQuery();
@@ -84,6 +85,9 @@ function StatusContent({
   readonly retry: () => void;
 }) {
   const presentation = publicStatusPresentation[data.status];
+  const metricsUnavailable = data.components.some(
+    (component) => component.key === "storage" && component.status !== "operational",
+  );
   return (
     <>
       <section aria-labelledby="status-heading" {...stylex.props(styles.hero)}>
@@ -134,7 +138,7 @@ function StatusContent({
         </div>
         <div {...stylex.props(styles.metricGrid)}>
           {data.metrics.map((metric) => (
-            <MetricCard key={metric.key} metric={metric} />
+            <MetricCard key={metric.key} metric={metric} unavailable={metricsUnavailable} />
           ))}
         </div>
       </section>
@@ -170,7 +174,13 @@ function ComponentRow({ component }: { readonly component: PublicStatusComponent
   );
 }
 
-function MetricCard({ metric }: { readonly metric: PublicStatusMetric }) {
+function MetricCard({
+  metric,
+  unavailable,
+}: {
+  readonly metric: PublicStatusMetric;
+  readonly unavailable: boolean;
+}) {
   const series = publicMetricSeries(metric);
   const axis = publicMetricAxis(metric);
   const latest = latestMetricValue(metric);
@@ -200,8 +210,12 @@ function MetricCard({ metric }: { readonly metric: PublicStatusMetric }) {
         </div>
       ) : (
         <div role="status" {...stylex.props(styles.metricEmpty)}>
-          <span>No recent samples</span>
-          <small>This signal will appear after the next telemetry export.</small>
+          <span>{unavailable ? "Recent samples unavailable" : "No recent samples"}</span>
+          <small>
+            {unavailable
+              ? "Clear could not retrieve this signal. It will retry automatically."
+              : "This signal will appear after the next telemetry export."}
+          </small>
         </div>
       )}
       {hasData ? (
@@ -380,7 +394,6 @@ const styles = stylex.create({
     borderRadius: radii.lg,
     borderStyle: "solid",
     borderWidth: 1,
-    minHeight: 390,
     padding: { default: 22, "@media (max-width: 620px)": 16 },
   },
   metricHeader: { display: "flex", gap: 16, justifyContent: "space-between", minHeight: 68 },
@@ -410,7 +423,7 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     gap: 5,
-    height: 250,
+    height: statusMetricEmptyHeight,
     justifyContent: "center",
     textAlign: "center",
   },

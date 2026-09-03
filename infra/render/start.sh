@@ -87,6 +87,36 @@ start_clickhouse() {
     --user groundtruth \
     --password "$clickhouse_password" \
     --query "SELECT 1"
+
+  # The hosted config disables ClickHouse's internal system log tables because
+  # Render already retains process logs. Remove tables left by older releases so
+  # their thousands of tiny parts cannot keep consuming merge memory after boot.
+  local table
+  for table in \
+    asynchronous_insert_log \
+    asynchronous_metric_log \
+    backup_log \
+    crash_log \
+    error_log \
+    latency_log \
+    metric_log \
+    opentelemetry_span_log \
+    part_log \
+    processors_profile_log \
+    query_log \
+    query_metric_log \
+    query_thread_log \
+    query_views_log \
+    session_log \
+    text_log \
+    trace_log \
+    zookeeper_log; do
+    clickhouse-client \
+      --host 127.0.0.1 \
+      --user groundtruth \
+      --password "$clickhouse_password" \
+      --query "DROP TABLE IF EXISTS system.$table SYNC"
+  done
 }
 
 configure_application() {

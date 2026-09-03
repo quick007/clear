@@ -205,11 +205,7 @@ export const PublicStatusHandlers = HttpApiBuilder.group(
         observedAt: checkedAt,
       });
       const intake = telemetryComponent(result.health);
-      const storage = storageComponent(checkedAt, [
-        result.health,
-        result.requestRate,
-        result.latency,
-      ]);
+      const storage = storageComponent(checkedAt, [result.requestRate, result.latency]);
       const status =
         intake.status === "operational" && storage.status === "operational"
           ? "operational"

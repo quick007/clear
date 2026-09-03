@@ -34,6 +34,7 @@ interface HarnessOptions {
   readonly accountFailure?: PersistenceError;
   readonly metricNotFound?: boolean;
   readonly metricUnavailable?: boolean;
+  readonly signalHealthUnavailable?: boolean;
   readonly signalHealth?: ReadonlyArray<SignalHealth>;
 }
 
@@ -170,7 +171,17 @@ const makeHarness = (options: HarnessOptions = {}) =>
       signalHealth: (projectId) =>
         Ref.update(healthCalls, (count) => count + 1).pipe(
           Effect.andThen(Ref.update(telemetryProjects, (seen) => [...seen, String(projectId)])),
-          Effect.andThen(Effect.succeed(options.signalHealth ?? defaultSignalHealth)),
+          Effect.andThen(
+            options.signalHealthUnavailable === true
+              ? Effect.fail(
+                  new TelemetryUnavailable({
+                    operation: "private signal activity query",
+                    retryable: true,
+                    message: "Private signal activity lookup failed",
+                  }),
+                )
+              : Effect.succeed(options.signalHealth ?? defaultSignalHealth),
+          ),
         ),
       queryMetrics: (projectId, query) =>
         Effect.gen(function* () {
@@ -412,7 +423,7 @@ describe("public status handler", () => {
     ),
   );
 
-  it.effect("degrades storage without exposing telemetry query failures", () =>
+  it.effect("marks storage unavailable without exposing telemetry query failures", () =>
     Effect.acquireUseRelease(
       makeHarness({ metricUnavailable: true }),
       ({ handler }) =>
@@ -424,7 +435,7 @@ describe("public status handler", () => {
           assert.strictEqual(status.status, "degraded");
           assert.strictEqual(
             status.components.find(({ key }) => key === "storage")?.status,
-            "degraded",
+            "unavailable",
           );
           assert.deepStrictEqual(
             status.metrics.map(({ status: metricStatus }) => metricStatus),
@@ -432,6 +443,34 @@ describe("public status handler", () => {
           );
           const encoded = JSON.stringify(unknown);
           assert.strictEqual(/private ClickHouse|host and query failed/.test(encoded), false);
+        }),
+      ({ dispose }) => Effect.promise(dispose),
+    ),
+  );
+
+  it.effect("does not report a second storage incident when only intake health fails", () =>
+    Effect.acquireUseRelease(
+      makeHarness({ signalHealthUnavailable: true }),
+      ({ handler }) =>
+        Effect.gen(function* () {
+          const response = yield* getStatus(handler);
+          assert.strictEqual(response.status, 200);
+          const unknown = yield* Effect.promise(() => response.json());
+          const status = yield* Schema.decodeUnknownEffect(PublicStatusResponse)(unknown);
+
+          assert.strictEqual(status.status, "degraded");
+          assert.strictEqual(
+            status.components.find(({ key }) => key === "telemetry")?.status,
+            "unavailable",
+          );
+          assert.strictEqual(
+            status.components.find(({ key }) => key === "storage")?.status,
+            "operational",
+          );
+          assert.strictEqual(
+            /private signal activity|lookup failed/.test(JSON.stringify(unknown)),
+            false,
+          );
         }),
       ({ dispose }) => Effect.promise(dispose),
     ),

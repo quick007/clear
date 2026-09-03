@@ -10,6 +10,28 @@
     <background_move_pool_size>1</background_move_pool_size>
     <max_connections>50</max_connections>
 
+    <!-- Render already retains process logs. ClickHouse system log tables create
+         hundreds of tiny MergeTree parts under this ingest-heavy workload, which
+         can exhaust the all-in-one instance while merging their own diagnostics. -->
+    <asynchronous_insert_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <backup_log remove="1"/>
+    <crash_log remove="1"/>
+    <error_log remove="1"/>
+    <latency_log remove="1"/>
+    <metric_log remove="1"/>
+    <opentelemetry_span_log remove="1"/>
+    <part_log remove="1"/>
+    <processors_profile_log remove="1"/>
+    <query_log remove="1"/>
+    <query_metric_log remove="1"/>
+    <query_thread_log remove="1"/>
+    <query_views_log remove="1"/>
+    <session_log remove="1"/>
+    <text_log remove="1"/>
+    <trace_log remove="1"/>
+    <zookeeper_log remove="1"/>
+
     <merge_tree>
         <number_of_free_entries_in_pool_to_lower_max_size_of_merge>2</number_of_free_entries_in_pool_to_lower_max_size_of_merge>
         <number_of_free_entries_in_pool_to_execute_mutation>1</number_of_free_entries_in_pool_to_execute_mutation>
